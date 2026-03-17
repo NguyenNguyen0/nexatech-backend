@@ -1,16 +1,16 @@
 # NexaTech Backend
 
 ## Build
-.PHONY: build clean infra-up infra-down up down logs
+.PHONY: build clean compile infra-up infra-down up down logs rebuild reset
 
 build:
-	cd nexatech-backend && mvn clean package -DskipTests
+	mvn clean package -DskipTests
 
 clean:
-	cd nexatech-backend && mvn clean
+	mvn clean
 
 compile:
-	cd nexatech-backend && mvn clean compile
+	mvn clean compile
 
 ## Docker - Infrastructure only
 infra-up:

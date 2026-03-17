@@ -272,6 +272,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - nexatech-net
 
@@ -324,6 +326,8 @@ services:
       mongodb:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - nexatech-net
@@ -380,6 +384,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - nexatech-net
 
@@ -427,9 +433,10 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-nexatech123}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - SPRING_MAIL_HOST=${MAIL_HOST:-smtp.gmail.com}
+      - SPRING_MAIL_PORT=${MAIL_PORT:-587}
       - SPRING_MAIL_USERNAME=${MAIL_USERNAME:-}
-      - JAVA_TOOL_OPTIONS=-Xmx200m
       - SPRING_MAIL_PASSWORD=${MAIL_PASSWORD:-}
+      - JAVA_TOOL_OPTIONS=-Xmx200m
     depends_on:
       config-server:
         condition: service_healthy
