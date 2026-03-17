@@ -1,0 +1,86 @@
+_format_version: "3.0"
+
+services:
+  - name: identity-service
+    url: http://identity-service:8081
+    routes:
+      - name: identity-route
+        paths:
+          - /api/v1/auth
+        strip_path: false
+
+  - name: user-service
+    url: http://user-service:8082
+    routes:
+      - name: user-route
+        paths:
+          - /api/v1/users
+        strip_path: false
+
+  - name: product-service
+    url: http://product-service:8083
+    routes:
+      - name: product-route
+        paths:
+          - /api/v1/products
+          - /api/v1/categories
+        strip_path: false
+
+  - name: order-service
+    url: http://order-service:8084
+    routes:
+      - name: order-route
+        paths:
+          - /api/v1/orders
+        strip_path: false
+
+  - name: inventory-service
+    url: http://inventory-service:8085
+    routes:
+      - name: inventory-route
+        paths:
+          - /api/v1/inventory
+        strip_path: false
+
+  - name: payment-service
+    url: http://payment-service:8086
+    routes:
+      - name: payment-route
+        paths:
+          - /api/v1/payments
+        strip_path: false
+
+  - name: notification-service
+    url: http://notification-service:8087
+    routes:
+      - name: notification-route
+        paths:
+          - /api/v1/notifications
+        strip_path: false
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - http://localhost:3000
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Content-Type
+        - Authorization
+        - X-User-Id
+        - X-User-Role
+        - X-User-Email
+      exposed_headers:
+        - X-Total-Count
+      max_age: 3600
+
+  - name: rate-limiting
+    config:
+      minute: 100
+      policy: local
