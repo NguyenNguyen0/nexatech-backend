@@ -20,7 +20,8 @@ import lombok.experimental.FieldDefaults;
 public class Role extends BaseEntity {
 
     @Column(nullable = false)
-    UUID userId;
+    @Id
+    UUID id;
 
     @Column(unique = true, nullable = false)
     String name;

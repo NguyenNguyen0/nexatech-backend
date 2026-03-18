@@ -19,7 +19,8 @@ import lombok.experimental.FieldDefaults;
 public class Address extends BaseEntity {
 
     @Column(nullable = false)
-    UUID userId;
+    @Id
+    UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

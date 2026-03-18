@@ -20,7 +20,8 @@ import com.nexatech.user.model.constant.Gender;
 public class User extends BaseEntity {
 
     @Column(nullable = false)
-    UUID userId;
+    @Id
+    UUID id;
 
     @Column(name = "keycloak_id", unique = true, nullable = false)
     String keycloakId;
