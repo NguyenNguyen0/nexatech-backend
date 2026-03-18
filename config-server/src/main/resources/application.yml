@@ -15,8 +15,7 @@ spring:
 eureka:
   client:
     service-url:
-      # Local fallback to avoid placeholder resolution failure
-      defaultZone: http://${EUREKA_INSTANCE_HOSTNAME:localhost}:8761/eureka/
+      defaultZone: http://${EUREKA_INSTANCE_HOSTNAME}:8761/eureka/
 
 management:
   endpoints:
