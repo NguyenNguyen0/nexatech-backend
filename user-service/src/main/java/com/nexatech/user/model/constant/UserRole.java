@@ -1,4 +1,4 @@
-package com.nexatech.user.enums;
+package com.nexatech.user.model.constant;
 
 public enum UserRole {
     ADMIN,

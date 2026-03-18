@@ -1,10 +1,11 @@
 package com.nexatech.user.dto;
 
-import com.nexatech.user.enums.UserRole;
 import lombok.Builder;
 import lombok.Data;
 
 import java.util.UUID;
+
+import com.nexatech.user.model.constant.UserRole;
 
 @Data
 @Builder
