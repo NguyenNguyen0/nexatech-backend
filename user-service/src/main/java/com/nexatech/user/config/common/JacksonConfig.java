@@ -1,4 +1,4 @@
-package com.nexatech.user.config;
+package com.nexatech.user.config.common;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
