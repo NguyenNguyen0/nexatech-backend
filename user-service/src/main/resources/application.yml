@@ -2,6 +2,4 @@ spring:
   application:
     name: user-service
   config:
-    # Spring Cloud Config (ConfigData import)
-    # Prefix must include the Config Server base URL, otherwise Spring can't resolve the location.
-    import: "configserver:${CONFIG_SERVER_URI:http://localhost:8081}/"
+    import: "configserver:${CONFIG_SERVER_URI}/"
