@@ -9,11 +9,10 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
   flyway:
-    enabled: true
-    locations: classpath:db/migration
+    enabled: false
   kafka:
     bootstrap-servers: localhost:9092
     producer:
@@ -26,3 +25,11 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: com.nexatech.*
+        # Tăng timeout để tránh crash khi Kafka khởi động chậm hơn service
+        request.timeout.ms: 30000
+        default.api.timeout.ms: 30000
+        reconnect.backoff.ms: 1000
+        reconnect.backoff.max.ms: 10000
+    listener:
+      # Không crash khi topic chưa được tạo (Kafka tự tạo topic qua KAFKA_AUTO_CREATE_TOPICS_ENABLE)
+      missing-topics-fatal: false

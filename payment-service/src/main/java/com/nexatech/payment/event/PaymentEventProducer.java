@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PaymentEventProducer {
 
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final KafkaTemplate<Object, Object> kafkaTemplate;
 
     public void publishPaymentEvent(PaymentEvent event) {
         kafkaTemplate.send("payment.events", event.getOrderId().toString(), event);

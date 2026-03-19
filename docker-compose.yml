@@ -161,8 +161,17 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      # Bật 4-letter commands để healthcheck và monitoring hoạt động
+      ZOOKEEPER_4LW_COMMANDS_WHITELIST: "ruok,srvr,stat,mntr"
     ports:
       - "2181:2181"
+    healthcheck:
+      # Dùng bash built-in TCP để kiểm tra ZooKeeper không cần nc/curl
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/2181 && echo ruok >&3 && cat <&3' | grep -q imok"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 20s
     networks:
       - nexatech-net
 
@@ -170,7 +179,8 @@ services:
     image: confluentinc/cp-kafka:7.6.0
     container_name: nexatech-kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy   # Đợi ZooKeeper healthy thật sự, không chỉ started
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -181,7 +191,9 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_HEAP_OPTS: "-Xmx256m -Xms128m"
+      KAFKA_ZOOKEEPER_SESSION_TIMEOUT_MS: 60000      # Tăng session timeout để tránh race condition
+      KAFKA_ZOOKEEPER_CONNECTION_TIMEOUT_MS: 60000   # Tăng connection timeout
+      KAFKA_HEAP_OPTS: "-Xmx512m -Xms256m"           # Tăng heap (256m quá thấp gây GC stall)
     ports:
       - "9092:9092"
     healthcheck:
