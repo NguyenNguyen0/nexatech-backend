@@ -148,6 +148,32 @@ public class UserServiceImpl implements UserService {
             userMapper.updateUser(user, dto);
         }
 
+        try {
+            TokenExchangeResponse token = keycloakClient.exchangeToken(
+                    realm,
+                    TokenExchangeParam.builder()
+                            .grant_type("client_credentials")
+                            .client_id(clientId)
+                            .client_secret(clientSecret)
+                            .scope("openid")
+                            .build());
+
+            keycloakClient.updateUser(
+                    realm,
+                    user.getId(),
+                    "Bearer " + token.getAccessToken(),
+                    UserCreationParam.builder()
+                            .username(user.getUsername())
+                            .firstName(user.getFirstName())
+                            .lastName(user.getLastName())
+                            .email(user.getEmail())
+                            .enabled(true)
+                            .emailVerified(false)
+                            .build());
+        } catch (FeignException exception) {
+            throw errorNormalizer.handleKeyCloakException(exception);
+        }
+
         return userMapper.toResponse(userRepository.save(user));
     }
 

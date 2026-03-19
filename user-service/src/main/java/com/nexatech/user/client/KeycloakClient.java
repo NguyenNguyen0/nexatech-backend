@@ -3,6 +3,7 @@ package com.nexatech.user.client;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
@@ -28,4 +29,11 @@ public interface KeycloakClient {
 
     @PostMapping(value = "/realms/{realm-name}/protocol/openid-connect/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     UserTokenExchangeResponse exchangeUserToken(@PathVariable("realm-name") String realm, @QueryMap UserTokenExchangeParam param);
+
+    @PutMapping(value = "/admin/realms/{realm-name}/users/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<?> updateUser(
+            @PathVariable("realm-name") String realm,
+            @PathVariable("id") String id,
+            @RequestHeader("authorization") String token,
+            @RequestBody UserCreationParam param);
 }
