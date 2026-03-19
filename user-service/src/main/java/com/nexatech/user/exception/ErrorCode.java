@@ -10,6 +10,10 @@ public enum ErrorCode {
     UNCATEGORIZED_EXCEPTION(9999, "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR),
     UNAUTHENTICATED(1001, "Unauthenticated", HttpStatus.UNAUTHORIZED),
     UNAUTHORIZED(1002, "You do not have permission", HttpStatus.FORBIDDEN),
+    USER_NOT_FOUND(2001, "User not found", HttpStatus.NOT_FOUND),
+    USER_EMAIL_EXISTS(2002, "Email already exists", HttpStatus.BAD_REQUEST),
+    INVALID_UUID(2003, "Invalid id format", HttpStatus.BAD_REQUEST),
+    ROLE_NOT_FOUND(2004, "Role not found", HttpStatus.BAD_REQUEST),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

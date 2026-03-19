@@ -1,7 +1,124 @@
 package com.nexatech.user.service.impl;
 
+import java.util.List;
+import java.util.UUID;
+
+import com.nexatech.user.dto.keycloak.LoginRequest;
+import com.nexatech.user.dto.keycloak.UserTokenExchangeResponse;
+import com.nexatech.user.dto.request.UserCreationRequest;
+import com.nexatech.user.dto.request.UserUpdatenRequest;
+import com.nexatech.user.dto.response.UserResponse;
+import com.nexatech.user.exception.AppException;
+import com.nexatech.user.exception.ErrorCode;
+import com.nexatech.user.mapper.UserMapper;
+import com.nexatech.user.model.Role;
+import com.nexatech.user.model.User;
+import com.nexatech.user.repository.RoleRepository;
+import com.nexatech.user.repository.UserRepository;
 import com.nexatech.user.service.UserService;
 
+import org.springframework.stereotype.Service;
+
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+
+@Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class UserServiceImpl implements UserService {
+
+    UserRepository userRepository;
+    RoleRepository roleRepository;
+    UserMapper userMapper;
+
+    @Override
+    public UserResponse createUser(UserCreationRequest request) {
+        if (request == null || request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+        }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new AppException(ErrorCode.USER_EMAIL_EXISTS);
+        }
+
+        User user = userMapper.toUser(request);
+        user.setId(UUID.randomUUID());
+
+        // No Keycloak yet: generate a unique placeholder to satisfy DB constraint.
+        user.setKeycloakId("local-" + UUID.randomUUID());
+
+        user.setOnBoarded(request.getOnBoarded() != null ? request.getOnBoarded() : Boolean.FALSE);
+
+        if (request.getRoleId() != null) {
+            Role role = roleRepository.findById(request.getRoleId())
+                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+            user.setRole(role);
+        }
+
+        return userMapper.toResponse(userRepository.save(user));
+    }
+
+    @Override
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAllByActiveTrue()
+                .stream()
+                .map(userMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    public UserResponse getUserById(String id) {
+        UUID userId = parseUuid(id);
+        User user = userRepository.findByIdAndActiveTrue(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return userMapper.toResponse(user);
+    }
+
+    @Override
+    public UserResponse updateUser(String id, UserUpdatenRequest dto) {
+        UUID userId = parseUuid(id);
+        User user = userRepository.findByIdAndActiveTrue(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        if (dto != null && dto.getEmail() != null && !dto.getEmail().isBlank()) {
+            if (!dto.getEmail().equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(dto.getEmail())) {
+                throw new AppException(ErrorCode.USER_EMAIL_EXISTS);
+            }
+        }
+
+        if (dto != null && dto.getRoleId() != null) {
+            Role role = roleRepository.findById(dto.getRoleId())
+                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+            user.setRole(role);
+        }
+
+        if (dto != null) {
+            userMapper.updateUser(user, dto);
+        }
+
+        return userMapper.toResponse(userRepository.save(user));
+    }
+
+    @Override
+    public void deleteUser(String id) {
+        UUID userId = parseUuid(id);
+        User user = userRepository.findByIdAndActiveTrue(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        user.setActive(false);
+        userRepository.save(user);
+    }
+
+    @Override
+    public UserTokenExchangeResponse login(LoginRequest request) {
+        throw new UnsupportedOperationException("Keycloak login is not implemented yet");
+    }
     
+    private UUID parseUuid(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.INVALID_UUID);
+        }
+    }
 }

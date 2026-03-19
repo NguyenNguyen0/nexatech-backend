@@ -2,10 +2,12 @@ package com.nexatech.user.exception;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import com.nexatech.user.dto.base.ApiResponse;
 
+@RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(AppException.class)
@@ -15,16 +17,16 @@ public class GlobalExceptionHandler {
                 .code(errorCode.getCode())
                 .message(errorCode.getMessage())
                 .build();
-        return ResponseEntity.status(errorCode.getCode()).body(response);
+        return ResponseEntity.status(errorCode.getStatusCode()).body(response);
     }
 
     @ExceptionHandler(value = Exception.class)
-    ResponseEntity<ApiResponse<Void>> handlingRuntimeException(RuntimeException exception) {
+    ResponseEntity<ApiResponse<Void>> handlingRuntimeException(Exception exception) {
         ApiResponse<Void> response = ApiResponse.<Void>builder()
                 .code(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode())
                 .message(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage())
                 .build();
-        return ResponseEntity.badRequest().body(response);
+        return ResponseEntity.status(ErrorCode.UNCATEGORIZED_EXCEPTION.getStatusCode()).body(response);
     }
 
     @ExceptionHandler(value = AccessDeniedException.class)
