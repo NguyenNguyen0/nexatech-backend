@@ -10,6 +10,7 @@ import com.nexatech.user.dto.keycloak.TokenExchangeResponse;
 import com.nexatech.user.dto.keycloak.UserCreationParam;
 import com.nexatech.user.dto.keycloak.UserTokenExchangeParam;
 import com.nexatech.user.dto.keycloak.UserTokenExchangeResponse;
+import com.nexatech.user.dto.keycloak.UserUpdateParam;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.UserResponse;
@@ -83,7 +84,6 @@ public class UserServiceImpl implements UserService {
                     realm,
                     "Bearer " + token.getAccessToken(),
                     UserCreationParam.builder()
-                            .username(request.getUsername())
                             .firstName(request.getFirstName())
                             .lastName(request.getLastName())
                             .email(request.getEmail())
@@ -162,7 +162,7 @@ public class UserServiceImpl implements UserService {
                     realm,
                     user.getId(),
                     "Bearer " + token.getAccessToken(),
-                    UserCreationParam.builder()
+                    UserUpdateParam.builder()
                             .username(user.getUsername())
                             .firstName(user.getFirstName())
                             .lastName(user.getLastName())

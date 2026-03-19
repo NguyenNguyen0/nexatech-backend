@@ -15,6 +15,7 @@ import com.nexatech.user.dto.keycloak.TokenExchangeResponse;
 import com.nexatech.user.dto.keycloak.UserCreationParam;
 import com.nexatech.user.dto.keycloak.UserTokenExchangeParam;
 import com.nexatech.user.dto.keycloak.UserTokenExchangeResponse;
+import com.nexatech.user.dto.keycloak.UserUpdateParam;
 
 import feign.QueryMap;
 
@@ -35,5 +36,5 @@ public interface KeycloakClient {
             @PathVariable("realm-name") String realm,
             @PathVariable("id") String id,
             @RequestHeader("authorization") String token,
-            @RequestBody UserCreationParam param);
+            @RequestBody UserUpdateParam param);
 }
