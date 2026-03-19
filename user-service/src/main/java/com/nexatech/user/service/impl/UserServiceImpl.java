@@ -15,6 +15,7 @@ import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.UserResponse;
 import com.nexatech.user.exception.AppException;
 import com.nexatech.user.exception.ErrorCode;
+import com.nexatech.user.exception.ErrorNormalizer;
 import com.nexatech.user.mapper.UserMapper;
 import com.nexatech.user.model.Role;
 import com.nexatech.user.model.User;
@@ -22,6 +23,8 @@ import com.nexatech.user.repository.RoleRepository;
 import com.nexatech.user.repository.UserRepository;
 import com.nexatech.user.service.UserService;
 import com.nexatech.user.utils.KeycloakUtils;
+
+import feign.FeignException;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +44,7 @@ public class UserServiceImpl implements UserService {
     RoleRepository roleRepository;
     UserMapper userMapper;
     KeycloakClient keycloakClient;
+    ErrorNormalizer errorNormalizer;
 
     @NonFinal
     @Value("${keycloak.realm}")
@@ -65,44 +69,47 @@ public class UserServiceImpl implements UserService {
 
         User user = userMapper.toUser(request);
 
-        TokenExchangeResponse token = keycloakClient.exchangeToken(
-                realm,
-                TokenExchangeParam.builder()
-                        .grant_type("client_credentials")
-                        .client_id(clientId)
-                        .client_secret(clientSecret)
-                        .scope("openid")
-                        .build());
+        try {
+            TokenExchangeResponse token = keycloakClient.exchangeToken(
+                    realm,
+                    TokenExchangeParam.builder()
+                            .grant_type("client_credentials")
+                            .client_id(clientId)
+                            .client_secret(clientSecret)
+                            .scope("openid")
+                            .build());
 
-        ResponseEntity<?> userCreationResponse = keycloakClient.createUser(
-                realm,
-                "Bearer " + token.getAccessToken(),
-                UserCreationParam.builder()
-                        .username(request.getUsername())
-                        .firstName(request.getFirstName())
-                        .lastName(request.getLastName())
-                        .email(request.getEmail())
-                        .enabled(true)
-                        .emailVerified(false)
-                        .credentials(List.of(Credential.builder()
-                                .type("password")
-                                .temporary(false)
-                                .value(request.getPassword())
-                                .build()))
-                        .build());
+            ResponseEntity<?> userCreationResponse = keycloakClient.createUser(
+                    realm,
+                    "Bearer " + token.getAccessToken(),
+                    UserCreationParam.builder()
+                            .username(request.getUsername())
+                            .firstName(request.getFirstName())
+                            .lastName(request.getLastName())
+                            .email(request.getEmail())
+                            .enabled(true)
+                            .emailVerified(false)
+                            .credentials(List.of(Credential.builder()
+                                    .type("password")
+                                    .temporary(false)
+                                    .value(request.getPassword())
+                                    .build()))
+                            .build());
+            String userId = KeycloakUtils.extractUserId(userCreationResponse);
+            user.setId(userId);
 
-        String userId = KeycloakUtils.extractUserId(userCreationResponse);
-        user.setId(userId);
+            user.setOnBoarded(request.getOnBoarded() != null ? request.getOnBoarded() : Boolean.FALSE);
 
-        user.setOnBoarded(request.getOnBoarded() != null ? request.getOnBoarded() : Boolean.FALSE);
+            if (request.getRoleId() != null) {
+                Role role = roleRepository.findById(request.getRoleId())
+                        .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+                user.setRole(role);
+            }
 
-        if (request.getRoleId() != null) {
-            Role role = roleRepository.findById(request.getRoleId())
-                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
-            user.setRole(role);
+            return userMapper.toResponse(userRepository.save(user));
+        } catch (FeignException exception) {
+            throw errorNormalizer.handleKeyCloakException(exception);
         }
-
-        return userMapper.toResponse(userRepository.save(user));
     }
 
     @Override
@@ -162,6 +169,6 @@ public class UserServiceImpl implements UserService {
                 .scope("openid")
                 .username(request.getUsername())
                 .password(request.getPassword())
-                .build());      
+                .build());
     }
 }

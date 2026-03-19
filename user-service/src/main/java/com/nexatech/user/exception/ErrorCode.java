@@ -18,6 +18,10 @@ public enum ErrorCode {
     PERMISSION_NOT_FOUND(2010, "Permission not found", HttpStatus.NOT_FOUND),
     PERMISSION_NAME_EXISTS(2011, "Permission name already exists", HttpStatus.BAD_REQUEST),
     ADDRESS_NOT_FOUND(2020, "Address not found", HttpStatus.NOT_FOUND),
+    KEYCLOAK_ERROR(2021, "Keycloak error", HttpStatus.BAD_REQUEST),
+    USER_EXISTED(2022, "User already exists", HttpStatus.BAD_REQUEST),
+    EMAIL_EXISTED(2022, "Email already exists", HttpStatus.BAD_REQUEST),
+    USERNAME_IS_MISSING(2023, "Username is missing", HttpStatus.BAD_REQUEST),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {
