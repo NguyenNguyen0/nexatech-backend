@@ -1,8 +1,18 @@
 package com.nexatech.user.service;
 
-import org.springframework.stereotype.Service;
+import java.util.List;
 
-@Service
+import com.nexatech.user.dto.request.PermissionRequest;
+import com.nexatech.user.dto.response.PermissionResponse;
+
 public interface PermissionService {
-    
+    PermissionResponse create(PermissionRequest request);
+
+    List<PermissionResponse> getAll();
+
+    PermissionResponse getById(String id);
+
+    PermissionResponse update(String id, PermissionRequest request);
+
+    void delete(String id);
 }

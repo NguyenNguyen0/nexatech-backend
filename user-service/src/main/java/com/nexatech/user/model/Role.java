@@ -8,6 +8,7 @@ import com.nexatech.user.model.base.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
 @Table(name = "roles")
@@ -19,8 +20,9 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Role extends BaseEntity {
 
-    @Column(nullable = false)
     @Id
+    @GeneratedValue
+    @UuidGenerator
     UUID id;
 
     @Column(unique = true, nullable = false)

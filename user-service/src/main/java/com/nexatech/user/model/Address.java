@@ -8,6 +8,7 @@ import com.nexatech.user.model.constant.AddressType;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
 @Table(name = "addresses")
@@ -15,11 +16,13 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @Getter
 @Setter
+@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Address extends BaseEntity {
 
-    @Column(nullable = false)
     @Id
+    @GeneratedValue
+    @UuidGenerator
     UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -43,6 +46,7 @@ public class Address extends BaseEntity {
     AddressType addressType;
 
     @Column(name = "is_default", nullable = false)
+    @Builder.Default
     boolean isDefault = false;
 
 }

@@ -14,6 +14,10 @@ public enum ErrorCode {
     USER_EMAIL_EXISTS(2002, "Email already exists", HttpStatus.BAD_REQUEST),
     INVALID_UUID(2003, "Invalid id format", HttpStatus.BAD_REQUEST),
     ROLE_NOT_FOUND(2004, "Role not found", HttpStatus.BAD_REQUEST),
+    ROLE_NAME_EXISTS(2005, "Role name already exists", HttpStatus.BAD_REQUEST),
+    PERMISSION_NOT_FOUND(2010, "Permission not found", HttpStatus.NOT_FOUND),
+    PERMISSION_NAME_EXISTS(2011, "Permission name already exists", HttpStatus.BAD_REQUEST),
+    ADDRESS_NOT_FOUND(2020, "Address not found", HttpStatus.NOT_FOUND),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

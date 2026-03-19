@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import com.nexatech.user.model.base.BaseEntity;
 import com.nexatech.user.model.constant.Gender;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
 @Table(name = "users")
@@ -16,14 +17,18 @@ import com.nexatech.user.model.constant.Gender;
 @NoArgsConstructor
 @Getter
 @Setter
+@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class User extends BaseEntity {
 
-    @Column(nullable = false)
     @Id
+    @GeneratedValue
+    @UuidGenerator
     UUID id;
 
-    @Column(name = "keycloak_id", unique = true, nullable = false)
+    // Not integrated yet: will be updated later (nullable now).
+    // Note: PostgreSQL UNIQUE allows multiple NULL values.
+    @Column(name = "keycloak_id", unique = true)
     String keycloakId;
 
     @Column(nullable = false, unique = true)
