@@ -13,7 +13,6 @@ import lombok.experimental.FieldDefaults;
 public class UserContext {
 
     String email;
-    String keycloakId;
 
     private static final ThreadLocal<UserContext> HOLDER = new ThreadLocal<>();
 

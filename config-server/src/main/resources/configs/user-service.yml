@@ -2,6 +2,11 @@ server:
   port: 8082
 
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
   datasource:
     url: ${DATASOURCE_URL}
     username: ${DATASOURCE_USERNAME}
@@ -21,3 +26,5 @@ keycloak:
   realm: ${KEYCLOAK_REALM}
   client-id: ${KEYCLOAK_CLIENT_ID}
   client-secret: ${KEYCLOAK_CLIENT_SECRET}
+  user-name: ${KEYCLOAK_USER_NAME}
+  password: ${KEYCLOAK_PASSWORD}

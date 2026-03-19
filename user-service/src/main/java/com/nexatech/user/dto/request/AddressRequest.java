@@ -1,7 +1,5 @@
 package com.nexatech.user.dto.request;
 
-import java.util.UUID;
-
 import com.nexatech.user.model.constant.AddressType;
 
 import lombok.AccessLevel;
@@ -19,7 +17,7 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AddressRequest {
-    UUID userId;
+    String userId;
     String receiverName;
     String phone;
     String province;

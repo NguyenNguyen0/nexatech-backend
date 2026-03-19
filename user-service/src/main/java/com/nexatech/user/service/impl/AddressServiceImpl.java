@@ -2,7 +2,6 @@ package com.nexatech.user.service.impl;
 
 import java.util.List;
 import java.util.UUID;
-
 import org.springframework.stereotype.Service;
 
 import com.nexatech.user.dto.request.AddressRequest;
@@ -55,8 +54,7 @@ public class AddressServiceImpl implements AddressService {
 
     @Override
     public List<AddressResponse> getByUserId(String userId) {
-        UUID id = parseUuid(userId);
-        return addressRepository.findAllByUser_IdAndActiveTrue(id)
+        return addressRepository.findAllByUser_IdAndActiveTrue(userId)
                 .stream()
                 .map(addressMapper::toResponse)
                 .toList();

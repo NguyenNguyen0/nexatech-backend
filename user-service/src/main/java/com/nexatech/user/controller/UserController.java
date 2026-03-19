@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.user.dto.base.ApiResponse;
+import com.nexatech.user.dto.keycloak.LoginRequest;
+import com.nexatech.user.dto.keycloak.UserTokenExchangeResponse;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.UserResponse;
@@ -65,6 +67,13 @@ public class UserController {
     public ApiResponse<Void> deleteUser(@PathVariable String userId) {
         userService.deleteUser(userId);
         return ApiResponse.<Void>builder()
+                .build();
+    }
+
+    @PostMapping("/login")
+    public ApiResponse<UserTokenExchangeResponse> login(@RequestBody LoginRequest request){
+        return ApiResponse.<UserTokenExchangeResponse>builder()
+                .result(userService.login(request))
                 .build();
     }
 }

@@ -21,11 +21,14 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserCreationRequest {
     String email;
-    String fullName;
+    String username;
+    String firstName;
+    String lastName;
     String avatarUrl;
     String phone;
     LocalDate dob;
     Gender gender;
+    String password;
 
     // optional
     UUID roleId;

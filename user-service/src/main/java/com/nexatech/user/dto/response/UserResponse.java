@@ -22,9 +22,10 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserResponse {
     UUID id;
-    String keycloakId;
     String email;
-    String fullName;
+    String username;
+    String firstName;
+    String lastName;
     String avatarUrl;
     String phone;
     LocalDate dob;

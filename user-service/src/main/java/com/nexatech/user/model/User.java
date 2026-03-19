@@ -5,11 +5,8 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDate;
-import java.util.UUID;
-
 import com.nexatech.user.model.base.BaseEntity;
 import com.nexatech.user.model.constant.Gender;
-import org.hibernate.annotations.UuidGenerator;
 
 @Entity
 @Table(name = "users")
@@ -22,20 +19,20 @@ import org.hibernate.annotations.UuidGenerator;
 public class User extends BaseEntity {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator
-    UUID id;
-
-    // Not integrated yet: will be updated later (nullable now).
-    // Note: PostgreSQL UNIQUE allows multiple NULL values.
-    @Column(name = "keycloak_id", unique = true)
-    String keycloakId;
+    @Column(length = 64)
+    String id;
 
     @Column(nullable = false, unique = true)
     String email;
 
+    @Column(nullable = false, unique = true, length = 50)
+    String username;
+
     @Column(length = 50)
-    String fullName;
+    String firstName;
+
+    @Column(length = 50)
+    String lastName;
 
     String avatarUrl;
 
