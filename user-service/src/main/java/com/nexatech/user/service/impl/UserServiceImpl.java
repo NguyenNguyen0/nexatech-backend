@@ -4,16 +4,9 @@ import java.util.List;
 
 import com.nexatech.user.client.KeycloakClient;
 import com.nexatech.user.dto.keycloak.Credential;
-import com.nexatech.user.dto.keycloak.LoginRequest;
-import com.nexatech.user.dto.keycloak.LogoutParam;
-import com.nexatech.user.dto.keycloak.LogoutRequest;
-import com.nexatech.user.dto.keycloak.RefreshTokenParam;
-import com.nexatech.user.dto.keycloak.RefreshTokenRequest;
 import com.nexatech.user.dto.keycloak.TokenExchangeParam;
 import com.nexatech.user.dto.keycloak.TokenExchangeResponse;
 import com.nexatech.user.dto.keycloak.UserCreationParam;
-import com.nexatech.user.dto.keycloak.UserTokenExchangeParam;
-import com.nexatech.user.dto.keycloak.UserTokenExchangeResponse;
 import com.nexatech.user.dto.keycloak.UserUpdateParam;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
@@ -88,6 +81,7 @@ public class UserServiceImpl implements UserService {
                     realm,
                     "Bearer " + token.getAccessToken(),
                     UserCreationParam.builder()
+                            .username(request.getUsername())
                             .firstName(request.getFirstName())
                             .lastName(request.getLastName())
                             .email(request.getEmail())
@@ -185,56 +179,7 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(String id) {
         User user = userRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-
         user.setActive(false);
         userRepository.save(user);
-    }
-
-    @Override
-    public UserTokenExchangeResponse login(LoginRequest request) {
-        return keycloakClient.exchangeUserToken(realm, UserTokenExchangeParam.builder()
-                .grant_type("password")
-                .client_id(clientId)
-                .client_secret(clientSecret)
-                .scope("openid")
-                .username(request.getUsername())
-                .password(request.getPassword())
-                .build());
-    }
-
-    @Override
-    public UserTokenExchangeResponse refreshToken(RefreshTokenRequest request) {
-        if (request == null || request.getRefreshToken() == null || request.getRefreshToken().isBlank()) {
-            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
-        }
-
-        try {
-            return keycloakClient.refreshToken(realm, RefreshTokenParam.builder()
-                    .grant_type("refresh_token")
-                    .client_id(clientId)
-                    .client_secret(clientSecret)
-                    .scope("openid")
-                    .refresh_token(request.getRefreshToken())
-                    .build());
-        } catch (FeignException exception) {
-            throw errorNormalizer.handleKeyCloakException(exception);
-        }
-    }
-
-    @Override
-    public void logout(LogoutRequest request) {
-        if (request == null || request.getRefreshToken() == null || request.getRefreshToken().isBlank()) {
-            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
-        }
-
-        try {
-            keycloakClient.logout(realm, LogoutParam.builder()
-                    .client_id(clientId)
-                    .client_secret(clientSecret)
-                    .refresh_token(request.getRefreshToken())
-                    .build());
-        } catch (FeignException exception) {
-            throw errorNormalizer.handleKeyCloakException(exception);
-        }
     }
 }

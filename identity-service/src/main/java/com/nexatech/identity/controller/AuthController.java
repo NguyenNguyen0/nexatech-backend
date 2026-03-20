@@ -1,5 +1,48 @@
 package com.nexatech.identity.controller;
 
+import java.util.Objects;
+
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.nexatech.identity.dto.base.ApiResponse;
+import com.nexatech.identity.dto.keycloak.LoginRequest;
+import com.nexatech.identity.dto.keycloak.LogoutRequest;
+import com.nexatech.identity.dto.keycloak.RefreshTokenRequest;
+import com.nexatech.identity.dto.keycloak.UserTokenExchangeResponse;
+import com.nexatech.identity.service.AuthService;
+
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+
+@RestController
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@RequestMapping("/auth")
 public class AuthController {
 
+    AuthService authService;
+
+    @PostMapping("/login")
+    public ApiResponse<UserTokenExchangeResponse> login(@RequestBody LoginRequest request) {
+        return ApiResponse.<UserTokenExchangeResponse>builder()
+                .result(authService.login(request))
+                .build();
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<UserTokenExchangeResponse> refresh(@RequestBody RefreshTokenRequest request) {
+        return ApiResponse.<UserTokenExchangeResponse>builder()
+                .result(authService.refreshToken(request))
+                .build();
+    }
+
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(@RequestBody LogoutRequest request) {
+        authService.logout(request);
+        return ApiResponse.<Void>builder().build();
+    }
 }

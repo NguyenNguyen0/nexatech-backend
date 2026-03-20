@@ -13,10 +13,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.user.dto.base.ApiResponse;
-import com.nexatech.user.dto.keycloak.LoginRequest;
-import com.nexatech.user.dto.keycloak.LogoutRequest;
-import com.nexatech.user.dto.keycloak.RefreshTokenRequest;
-import com.nexatech.user.dto.keycloak.UserTokenExchangeResponse;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.UserResponse;
@@ -70,25 +66,5 @@ public class UserController {
         userService.deleteUser(userId);
         return ApiResponse.<Void>builder()
                 .build();
-    }
-
-    @PostMapping("/login")
-    public ApiResponse<UserTokenExchangeResponse> login(@RequestBody LoginRequest request){
-        return ApiResponse.<UserTokenExchangeResponse>builder()
-                .result(userService.login(request))
-                .build();
-    }
-
-    @PostMapping("/refresh-token")
-    public ApiResponse<UserTokenExchangeResponse> refreshToken(@RequestBody RefreshTokenRequest request) {
-        return ApiResponse.<UserTokenExchangeResponse>builder()
-                .result(userService.refreshToken(request))
-                .build();
-    }
-
-    @PostMapping("/logout")
-    public ApiResponse<Void> logout(@RequestBody LogoutRequest request) {
-        userService.logout(request);
-        return ApiResponse.<Void>builder().build();
     }
 }
