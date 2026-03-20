@@ -3,6 +3,8 @@ package com.nexatech.user.service;
 import java.util.List;
 
 import com.nexatech.user.dto.keycloak.LoginRequest;
+import com.nexatech.user.dto.keycloak.LogoutRequest;
+import com.nexatech.user.dto.keycloak.RefreshTokenRequest;
 import com.nexatech.user.dto.keycloak.UserTokenExchangeResponse;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
@@ -21,4 +23,8 @@ public interface UserService {
     void deleteUser(String id);
 
     UserTokenExchangeResponse login(LoginRequest request);
+
+    UserTokenExchangeResponse refreshToken(RefreshTokenRequest request);
+
+    void logout(LogoutRequest request);
 }

@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+import com.nexatech.user.dto.keycloak.LogoutParam;
+import com.nexatech.user.dto.keycloak.RefreshTokenParam;
 import com.nexatech.user.dto.keycloak.TokenExchangeParam;
 import com.nexatech.user.dto.keycloak.TokenExchangeResponse;
 import com.nexatech.user.dto.keycloak.UserCreationParam;
@@ -30,6 +32,12 @@ public interface KeycloakClient {
 
     @PostMapping(value = "/realms/{realm-name}/protocol/openid-connect/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     UserTokenExchangeResponse exchangeUserToken(@PathVariable("realm-name") String realm, @QueryMap UserTokenExchangeParam param);
+
+    @PostMapping(value = "/realms/{realm-name}/protocol/openid-connect/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    UserTokenExchangeResponse refreshToken(@PathVariable("realm-name") String realm, @QueryMap RefreshTokenParam param);
+
+    @PostMapping(value = "/realms/{realm-name}/protocol/openid-connect/logout", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    ResponseEntity<?> logout(@PathVariable("realm-name") String realm, @QueryMap LogoutParam param);
 
     @PutMapping(value = "/admin/realms/{realm-name}/users/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<?> updateUser(

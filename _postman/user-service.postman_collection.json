@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Nexatech - User Service (no Keycloak)",
+    "name": "Nexatech - User Service",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -8,7 +8,10 @@
     { "key": "userId", "value": "" },
     { "key": "addressId", "value": "" },
     { "key": "roleId", "value": "" },
-    { "key": "permissionId", "value": "" }
+    { "key": "permissionId", "value": "" },
+    { "key": "username", "value": "" },
+    { "key": "password", "value": "" },
+    { "key": "refreshToken", "value": "" }
   ],
   "item": [
     {
@@ -22,7 +25,43 @@
             "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"demo.user@nexatech.local\",\n  \"fullName\": \"Demo User\",\n  \"phone\": \"0123456789\",\n  \"dob\": \"1999-01-01\",\n  \"gender\": \"MALE\",\n  \"onBoarded\": false,\n  \"roleId\": null\n}\n"
+              "raw": "{\n  \"email\": \"demo.user@nexatech.local\",\n  \"username\": \"demo.user\",\n  \"firstName\": \"Demo\",\n  \"lastName\": \"User\",\n  \"avatarUrl\": null,\n  \"phone\": \"0123456789\",\n  \"dob\": \"1999-01-01\",\n  \"gender\": \"MALE\",\n  \"password\": \"123456789\",\n  \"roleId\": null,\n  \"onBoarded\": false\n}\n"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/users/login", "host": ["{{baseUrl}}"], "path": ["users", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}\n"
+            }
+          }
+        },
+        {
+          "name": "Refresh token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/users/refresh-token", "host": ["{{baseUrl}}"], "path": ["users", "refresh-token"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}\n"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/users/logout", "host": ["{{baseUrl}}"], "path": ["users", "logout"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}\n"
             }
           }
         },
@@ -48,7 +87,7 @@
             "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Demo User Updated\",\n  \"phone\": \"0987654321\",\n  \"onBoarded\": true\n}\n"
+              "raw": "{\n  \"email\": \"demo.user.updated@nexatech.local\",\n  \"firstName\": \"Demo\",\n  \"lastName\": \"User Updated\",\n  \"avatarUrl\": null,\n  \"phone\": \"0987654321\",\n  \"dob\": \"1999-01-01\",\n  \"gender\": \"MALE\",\n  \"onBoarded\": true,\n  \"roleId\": null\n}\n"
             }
           }
         },
