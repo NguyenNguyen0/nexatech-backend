@@ -1,4 +1,4 @@
-package com.nexatech.identity.dto.keycloak;
+package com.nexatech.identity.dto.request;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -6,19 +6,21 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 
 @Setter
 @Getter
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class UserUpdateParam {
+public class UserTokenExchangeParam {
     String username;
-    String firstName;
-    String lastName;
-    String email;
-    boolean enabled;
-    boolean emailVerified;
+    String password;
+    String grant_type;
+    String client_id;
+    String client_secret;
+    String scope;
 }

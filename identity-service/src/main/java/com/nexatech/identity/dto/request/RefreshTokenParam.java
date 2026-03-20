@@ -1,4 +1,4 @@
-package com.nexatech.identity.dto.keycloak;
+package com.nexatech.identity.dto.request;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;

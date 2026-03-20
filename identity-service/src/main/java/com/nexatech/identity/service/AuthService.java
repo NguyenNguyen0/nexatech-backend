@@ -7,18 +7,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.nexatech.identity.client.KeycloakClient;
-import com.nexatech.identity.dto.keycloak.Credential;
-import com.nexatech.identity.dto.keycloak.LoginRequest;
-import com.nexatech.identity.dto.keycloak.LogoutParam;
-import com.nexatech.identity.dto.keycloak.LogoutRequest;
-import com.nexatech.identity.dto.keycloak.RefreshTokenParam;
-import com.nexatech.identity.dto.keycloak.RefreshTokenRequest;
-import com.nexatech.identity.dto.keycloak.TokenExchangeParam;
-import com.nexatech.identity.dto.keycloak.TokenExchangeResponse;
-import com.nexatech.identity.dto.keycloak.UserCreationParam;
-import com.nexatech.identity.dto.keycloak.UserTokenExchangeParam;
-import com.nexatech.identity.dto.keycloak.UserTokenExchangeResponse;
-import com.nexatech.identity.dto.keycloak.UserUpdateParam;
+import com.nexatech.identity.dto.request.Credential;
+import com.nexatech.identity.dto.request.LoginRequest;
+import com.nexatech.identity.dto.request.LogoutParam;
+import com.nexatech.identity.dto.request.LogoutRequest;
+import com.nexatech.identity.dto.request.RefreshTokenParam;
+import com.nexatech.identity.dto.request.RefreshTokenRequest;
+import com.nexatech.identity.dto.request.TokenExchangeParam;
+import com.nexatech.identity.dto.request.UserCreationParam;
+import com.nexatech.identity.dto.request.UserTokenExchangeParam;
+import com.nexatech.identity.dto.request.UserUpdateParam;
+import com.nexatech.identity.dto.response.TokenExchangeResponse;
+import com.nexatech.identity.dto.response.UserTokenExchangeResponse;
 
 import lombok.RequiredArgsConstructor;
 

@@ -9,12 +9,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.identity.dto.base.ApiResponse;
-import com.nexatech.identity.dto.keycloak.LoginRequest;
-import com.nexatech.identity.dto.keycloak.LogoutRequest;
-import com.nexatech.identity.dto.keycloak.RefreshTokenRequest;
-import com.nexatech.identity.dto.keycloak.UserCreationParam;
-import com.nexatech.identity.dto.keycloak.UserTokenExchangeResponse;
-import com.nexatech.identity.dto.keycloak.UserUpdateParam;
+import com.nexatech.identity.dto.request.LoginRequest;
+import com.nexatech.identity.dto.request.LogoutRequest;
+import com.nexatech.identity.dto.request.RefreshTokenRequest;
+import com.nexatech.identity.dto.request.UserCreationParam;
+import com.nexatech.identity.dto.request.UserUpdateParam;
+import com.nexatech.identity.dto.response.UserTokenExchangeResponse;
 import com.nexatech.identity.service.AuthService;
 
 import lombok.AccessLevel;

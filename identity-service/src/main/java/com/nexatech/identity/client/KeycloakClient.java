@@ -7,14 +7,14 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
-import com.nexatech.identity.dto.keycloak.TokenExchangeParam;
-import com.nexatech.identity.dto.keycloak.TokenExchangeResponse;
-import com.nexatech.identity.dto.keycloak.LogoutParam;
-import com.nexatech.identity.dto.keycloak.RefreshTokenParam;
-import com.nexatech.identity.dto.keycloak.UserCreationParam;
-import com.nexatech.identity.dto.keycloak.UserTokenExchangeParam;
-import com.nexatech.identity.dto.keycloak.UserTokenExchangeResponse;
-import com.nexatech.identity.dto.keycloak.UserUpdateParam;
+import com.nexatech.identity.dto.request.LogoutParam;
+import com.nexatech.identity.dto.request.RefreshTokenParam;
+import com.nexatech.identity.dto.request.TokenExchangeParam;
+import com.nexatech.identity.dto.request.UserCreationParam;
+import com.nexatech.identity.dto.request.UserTokenExchangeParam;
+import com.nexatech.identity.dto.request.UserUpdateParam;
+import com.nexatech.identity.dto.response.TokenExchangeResponse;
+import com.nexatech.identity.dto.response.UserTokenExchangeResponse;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

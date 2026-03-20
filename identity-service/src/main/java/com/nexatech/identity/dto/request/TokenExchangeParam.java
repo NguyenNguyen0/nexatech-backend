@@ -1,4 +1,4 @@
-package com.nexatech.identity.dto.keycloak;
+package com.nexatech.identity.dto.request;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -10,11 +10,13 @@ import lombok.experimental.FieldDefaults;
 
 @Setter
 @Getter
-@Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class LoginRequest {
-    String username;
-    String password;
+public class TokenExchangeParam {
+    String grant_type;
+    String client_id;
+    String client_secret;
+    String scope;
 }

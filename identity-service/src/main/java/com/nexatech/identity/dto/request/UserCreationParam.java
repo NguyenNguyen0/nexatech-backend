@@ -1,4 +1,4 @@
-package com.nexatech.identity.dto.keycloak;
+package com.nexatech.identity.dto.request;
 
 import java.util.List;
 
@@ -25,3 +25,4 @@ public class UserCreationParam {
     String lastName;
     List<Credential> credentials;
 }
+

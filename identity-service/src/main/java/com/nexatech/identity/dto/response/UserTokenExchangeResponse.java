@@ -1,5 +1,4 @@
-package com.nexatech.identity.dto.keycloak;
-
+package com.nexatech.identity.dto.response;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -31,6 +30,7 @@ public class UserTokenExchangeResponse {
     @JsonProperty("not-before-policy")
     Long notBeforePolicy;
 
-    String sessionState;   
-    String scope;   
+    String sessionState;
+    String scope;
 }
+

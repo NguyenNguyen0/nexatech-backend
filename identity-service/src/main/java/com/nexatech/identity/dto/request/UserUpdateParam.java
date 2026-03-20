@@ -1,4 +1,4 @@
-package com.nexatech.identity.dto.keycloak;
+package com.nexatech.identity.dto.request;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -14,8 +14,12 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class Credential {
-    String type;
-    String value;
-    boolean temporary;
+public class UserUpdateParam {
+    String username;
+    String firstName;
+    String lastName;
+    String email;
+    boolean enabled;
+    boolean emailVerified;
 }
+
