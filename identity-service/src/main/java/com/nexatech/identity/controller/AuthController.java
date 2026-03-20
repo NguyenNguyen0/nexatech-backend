@@ -12,8 +12,9 @@ import com.nexatech.identity.dto.base.ApiResponse;
 import com.nexatech.identity.dto.keycloak.LoginRequest;
 import com.nexatech.identity.dto.keycloak.LogoutRequest;
 import com.nexatech.identity.dto.keycloak.RefreshTokenRequest;
-import com.nexatech.identity.dto.keycloak.UserParam;
+import com.nexatech.identity.dto.keycloak.UserCreationParam;
 import com.nexatech.identity.dto.keycloak.UserTokenExchangeResponse;
+import com.nexatech.identity.dto.keycloak.UserUpdateParam;
 import com.nexatech.identity.service.AuthService;
 
 import lombok.AccessLevel;
@@ -49,14 +50,14 @@ public class AuthController {
     }
 
     @PostMapping("/onboard")
-    public ApiResponse<?> onboard(@RequestBody UserParam param) {
+    public ApiResponse<?> onboard(@RequestBody UserCreationParam param) {
         return ApiResponse.<ResponseEntity<?>>builder()
                 .result(authService.onboardUser(param))
                 .build();
     }
 
     @PutMapping("/update/{userId}")
-    public ApiResponse<?> update(@PathVariable String userId, @RequestBody UserParam param) {
+    public ApiResponse<?> update(@PathVariable String userId, @RequestBody UserUpdateParam param) {
         return ApiResponse.<ResponseEntity<?>>builder()
                 .result(authService.updateUser(userId, param))
                 .build();

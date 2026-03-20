@@ -1,7 +1,5 @@
 package com.nexatech.identity.dto.keycloak;
 
-import java.util.List;
-
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,12 +14,11 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class UserParam {
+public class UserUpdateParam {
     String username;
-    boolean enabled;
-    String email;
-    boolean emailVerified;
     String firstName;
     String lastName;
-    List<Credential> credentials;
+    String email;
+    boolean enabled;
+    boolean emailVerified;
 }

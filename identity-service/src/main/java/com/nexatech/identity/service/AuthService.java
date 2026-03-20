@@ -15,9 +15,10 @@ import com.nexatech.identity.dto.keycloak.RefreshTokenParam;
 import com.nexatech.identity.dto.keycloak.RefreshTokenRequest;
 import com.nexatech.identity.dto.keycloak.TokenExchangeParam;
 import com.nexatech.identity.dto.keycloak.TokenExchangeResponse;
-import com.nexatech.identity.dto.keycloak.UserParam;
+import com.nexatech.identity.dto.keycloak.UserCreationParam;
 import com.nexatech.identity.dto.keycloak.UserTokenExchangeParam;
 import com.nexatech.identity.dto.keycloak.UserTokenExchangeResponse;
+import com.nexatech.identity.dto.keycloak.UserUpdateParam;
 
 import lombok.RequiredArgsConstructor;
 
@@ -80,13 +81,13 @@ public class AuthService {
                 .build());
     }
 
-    public ResponseEntity<?> onboardUser(UserParam param) {
+    public ResponseEntity<?> onboardUser(UserCreationParam param) {
         if (param == null || param.getCredentials() == null || param.getCredentials().isEmpty()) {
             throw new IllegalArgumentException("credentials is required");
         }
 
         return keycloakClient.onboardUser(realm, "Bearer " + exchangeToken().getAccessToken(),
-                UserParam.builder()
+                UserCreationParam.builder()
                         .username(param.getUsername())
                         .firstName(param.getFirstName())
                         .lastName(param.getLastName())
@@ -101,24 +102,15 @@ public class AuthService {
                         .build());
     }
 
-    public ResponseEntity<?> updateUser(String userId, UserParam param) {
-        if (param == null || param.getCredentials() == null || param.getCredentials().isEmpty()) {
-            throw new IllegalArgumentException("credentials is required");
-        }
-
+    public ResponseEntity<?> updateUser(String userId, UserUpdateParam param) {
         return keycloakClient.updateUser(realm, userId, "Bearer " + exchangeToken().getAccessToken(),
-                UserParam.builder()
+                UserUpdateParam.builder()
                         .username(param.getUsername())
                         .firstName(param.getFirstName())
                         .lastName(param.getLastName())
                         .email(param.getEmail())
-                        .enabled(true)
-                        .emailVerified(false)
-                        .credentials(List.of(Credential.builder()
-                                .type(param.getCredentials().get(0).getType())
-                                .value(param.getCredentials().get(0).getValue())
-                                .temporary(param.getCredentials().get(0).isTemporary())
-                                .build()))
+                        .enabled(param.isEnabled())
+                        .emailVerified(param.isEmailVerified())
                         .build());
     }
 
