@@ -1,8 +1,9 @@
 package com.nexatech.identity.controller;
 
-import java.util.Objects;
-
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -11,6 +12,7 @@ import com.nexatech.identity.dto.base.ApiResponse;
 import com.nexatech.identity.dto.keycloak.LoginRequest;
 import com.nexatech.identity.dto.keycloak.LogoutRequest;
 import com.nexatech.identity.dto.keycloak.RefreshTokenRequest;
+import com.nexatech.identity.dto.keycloak.UserParam;
 import com.nexatech.identity.dto.keycloak.UserTokenExchangeResponse;
 import com.nexatech.identity.service.AuthService;
 
@@ -44,5 +46,19 @@ public class AuthController {
     public ApiResponse<Void> logout(@RequestBody LogoutRequest request) {
         authService.logout(request);
         return ApiResponse.<Void>builder().build();
+    }
+
+    @PostMapping("/onboard")
+    public ApiResponse<?> onboard(@RequestBody UserParam param) {
+        return ApiResponse.<ResponseEntity<?>>builder()
+                .result(authService.onboardUser(param))
+                .build();
+    }
+
+    @PutMapping("/update/{userId}")
+    public ApiResponse<?> update(@PathVariable String userId, @RequestBody UserParam param) {
+        return ApiResponse.<ResponseEntity<?>>builder()
+                .result(authService.updateUser(userId, param))
+                .build();
     }
 }

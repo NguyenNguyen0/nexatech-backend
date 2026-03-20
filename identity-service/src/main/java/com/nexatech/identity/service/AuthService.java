@@ -1,14 +1,21 @@
 package com.nexatech.identity.service;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.nexatech.identity.client.KeycloakClient;
+import com.nexatech.identity.dto.keycloak.Credential;
 import com.nexatech.identity.dto.keycloak.LoginRequest;
 import com.nexatech.identity.dto.keycloak.LogoutParam;
 import com.nexatech.identity.dto.keycloak.LogoutRequest;
 import com.nexatech.identity.dto.keycloak.RefreshTokenParam;
 import com.nexatech.identity.dto.keycloak.RefreshTokenRequest;
+import com.nexatech.identity.dto.keycloak.TokenExchangeParam;
+import com.nexatech.identity.dto.keycloak.TokenExchangeResponse;
+import com.nexatech.identity.dto.keycloak.UserParam;
 import com.nexatech.identity.dto.keycloak.UserTokenExchangeParam;
 import com.nexatech.identity.dto.keycloak.UserTokenExchangeResponse;
 
@@ -72,5 +79,56 @@ public class AuthService {
                 .refresh_token(request.getRefreshToken())
                 .build());
     }
-}
 
+    public ResponseEntity<?> onboardUser(UserParam param) {
+        if (param == null || param.getCredentials() == null || param.getCredentials().isEmpty()) {
+            throw new IllegalArgumentException("credentials is required");
+        }
+
+        return keycloakClient.onboardUser(realm, "Bearer " + exchangeToken().getAccessToken(),
+                UserParam.builder()
+                        .username(param.getUsername())
+                        .firstName(param.getFirstName())
+                        .lastName(param.getLastName())
+                        .email(param.getEmail())
+                        .enabled(true)
+                        .emailVerified(false)
+                        .credentials(List.of(Credential.builder()
+                                .type(param.getCredentials().get(0).getType())
+                                .value(param.getCredentials().get(0).getValue())
+                                .temporary(param.getCredentials().get(0).isTemporary())
+                                .build()))
+                        .build());
+    }
+
+    public ResponseEntity<?> updateUser(String userId, UserParam param) {
+        if (param == null || param.getCredentials() == null || param.getCredentials().isEmpty()) {
+            throw new IllegalArgumentException("credentials is required");
+        }
+
+        return keycloakClient.updateUser(realm, userId, "Bearer " + exchangeToken().getAccessToken(),
+                UserParam.builder()
+                        .username(param.getUsername())
+                        .firstName(param.getFirstName())
+                        .lastName(param.getLastName())
+                        .email(param.getEmail())
+                        .enabled(true)
+                        .emailVerified(false)
+                        .credentials(List.of(Credential.builder()
+                                .type(param.getCredentials().get(0).getType())
+                                .value(param.getCredentials().get(0).getValue())
+                                .temporary(param.getCredentials().get(0).isTemporary())
+                                .build()))
+                        .build());
+    }
+
+    // internal method
+    private TokenExchangeResponse exchangeToken() {
+        return keycloakClient.exchangeAdminToken(realm, TokenExchangeParam.builder()
+                .grant_type("client_credentials")
+                .client_id(clientId)
+                .client_secret(clientSecret)
+                .scope("openid")
+                .build());
+    }
+}
