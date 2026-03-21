@@ -1,28 +1,20 @@
 package com.nexatech.user.service;
 
-import com.nexatech.user.dto.AddressRequest;
-import com.nexatech.user.dto.AddressResponse;
-import org.springframework.stereotype.Service;
-
 import java.util.List;
-import java.util.UUID;
 
-@Service
-public class AddressService {
+import com.nexatech.user.dto.request.AddressRequest;
+import com.nexatech.user.dto.response.AddressResponse;
 
-    public List<AddressResponse> getAddresses(UUID userId) {
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
+public interface AddressService {
+    AddressResponse create(AddressRequest request);
 
-    public AddressResponse createAddress(UUID userId, AddressRequest request) {
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
+    List<AddressResponse> getAll();
 
-    public AddressResponse updateAddress(UUID userId, UUID addressId, AddressRequest request) {
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
+    List<AddressResponse> getByUserId(String userId);
 
-    public void deleteAddress(UUID userId, UUID addressId) {
-        throw new UnsupportedOperationException("Not implemented yet");
-    }
+    AddressResponse getById(String id);
+
+    AddressResponse update(String id, AddressRequest request);
+
+    void delete(String id);
 }

@@ -1,30 +1,8 @@
 server:
-  port: 8081
+  port: 8082
 
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/nexatech_identity
-    username: ${DB_USERNAME:nexatech}
-    password: ${DB_PASSWORD:nexatech}
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-  data:
-    redis:
-      host: localhost
-      port: 6379
-  kafka:
-    bootstrap-servers: localhost:9092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-
-jwt:
-  secret: ${JWT_SECRET:nexatech-default-secret-key-for-development-only-change-in-production}
-  access-token-expiration: 900000
-  refresh-token-expiration: 604800000
+keycloak:
+  url: ${KEYCLOAK_URL}
+  realm: ${KEYCLOAK_REALM}
+  client-id: ${KEYCLOAK_CLIENT_ID}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET}

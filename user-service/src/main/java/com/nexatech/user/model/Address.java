@@ -1,41 +1,52 @@
 package com.nexatech.user.model;
 
-import com.nexatech.user.entity.base.BaseEntity;
+import java.util.UUID;
+
+import com.nexatech.user.model.base.BaseEntity;
+import com.nexatech.user.model.constant.AddressType;
+
 import jakarta.persistence.*;
 import lombok.*;
-
-import java.util.UUID;
+import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.UuidGenerator;
 
 @Entity
 @Table(name = "addresses")
+@AllArgsConstructor
+@NoArgsConstructor
 @Getter
 @Setter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class Address extends BaseEntity {
 
-    @Column(nullable = false)
-    private UUID userId;
+    @Id
+    @GeneratedValue
+    @UuidGenerator
+    UUID id;
 
-    @Column(nullable = false)
-    private String recipientName;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    User user;
 
-    @Column(nullable = false)
-    private String phone;
+    String receiverName;
+    String phone;
 
-    @Column(nullable = false)
-    private String province;
+    String province; // Tỉnh/Thành phố
+    String ward;     // Phường/Xã
+    String detail;   // Số nhà, tên đường
 
-    @Column(nullable = false)
-    private String district;
+    @Column(name = "latitude", nullable = false)
+    Double latitude;
 
-    @Column(nullable = false)
-    private String ward;
+    @Column(name = "longitude", nullable = false)
+    Double longitude;
 
-    @Column(nullable = false)
-    private String streetAddress;
+    @Enumerated(EnumType.STRING)
+    AddressType addressType;
 
-    @Column(nullable = false)
-    private boolean defaultAddress;
+    @Column(name = "is_default", nullable = false)
+    @Builder.Default
+    boolean isDefault = false;
+
 }
