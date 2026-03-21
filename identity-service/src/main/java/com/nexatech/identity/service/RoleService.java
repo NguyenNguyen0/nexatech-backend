@@ -2,6 +2,7 @@ package com.nexatech.identity.service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,9 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class RoleService {
+    private static final Set<String> EXCLUDED_SYSTEM_ROLE_NAMES = Set.of(
+            "uma_authorization",
+            "offline_access");
 
     private final KeycloakRoleClient keycloakRoleClient;
     private final KeycloakAdminTokenProvider adminTokenProvider;
@@ -31,7 +35,10 @@ public class RoleService {
     }
 
     public List<Map<String, Object>> listRoles() {
-        return keycloakRoleClient.listRoles(realm, adminTokenProvider.adminAuthorizationHeader());
+        return keycloakRoleClient.listRoles(realm, adminTokenProvider.adminAuthorizationHeader())
+                .stream()
+                .filter(this::isNotSystemRole)
+                .toList();
     }
 
     public Map<String, Object> getRoleByName(String roleName) {
@@ -62,5 +69,14 @@ public class RoleService {
 
     public void deleteRole(String roleName) {
         keycloakRoleClient.deleteRole(realm, roleName, adminTokenProvider.adminAuthorizationHeader());
+    }
+
+    private boolean isNotSystemRole(Map<String, Object> role) {
+        Object rawName = role.get("name");
+        if (rawName == null) {
+            return true;
+        }
+        String roleName = rawName.toString();
+        return !EXCLUDED_SYSTEM_ROLE_NAMES.contains(roleName) && !roleName.startsWith("default-roles-");
     }
 }

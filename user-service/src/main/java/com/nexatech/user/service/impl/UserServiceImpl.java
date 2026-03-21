@@ -75,12 +75,6 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        if (dto != null && dto.getEmail() != null && !dto.getEmail().isBlank()) {
-            if (!dto.getEmail().equalsIgnoreCase(user.getEmail())) {
-                throw new AppException(ErrorCode.EMAIL_UPDATE_NOT_ALLOWED);
-            }
-        }
-
         boolean syncKeycloak = dto != null && (isChanged(user.getFirstName(), dto.getFirstName())
                 || isChanged(user.getLastName(), dto.getLastName()));
 

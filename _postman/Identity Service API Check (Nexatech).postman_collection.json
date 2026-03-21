@@ -1,34 +1,16 @@
 {
   "info": {
-    "_postman_id": "95fefc6a-29ad-465a-b30f-f3ca38fda2d2",
-    "name": "Identity Service API (Nexatech)",
-    "description": "Gọi trực tiếp **identity-service** (Auth, Users, Roles, Groups, Membership).\n\n**Cấu hình:** sửa biến `identityBaseUrl` (ví dụ `http://localhost:8080` hoặc qua API Gateway + context-path).\n\n**Luồng gợi ý:** Login → (tuỳ chọn) Refresh / UserInfo / Introspect → tạo Role → Get by name (auto `roleId`) → tạo User (auto `userId`) → gán role / group.\n\nResponse wrapper: `{ code, message, result }`. Token trong `result` dùng **snake_case** (`access_token`, `refresh_token`) theo `UserTokenExchangeResponse`.",
+    "_postman_id": "9b42eb41-7f30-455f-8e78-662e110a66b9",
+    "name": "Identity Service API Check (Nexatech)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "40740215"
   },
   "item": [
     {
-      "name": "I. Auth",
+      "name": "1. Auth (chỉ dùng folder này)",
       "item": [
         {
-          "name": "1. OpenID configuration",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('Has result', () => pm.expect(j).to.have.property('result'));",
-                  "if (j.result && j.result.issuer) {",
-                  "    pm.collectionVariables.set('openidIssuer', j.result.issuer);",
-                  "    console.log('issuer saved to openidIssuer');",
-                  "}"
-                ]
-              }
-            }
-          ],
+          "name": "openid-configuration",
           "request": {
             "method": "GET",
             "header": [],
@@ -46,27 +28,7 @@
           "response": []
         },
         {
-          "name": "2. Register user",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "const r = j && j.result;",
-                  "if (!r) { console.warn('No result'); return; }",
-                  "const at = r.access_token || r.accessToken;",
-                  "const rt = r.refresh_token || r.refreshToken;",
-                  "if (at) { pm.collectionVariables.set('accessToken', at); console.log('accessToken saved'); }",
-                  "if (rt) { pm.collectionVariables.set('refreshToken', rt); console.log('refreshToken saved'); }"
-                ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
-              }
-            }
-          ],
+          "name": "register",
           "request": {
             "method": "POST",
             "header": [
@@ -77,7 +39,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"username\": \"nvminh1625\",\n    \"enabled\": true,\n    \"email\": \"nvminh1625@gmail.com\",\n    \"emailVerified\": true,\n    \"firstName\": \"Minh\",\n    \"lastName\": \"Nguyen\",\n    \"credentials\": [\n        {\n            \"type\": \"password\",\n            \"value\": \"123456789\",\n            \"temporary\": false\n        }\n    ]\n}"
+              "raw": "{\n  \"username\": \"{{registerUsername}}\",\n  \"enabled\": true,\n  \"email\": \"{{registerEmail}}\",\n  \"emailVerified\": true,\n  \"firstName\": \"Minh\",\n  \"lastName\": \"Nguyen\",\n  \"credentials\": [\n    { \"type\": \"password\", \"value\": \"{{registerPassword}}\", \"temporary\": false }\n  ]\n}"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/auth/register",
@@ -93,69 +55,15 @@
           "response": []
         },
         {
-          "name": "3. Refresh token",
+          "name": "login",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "const r = j && j.result;",
-                  "if (!r) return;",
-                  "const at = r.access_token || r.accessToken;",
-                  "const rt = r.refresh_token || r.refreshToken;",
-                  "if (at) pm.collectionVariables.set('accessToken', at);",
-                  "if (rt) pm.collectionVariables.set('refreshToken', rt);"
+                  "const r = pm.response.json()?.result || {}; if (r.access_token) pm.collectionVariables.set('accessToken', r.access_token); if (r.refresh_token) pm.collectionVariables.set('refreshToken', r.refresh_token);"
                 ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
-            },
-            "url": {
-              "raw": "{{identityBaseUrl}}/auth/refresh",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "refresh"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "2. Login (auto access + refresh)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "const r = j && j.result;",
-                  "if (!r) { console.warn('No result'); return; }",
-                  "const at = r.access_token || r.accessToken;",
-                  "const rt = r.refresh_token || r.refreshToken;",
-                  "if (at) { pm.collectionVariables.set('accessToken', at); console.log('accessToken saved'); }",
-                  "if (rt) { pm.collectionVariables.set('refreshToken', rt); console.log('refreshToken saved'); }"
-                ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
               }
             }
           ],
@@ -185,30 +93,47 @@
           "response": []
         },
         {
-          "name": "4. UserInfo (Bearer)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "pm.test('Has result claims', () => pm.expect(j).to.have.property('result'));"
-                ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
-              }
-            }
-          ],
+          "name": "refresh",
           "request": {
-            "method": "GET",
+            "method": "POST",
             "header": [
               {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"refreshToken\": \"{{refreshToken}}\" }"
+            },
+            "url": {
+              "raw": "{{identityBaseUrl}}/auth/refresh",
+              "host": [
+                "{{identityBaseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "userinfo",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
             "url": {
               "raw": "{{identityBaseUrl}}/auth/userinfo",
               "host": [
@@ -223,23 +148,7 @@
           "response": []
         },
         {
-          "name": "5. Introspect",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "const r = j && j.result;",
-                  "if (r && (r.active === true || r.active === 'true')) {",
-                  "    console.log('Token active');",
-                  "}"
-                ]
-              }
-            }
-          ],
+          "name": "introspect",
           "request": {
             "method": "POST",
             "header": [
@@ -250,7 +159,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"token\": \"{{accessToken}}\"\n}"
+              "raw": "{ \"token\": \"{{accessToken}}\" }"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/auth/introspect",
@@ -266,7 +175,7 @@
           "response": []
         },
         {
-          "name": "6. Logout",
+          "name": "logout",
           "request": {
             "method": "POST",
             "header": [
@@ -277,7 +186,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+              "raw": "{ \"refreshToken\": \"{{refreshToken}}\" }"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/auth/logout",
@@ -295,28 +204,10 @@
       ]
     },
     {
-      "name": "II. Users",
+      "name": "2. Users",
       "item": [
         {
-          "name": "1. Create user (auto userId)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "if (j && j.result && typeof j.result === 'string') {",
-                  "    pm.collectionVariables.set('userId', j.result);",
-                  "    console.log('userId saved:', j.result);",
-                  "} else { console.warn('Expected result as user id string'); }"
-                ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
-              }
-            }
-          ],
+          "name": "create",
           "request": {
             "method": "POST",
             "header": [
@@ -327,7 +218,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"nvminh1602\",\n  \"enabled\": true,\n  \"email\": \"nvminh1602@gmail.com\",\n  \"emailVerified\": false,\n  \"firstName\": \"API\",\n  \"lastName\": \"Test\",\n  \"credentials\": [\n    {\n      \"type\": \"password\",\n      \"value\": \"123456789\",\n      \"temporary\": false\n    }\n  ]\n}"
+              "raw": "{\n  \"username\": \"{{newUsername}}\",\n  \"enabled\": true,\n  \"email\": \"{{newEmail}}\",\n  \"emailVerified\": true,\n  \"firstName\": \"API\",\n  \"lastName\": \"User\",\n  \"credentials\": [\n    { \"type\": \"password\", \"value\": \"123456789\", \"temporary\": false }\n  ]\n}"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/users",
@@ -342,7 +233,7 @@
           "response": []
         },
         {
-          "name": "2. List users",
+          "name": "list (param?id)",
           "request": {
             "method": "GET",
             "header": [],
@@ -353,46 +244,12 @@
               ],
               "path": [
                 "users"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "3. Find by username (auto userId)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "const arr = j && j.result;",
-                  "if (Array.isArray(arr) && arr.length > 0) {",
-                  "    const u = arr[0];",
-                  "    const id = u.id || u.userId;",
-                  "    if (id) { pm.collectionVariables.set('userId', id); console.log('userId:', id); }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{identityBaseUrl}}/users?username={{loginUsername}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users"
               ],
               "query": [
                 {
                   "key": "username",
-                  "value": "{{loginUsername}}"
+                  "value": "{{newUsername}}",
+                  "disabled": true
                 }
               ]
             }
@@ -400,8 +257,18 @@
           "response": []
         },
         {
-          "name": "4. Get user by id",
+          "name": "getById",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -418,7 +285,7 @@
           "response": []
         },
         {
-          "name": "5. Update user",
+          "name": "update",
           "request": {
             "method": "PUT",
             "header": [
@@ -429,7 +296,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"Name\",\n  \"email\": \"updated@example.com\",\n  \"emailVerified\": false,\n  \"enabled\": false\n}"
+              "raw": "{ \"firstName\": \"Updated\", \"lastName\": \"User\", \"email\": \"{{newEmail}}\", \"enabled\": true, \"emailVerified\": true }"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/users/{{userId}}",
@@ -445,8 +312,18 @@
           "response": []
         },
         {
-          "name": "6. Get credentials",
+          "name": "credentials",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -464,7 +341,7 @@
           "response": []
         },
         {
-          "name": "7. Reset password",
+          "name": "reset-password",
           "request": {
             "method": "PUT",
             "header": [
@@ -475,7 +352,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"type\": \"password\",\n  \"value\": \"123456789!\",\n  \"temporary\": false\n}"
+              "raw": "{ \"type\": \"password\", \"value\": \"123456789\", \"temporary\": false }"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/users/{{userId}}/reset-password",
@@ -492,7 +369,7 @@
           "response": []
         },
         {
-          "name": "8. Role mappings",
+          "name": "role-mappings",
           "request": {
             "method": "GET",
             "header": [],
@@ -511,7 +388,7 @@
           "response": []
         },
         {
-          "name": "9. Sessions",
+          "name": "sessions",
           "request": {
             "method": "GET",
             "header": [],
@@ -530,7 +407,7 @@
           "response": []
         },
         {
-          "name": "10. Assign realm roles",
+          "name": "assign-realm-roles",
           "request": {
             "method": "POST",
             "header": [
@@ -541,7 +418,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"id\": \"{{roleId}}\",\n    \"name\": \"{{roleName}}\"\n  }\n]"
+              "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/users/{{userId}}/realm-role-mappings",
@@ -558,7 +435,7 @@
           "response": []
         },
         {
-          "name": "11. Remove realm roles",
+          "name": "remove-realm-roles",
           "request": {
             "method": "DELETE",
             "header": [
@@ -569,7 +446,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"id\": \"{{roleId}}\",\n    \"name\": \"{{roleName}}\"\n  }\n]"
+              "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/users/{{userId}}/realm-role-mappings",
@@ -586,7 +463,7 @@
           "response": []
         },
         {
-          "name": "12. Delete user",
+          "name": "delete",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -606,10 +483,10 @@
       ]
     },
     {
-      "name": "III. Roles",
+      "name": "3. Roles",
       "item": [
         {
-          "name": "1. Create role",
+          "name": "create",
           "request": {
             "method": "POST",
             "header": [
@@ -620,7 +497,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"{{permissionRoleName}}\",\n  \"description\": \"{{newRoleDescription}}\"\n}"
+              "raw": "{ \"name\": \"{{roleName}}\", \"description\": \"Created via Postman\" }"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/roles",
@@ -635,7 +512,7 @@
           "response": []
         },
         {
-          "name": "2. List roles",
+          "name": "list",
           "request": {
             "method": "GET",
             "header": [],
@@ -652,61 +529,7 @@
           "response": []
         },
         {
-          "name": "3a. Get permission role by name (auto permissionRoleId)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "const role = j && j.result;",
-                  "if (role && role.id) {",
-                  "    pm.collectionVariables.set('permissionRoleId', role.id);",
-                  "    console.log('permissionRoleId:', role.id);",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{identityBaseUrl}}/roles/by-name/{{permissionRoleName}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "roles",
-                "by-name",
-                "{{permissionRoleName}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "3b. Get role by name (auto roleId + roleName)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "const role = j && j.result;",
-                  "if (role && role.id) {",
-                  "    pm.collectionVariables.set('roleId', role.id);",
-                  "    pm.collectionVariables.set('roleName', role.name || role.id);",
-                  "    console.log('roleId:', role.id, 'roleName:', role.name);",
-                  "}"
-                ]
-              }
-            }
-          ],
+          "name": "by-name",
           "request": {
             "method": "GET",
             "header": [],
@@ -725,7 +548,7 @@
           "response": []
         },
         {
-          "name": "4. Get role by id",
+          "name": "by-id",
           "request": {
             "method": "GET",
             "header": [],
@@ -744,7 +567,7 @@
           "response": []
         },
         {
-          "name": "5. Add composite roles",
+          "name": "add-composite",
           "request": {
             "method": "POST",
             "header": [
@@ -755,16 +578,16 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"id\": \"{{permissionRoleId}}\",\n    \"name\": \"{{permissionRoleName}}\"\n  }\n]"
+              "raw": "[{ \"id\": \"{{permissionRoleId}}\", \"name\": \"{{permissionRoleName}}\" }]"
             },
             "url": {
-              "raw": "{{identityBaseUrl}}/roles/{{compositeParentRole}}/composites",
+              "raw": "{{identityBaseUrl}}/roles/{{roleName}}/composites",
               "host": [
                 "{{identityBaseUrl}}"
               ],
               "path": [
                 "roles",
-                "{{compositeParentRole}}",
+                "{{roleName}}",
                 "composites"
               ]
             }
@@ -772,18 +595,18 @@
           "response": []
         },
         {
-          "name": "6. Get composite roles",
+          "name": "list-composite",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{identityBaseUrl}}/roles/{{compositeParentRole}}/composites",
+              "raw": "{{identityBaseUrl}}/roles/{{roleName}}/composites",
               "host": [
                 "{{identityBaseUrl}}"
               ],
               "path": [
                 "roles",
-                "{{compositeParentRole}}",
+                "{{roleName}}",
                 "composites"
               ]
             }
@@ -791,7 +614,7 @@
           "response": []
         },
         {
-          "name": "7. Remove composite roles",
+          "name": "remove-composite",
           "request": {
             "method": "DELETE",
             "header": [
@@ -802,16 +625,16 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"id\": \"{{permissionRoleId}}\",\n    \"name\": \"{{permissionRoleName}}\"\n  }\n]"
+              "raw": "[{ \"id\": \"{{permissionRoleId}}\", \"name\": \"{{permissionRoleName}}\" }]"
             },
             "url": {
-              "raw": "{{identityBaseUrl}}/roles/{{compositeParentRole}}/composites",
+              "raw": "{{identityBaseUrl}}/roles/{{roleName}}/composites",
               "host": [
                 "{{identityBaseUrl}}"
               ],
               "path": [
                 "roles",
-                "{{compositeParentRole}}",
+                "{{roleName}}",
                 "composites"
               ]
             }
@@ -819,18 +642,18 @@
           "response": []
         },
         {
-          "name": "8. Delete role (by name)",
+          "name": "delete",
           "request": {
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{identityBaseUrl}}/roles/{{permissionRoleName}}",
+              "raw": "{{identityBaseUrl}}/roles/{{roleName}}",
               "host": [
                 "{{identityBaseUrl}}"
               ],
               "path": [
                 "roles",
-                "{{permissionRoleName}}"
+                "{{roleName}}"
               ]
             }
           },
@@ -839,28 +662,10 @@
       ]
     },
     {
-      "name": "IV. Groups",
+      "name": "4. Groups & Membership",
       "item": [
         {
-          "name": "1. Create group (auto groupId)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "const j = pm.response.json();",
-                  "if (j && j.result && typeof j.result === 'string') {",
-                  "    pm.collectionVariables.set('groupId', j.result);",
-                  "    console.log('groupId saved:', j.result);",
-                  "}"
-                ],
-                "type": "text/javascript",
-                "packages": {},
-                "requests": {}
-              }
-            }
-          ],
+          "name": "create-group",
           "request": {
             "method": "POST",
             "header": [
@@ -871,7 +676,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"{{newGroupName}}\"\n}"
+              "raw": "{ \"name\": \"{{groupName}}\" }"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/groups",
@@ -886,45 +691,12 @@
           "response": []
         },
         {
-          "name": "2. List groups",
+          "name": "list-groups",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{identityBaseUrl}}/groups",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "groups"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "3. List groups (search)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const j = pm.response.json();",
-                  "const arr = j && j.result;",
-                  "if (Array.isArray(arr) && arr.length > 0) {",
-                  "    const g = arr.find(x => x.name === pm.collectionVariables.get('newGroupName')) || arr[0];",
-                  "    if (g && g.id) { pm.collectionVariables.set('groupId', g.id); console.log('groupId:', g.id); }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{identityBaseUrl}}/groups?search={{newGroupName}}",
+              "raw": "{{identityBaseUrl}}/groups?search={{groupName}}",
               "host": [
                 "{{identityBaseUrl}}"
               ],
@@ -934,7 +706,7 @@
               "query": [
                 {
                   "key": "search",
-                  "value": "{{newGroupName}}"
+                  "value": "{{groupName}}"
                 }
               ]
             }
@@ -942,7 +714,7 @@
           "response": []
         },
         {
-          "name": "4. Group role mappings",
+          "name": "group-role-mappings",
           "request": {
             "method": "GET",
             "header": [],
@@ -961,7 +733,7 @@
           "response": []
         },
         {
-          "name": "5. Assign realm roles to group",
+          "name": "assign-group-roles",
           "request": {
             "method": "POST",
             "header": [
@@ -972,7 +744,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"id\": \"{{roleId}}\",\n    \"name\": \"{{roleName}}\"\n  }\n]"
+              "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/groups/{{groupId}}/realm-role-mappings",
@@ -989,7 +761,7 @@
           "response": []
         },
         {
-          "name": "6. Remove realm roles from group",
+          "name": "remove-group-roles",
           "request": {
             "method": "DELETE",
             "header": [
@@ -1000,7 +772,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"id\": \"{{roleId}}\",\n    \"name\": \"{{roleName}}\"\n  }\n]"
+              "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/groups/{{groupId}}/realm-role-mappings",
@@ -1017,7 +789,7 @@
           "response": []
         },
         {
-          "name": "7. Group members",
+          "name": "group-members",
           "request": {
             "method": "GET",
             "header": [],
@@ -1036,30 +808,7 @@
           "response": []
         },
         {
-          "name": "8. Delete group",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{identityBaseUrl}}/groups/{{groupId}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "groups",
-                "{{groupId}}"
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "V. User ↔ Group",
-      "item": [
-        {
-          "name": "1. Add user to group",
+          "name": "add-user-to-group",
           "request": {
             "method": "PUT",
             "header": [],
@@ -1079,7 +828,7 @@
           "response": []
         },
         {
-          "name": "2. Groups of user",
+          "name": "groups-of-user",
           "request": {
             "method": "GET",
             "header": [],
@@ -1098,7 +847,7 @@
           "response": []
         },
         {
-          "name": "3. Remove user from group",
+          "name": "remove-user-from-group",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -1116,6 +865,24 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "delete-group",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{identityBaseUrl}}/groups/{{groupId}}",
+              "host": [
+                "{{identityBaseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }
@@ -1125,21 +892,9 @@
       "listen": "prerequest",
       "script": {
         "type": "text/javascript",
-        "packages": {},
-        "requests": {},
         "exec": [
-          ""
-        ]
-      }
-    },
-    {
-      "listen": "test",
-      "script": {
-        "type": "text/javascript",
-        "packages": {},
-        "requests": {},
-        "exec": [
-          ""
+          "const t = pm.collectionVariables.get('accessToken');",
+          "if (t && !pm.request.headers.has('Authorization') && !pm.request.url.toString().includes('/auth/login') && !pm.request.url.toString().includes('/auth/register') && !pm.request.url.toString().includes('/auth/refresh') && !pm.request.url.toString().includes('/auth/introspect') && !pm.request.url.toString().includes('/auth/openid-configuration')) pm.request.headers.add({ key: 'Authorization', value: `Bearer ${t}` });"
         ]
       }
     }
@@ -1147,7 +902,7 @@
   "variable": [
     {
       "key": "identityBaseUrl",
-      "value": "http://localhost:8080"
+      "value": "http://localhost:8082"
     },
     {
       "key": "loginUsername",
@@ -1155,6 +910,18 @@
     },
     {
       "key": "loginPassword",
+      "value": "123456789"
+    },
+    {
+      "key": "registerUsername",
+      "value": "api_register_001"
+    },
+    {
+      "key": "registerEmail",
+      "value": "api_register_001@nexatech.local"
+    },
+    {
+      "key": "registerPassword",
       "value": "123456789"
     },
     {
@@ -1170,8 +937,12 @@
       "value": ""
     },
     {
-      "key": "groupId",
-      "value": ""
+      "key": "newUsername",
+      "value": "api_user_identity"
+    },
+    {
+      "key": "newEmail",
+      "value": "api_user_identity@nexatech.local"
     },
     {
       "key": "roleId",
@@ -1182,28 +953,20 @@
       "value": "ADMIN"
     },
     {
-      "key": "compositeParentRole",
-      "value": "ADMIN"
+      "key": "permissionRoleId",
+      "value": ""
     },
     {
       "key": "permissionRoleName",
       "value": "USER_VIEW"
     },
     {
-      "key": "permissionRoleId",
+      "key": "groupId",
       "value": ""
     },
     {
-      "key": "newGroupName",
+      "key": "groupName",
       "value": "TEST_GROUP"
-    },
-    {
-      "key": "newRoleDescription",
-      "value": "Created via Postman"
-    },
-    {
-      "key": "openidIssuer",
-      "value": ""
     }
   ]
 }
