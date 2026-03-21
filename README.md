@@ -1,15 +1,3 @@
-```
-public enum UserRole {
-    ADMIN,
-    MANAGER,
-    STAFF,
-    WAREHOUSE,
-    ACCOUNTANT,
-    CUSTOMER
-}
-```
-
-
 <div align="center">
   <a href="https://ibb.co/0pjPLMSK">
     <img src="https://i.ibb.co/7xJ7DW5Q/nexatech-bg.jpg" alt="NexaTech Banner" width="100%" />
