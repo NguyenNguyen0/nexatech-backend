@@ -11,7 +11,7 @@ import com.nexatech.user.dto.request.IdentityUserUpdateRequest;
 @FeignClient(name = "identity-service", url = "${openfeign.identity-service.url}")
 public interface IdentityClient {
 
-    @PutMapping("/users/{userId}")
+    @PutMapping("/internal/users/{userId}")
     ApiResponse<Void> updateUser(@PathVariable("userId") String userId,
             @RequestBody IdentityUserUpdateRequest request);
 }

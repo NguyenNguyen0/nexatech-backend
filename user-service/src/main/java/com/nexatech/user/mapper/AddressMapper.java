@@ -16,6 +16,7 @@ public interface AddressMapper {
     Address toEntity(AddressRequest request);
 
     @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "isDefault", expression = "java(address.isDefault())")
     AddressResponse toResponse(Address address);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
