@@ -1,50 +1,70 @@
 package com.nexatech.user.controller;
 
-import com.nexatech.user.dto.response.ApiResponse;
-import com.nexatech.user.dto.response.PageResponse;
-import com.nexatech.user.dto.UpdateProfileRequest;
-import com.nexatech.user.dto.UserProfileResponse;
-import com.nexatech.user.service.UserProfileService;
-import jakarta.validation.Valid;
+import java.util.List;
+
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.nexatech.user.dto.base.ApiResponse;
+import com.nexatech.user.dto.request.UserCreationRequest;
+import com.nexatech.user.dto.request.UserUpdatenRequest;
+import com.nexatech.user.dto.response.UserResponse;
+import com.nexatech.user.service.UserService;
+
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
-import org.springframework.web.bind.annotation.*;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 
-import java.util.UUID;
-
+@Slf4j
 @RestController
-@RequestMapping("/api/v1/users")
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @RequiredArgsConstructor
+@RequestMapping("/users")
 public class UserController {
 
-    private final UserProfileService userProfileService;
+    UserService userService;
 
-    @GetMapping("/me")
-    public ApiResponse<UserProfileResponse> getMyProfile(@RequestHeader("X-User-Id") UUID userId) {
-        return ApiResponse.ok(userProfileService.getProfile(userId));
-    }
-
-    @PutMapping("/me")
-    public ApiResponse<UserProfileResponse> updateMyProfile(
-            @RequestHeader("X-User-Id") UUID userId,
-            @Valid @RequestBody UpdateProfileRequest request) {
-        return ApiResponse.ok(userProfileService.updateProfile(userId, request));
-    }
-
-    @GetMapping("/{id}")
-    public ApiResponse<UserProfileResponse> getUserById(@PathVariable UUID id) {
-        return ApiResponse.ok(userProfileService.getProfile(id));
+    @PostMapping
+    public ApiResponse<UserResponse> createUser(@RequestBody UserCreationRequest request) {
+        return ApiResponse.<UserResponse>builder()
+                .result(userService.createUser(request))
+                .build();
     }
 
     @GetMapping
-    public ApiResponse<PageResponse<UserProfileResponse>> getAllUsers(Pageable pageable) {
-        var page = userProfileService.getAllUsers(pageable);
-        return ApiResponse.ok(PageResponse.of(page));
+    public ApiResponse<List<UserResponse>> getAllUsers(
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        return ApiResponse.<List<UserResponse>>builder()
+                .result(userService.getAllUsers())
+                .build();
     }
 
-    @DeleteMapping("/{id}")
-    public ApiResponse<Void> deactivateUser(@PathVariable UUID id) {
-        userProfileService.deactivateUser(id);
-        return ApiResponse.ok(null);
+    @GetMapping("/{userId}")
+    public ApiResponse<UserResponse> getUserById(@PathVariable String userId) {
+        return ApiResponse.<UserResponse>builder()
+                .result(userService.getUserById(userId))
+                .build();
+    }
+
+    @PutMapping("/{userId}")
+    public ApiResponse<UserResponse> updateUser(@PathVariable String userId, @RequestBody UserUpdatenRequest request) {
+        return ApiResponse.<UserResponse>builder()
+                .result(userService.updateUser(userId, request))
+                .build();
+    }
+
+    @DeleteMapping("/{userId}")
+    public ApiResponse<Void> deleteUser(@PathVariable String userId) {
+        userService.deleteUser(userId);
+        return ApiResponse.<Void>builder()
+                .build();
     }
 }
