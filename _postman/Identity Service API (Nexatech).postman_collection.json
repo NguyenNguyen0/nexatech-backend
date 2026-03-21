@@ -46,7 +46,7 @@
           "response": []
         },
         {
-          "name": "2. Login (auto access + refresh)",
+          "name": "2. Register user",
           "event": [
             {
               "listen": "test",
@@ -77,16 +77,16 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{loginUsername}}\",\n  \"password\": \"{{loginPassword}}\"\n}"
+              "raw": "{\n    \"username\": \"nvminh1625\",\n    \"enabled\": true,\n    \"email\": \"nvminh1625@gmail.com\",\n    \"emailVerified\": true,\n    \"firstName\": \"Minh\",\n    \"lastName\": \"Nguyen\",\n    \"credentials\": [\n        {\n            \"type\": \"password\",\n            \"value\": \"123456789\",\n            \"temporary\": false\n        }\n    ]\n}"
             },
             "url": {
-              "raw": "{{identityBaseUrl}}/auth/login",
+              "raw": "{{identityBaseUrl}}/auth/register",
               "host": [
                 "{{identityBaseUrl}}"
               ],
               "path": [
                 "auth",
-                "login"
+                "register"
               ]
             }
           },
@@ -138,17 +138,66 @@
           "response": []
         },
         {
+          "name": "2. Login (auto access + refresh)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "const r = j && j.result;",
+                  "if (!r) { console.warn('No result'); return; }",
+                  "const at = r.access_token || r.accessToken;",
+                  "const rt = r.refresh_token || r.refreshToken;",
+                  "if (at) { pm.collectionVariables.set('accessToken', at); console.log('accessToken saved'); }",
+                  "if (rt) { pm.collectionVariables.set('refreshToken', rt); console.log('refreshToken saved'); }"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{loginUsername}}\",\n  \"password\": \"{{loginPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{identityBaseUrl}}/auth/login",
+              "host": [
+                "{{identityBaseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "4. UserInfo (Bearer)",
           "event": [
             {
               "listen": "test",
               "script": {
-                "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "const j = pm.response.json();",
                   "pm.test('Has result claims', () => pm.expect(j).to.have.property('result'));"
-                ]
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
               }
             }
           ],
@@ -254,7 +303,6 @@
             {
               "listen": "test",
               "script": {
-                "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "const j = pm.response.json();",
@@ -262,7 +310,10 @@
                   "    pm.collectionVariables.set('userId', j.result);",
                   "    console.log('userId saved:', j.result);",
                   "} else { console.warn('Expected result as user id string'); }"
-                ]
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
               }
             }
           ],
@@ -276,7 +327,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"api_test_user\",\n  \"enabled\": true,\n  \"email\": \"api_test_user@example.com\",\n  \"emailVerified\": false,\n  \"firstName\": \"API\",\n  \"lastName\": \"Test\",\n  \"credentials\": [\n    {\n      \"type\": \"password\",\n      \"value\": \"TempPass123!\",\n      \"temporary\": false\n    }\n  ]\n}"
+              "raw": "{\n  \"username\": \"nvminh1602\",\n  \"enabled\": true,\n  \"email\": \"nvminh1602@gmail.com\",\n  \"emailVerified\": false,\n  \"firstName\": \"API\",\n  \"lastName\": \"Test\",\n  \"credentials\": [\n    {\n      \"type\": \"password\",\n      \"value\": \"123456789\",\n      \"temporary\": false\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/users",
