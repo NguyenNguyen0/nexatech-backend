@@ -14,22 +14,10 @@ spring:
   flyway:
     enabled: false
   kafka:
-    bootstrap-servers: localhost:9092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     consumer:
       group-id: payment-service-group
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: com.nexatech.*
-        # Tăng timeout để tránh crash khi Kafka khởi động chậm hơn service
         request.timeout.ms: 30000
         default.api.timeout.ms: 30000
         reconnect.backoff.ms: 1000
         reconnect.backoff.max.ms: 10000
-    listener:
-      # Không crash khi topic chưa được tạo (Kafka tự tạo topic qua KAFKA_AUTO_CREATE_TOPICS_ENABLE)
-      missing-topics-fatal: false
