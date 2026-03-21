@@ -1,6 +1,17 @@
 server:
   port: 8082
 
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID}
+
 keycloak:
   url: ${KEYCLOAK_URL}
   realm: ${KEYCLOAK_REALM}
