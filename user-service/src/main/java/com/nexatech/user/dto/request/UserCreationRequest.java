@@ -27,6 +27,5 @@ public class UserCreationRequest {
     String phone;
     LocalDate dob;
     Gender gender;
-    String password;
     Boolean onBoarded;
 }

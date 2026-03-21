@@ -1,6 +1,7 @@
 package com.nexatech.user.service.impl;
 
 import java.util.List;
+import java.util.UUID;
 
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
@@ -36,8 +37,8 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = userMapper.toUser(request);
-
-        user.setOnBoarded(false);
+        
+        user.setId(UUID.randomUUID().toString());
 
         return userMapper.toResponse(userRepository.save(user));
     }
