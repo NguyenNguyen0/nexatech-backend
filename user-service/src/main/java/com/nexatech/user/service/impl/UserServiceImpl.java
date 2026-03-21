@@ -37,8 +37,14 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = userMapper.toUser(request);
-        
-        user.setId(UUID.randomUUID().toString());
+        if (request.getId() != null && !request.getId().isBlank()) {
+            user.setId(request.getId());
+        } else {
+            user.setId(UUID.randomUUID().toString());
+        }
+        if (user.getOnBoarded() == null) {
+            user.setOnBoarded(false);
+        }
 
         return userMapper.toResponse(userRepository.save(user));
     }

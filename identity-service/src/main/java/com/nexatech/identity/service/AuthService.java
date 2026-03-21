@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 
 import com.nexatech.identity.client.keycloak.KeycloakAuthClient;
+import com.nexatech.identity.client.user.UserClient;
 import com.nexatech.identity.dto.request.IntrospectParam;
 import com.nexatech.identity.dto.request.IntrospectTokenRequest;
 import com.nexatech.identity.dto.request.LoginRequest;
@@ -13,8 +14,13 @@ import com.nexatech.identity.dto.request.LogoutParam;
 import com.nexatech.identity.dto.request.LogoutRequest;
 import com.nexatech.identity.dto.request.RefreshTokenParam;
 import com.nexatech.identity.dto.request.RefreshTokenRequest;
+import com.nexatech.identity.dto.request.UserCreationParam;
+import com.nexatech.identity.dto.request.UserClientRequest;
 import com.nexatech.identity.dto.request.UserTokenExchangeParam;
 import com.nexatech.identity.dto.response.UserTokenExchangeResponse;
+import com.nexatech.identity.exception.AppException;
+import com.nexatech.identity.exception.ErrorCode;
+import com.nexatech.identity.mapper.UserClientMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,15 +29,30 @@ import lombok.RequiredArgsConstructor;
 public class AuthService {
 
     private final KeycloakAuthClient keycloakAuthClient;
+    private final UserService userService;
+    private final UserClient userClient;
+    private final UserClientMapper userClientMapper;
 
-    @Value("${keycloak.realm}")
+    @Value("${openfeign.keycloak.realm}")
     private String realm;
 
-    @Value("${keycloak.client-id}")
+    @Value("${openfeign.keycloak.client-id}")
     private String clientId;
 
-    @Value("${keycloak.client-secret}")
+    @Value("${openfeign.keycloak.client-secret}")
     private String clientSecret;
+
+    public String register(UserCreationParam param) {
+        String createdUserId = userService.createUser(param);
+        try {
+            UserClientRequest request = userClientMapper.toProvisionRequest(createdUserId, param);
+            userClient.createUser(request);
+            return createdUserId;
+        } catch (Exception ex) {
+            userService.deleteUser(createdUserId); // nếu lỗi thì bỏ hành động vừa tạo user trong keycloak
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+        }
+    }
 
     public UserTokenExchangeResponse login(LoginRequest request) {
         if (request == null || request.getUsername() == null || request.getUsername().isBlank()) {

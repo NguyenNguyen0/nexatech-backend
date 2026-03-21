@@ -20,7 +20,7 @@ import com.nexatech.identity.dto.request.UserUpdateParam;
 
 import feign.Response;
 
-@FeignClient(name = "keycloak", contextId = "keycloakUser", url = "${keycloak.url}")
+@FeignClient(name = "keycloak", contextId = "keycloakUser", url = "${openfeign.keycloak.url}")
 public interface KeycloakUserClient {
 
     @PostMapping(value = "/admin/realms/{realm}/users", consumes = MediaType.APPLICATION_JSON_VALUE)

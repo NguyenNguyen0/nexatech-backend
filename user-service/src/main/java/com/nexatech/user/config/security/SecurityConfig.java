@@ -12,18 +12,19 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
-        private static final String[] PUBLIC_ENDPOINTS = {
-                        "/actuator/**",
-                        "/v3/api-docs/**",
-                        "/swagger-ui/**",
-                        "/swagger-ui.html" };
+        // private static final String[] PUBLIC_ENDPOINTS = {
+        //                 "/actuator/**",
+        //                 "/v3/api-docs/**",
+        //                 "/swagger-ui/**",
+        //                 "/swagger-ui.html" };
 
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
-                httpSecurity.authorizeHttpRequests(request -> request.requestMatchers(PUBLIC_ENDPOINTS)
-                                .permitAll()
-                                .anyRequest()
-                                .authenticated());
+                // httpSecurity.authorizeHttpRequests(request -> request.requestMatchers(PUBLIC_ENDPOINTS)
+                //                 .permitAll()
+                //                 .anyRequest()
+                //                 .authenticated());
+                httpSecurity.authorizeHttpRequests(request -> request.anyRequest().permitAll());
 
                 httpSecurity.oauth2ResourceServer(oauth2 -> oauth2.jwt(
                                 jwtConfigurer -> jwtConfigurer.jwtAuthenticationConverter(jwtAuthenticationConverter()))

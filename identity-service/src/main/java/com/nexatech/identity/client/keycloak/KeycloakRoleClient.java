@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import com.nexatech.identity.dto.request.KeycloakRoleRef;
 import com.nexatech.identity.dto.request.RoleCreateParam;
 
-@FeignClient(name = "keycloak", contextId = "keycloakRole", url = "${keycloak.url}")
+@FeignClient(name = "keycloak", contextId = "keycloakRole", url = "${openfeign.keycloak.url}")
 public interface KeycloakRoleClient {
 
     @PostMapping(value = "/admin/realms/{realm}/roles", consumes = MediaType.APPLICATION_JSON_VALUE)

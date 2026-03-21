@@ -14,6 +14,7 @@ import com.nexatech.identity.dto.request.IntrospectTokenRequest;
 import com.nexatech.identity.dto.request.LoginRequest;
 import com.nexatech.identity.dto.request.LogoutRequest;
 import com.nexatech.identity.dto.request.RefreshTokenRequest;
+import com.nexatech.identity.dto.request.UserCreationParam;
 import com.nexatech.identity.dto.response.UserTokenExchangeResponse;
 import com.nexatech.identity.service.AuthService;
 
@@ -28,6 +29,13 @@ import lombok.experimental.FieldDefaults;
 public class AuthController {
 
     AuthService authService;
+
+    @PostMapping("/register")
+    public ApiResponse<String> register(@RequestBody UserCreationParam param) {
+        return ApiResponse.<String>builder()
+                .result(authService.register(param))
+                .build();
+    }
 
     @PostMapping("/login")
     public ApiResponse<UserTokenExchangeResponse> login(@RequestBody LoginRequest request) {

@@ -22,7 +22,7 @@ public class GroupService {
     private final KeycloakGroupClient keycloakGroupClient;
     private final KeycloakAdminTokenProvider adminTokenProvider;
 
-    @Value("${keycloak.realm}")
+    @Value("${openfeign.keycloak.realm}")
     private String realm;
 
     public String createGroup(GroupCreateParam param) {

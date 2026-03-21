@@ -20,7 +20,7 @@ public class RoleService {
     private final KeycloakRoleClient keycloakRoleClient;
     private final KeycloakAdminTokenProvider adminTokenProvider;
 
-    @Value("${keycloak.realm}")
+    @Value("${openfeign.keycloak.realm}")
     private String realm;
 
     public void createRole(RoleCreateParam param) {

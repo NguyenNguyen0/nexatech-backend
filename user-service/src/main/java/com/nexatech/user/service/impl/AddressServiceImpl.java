@@ -24,6 +24,7 @@ import lombok.experimental.FieldDefaults;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AddressServiceImpl implements AddressService {
+
     AddressRepository addressRepository;
     UserRepository userRepository;
     AddressMapper addressMapper;
@@ -33,6 +34,7 @@ public class AddressServiceImpl implements AddressService {
         if (request == null || userId == null || userId.isBlank()) {
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }
+
         User user = userRepository.findByIdAndActiveTrue(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
