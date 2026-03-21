@@ -8,19 +8,15 @@ import com.nexatech.user.dto.response.UserResponse;
 import com.nexatech.user.exception.AppException;
 import com.nexatech.user.exception.ErrorCode;
 import com.nexatech.user.mapper.UserMapper;
-import com.nexatech.user.model.Role;
 import com.nexatech.user.model.User;
-import com.nexatech.user.repository.RoleRepository;
 import com.nexatech.user.repository.UserRepository;
 import com.nexatech.user.service.UserService;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
 
 @Service
 @RequiredArgsConstructor
@@ -28,20 +24,7 @@ import lombok.experimental.NonFinal;
 public class UserServiceImpl implements UserService {
 
     UserRepository userRepository;
-    RoleRepository roleRepository;
     UserMapper userMapper;
-
-    @NonFinal
-    @Value("${keycloak.realm}")
-    String realm;
-
-    @NonFinal
-    @Value("${keycloak.client-id}")
-    String clientId;
-
-    @NonFinal
-    @Value("${keycloak.client-secret}")
-    String clientSecret;
 
     @Override
     public UserResponse createUser(UserCreationRequest request) {
@@ -55,12 +38,6 @@ public class UserServiceImpl implements UserService {
         User user = userMapper.toUser(request);
 
         user.setOnBoarded(false);
-
-        if (request.getRoleId() != null) {
-            Role role = roleRepository.findById(request.getRoleId())
-                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
-            user.setRole(role);
-        }
 
         return userMapper.toResponse(userRepository.save(user));
     }
@@ -89,12 +66,6 @@ public class UserServiceImpl implements UserService {
             if (!dto.getEmail().equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(dto.getEmail())) {
                 throw new AppException(ErrorCode.USER_EMAIL_EXISTS);
             }
-        }
-
-        if (dto != null && dto.getRoleId() != null) {
-            Role role = roleRepository.findById(dto.getRoleId())
-                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
-            user.setRole(role);
         }
 
         if (dto != null) {
