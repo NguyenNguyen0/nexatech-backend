@@ -22,6 +22,7 @@ public enum ErrorCode {
     USER_EXISTED(2022, "User already exists", HttpStatus.BAD_REQUEST),
     EMAIL_EXISTED(2022, "Email already exists", HttpStatus.BAD_REQUEST),
     USERNAME_IS_MISSING(2023, "Username is missing", HttpStatus.BAD_REQUEST),
+    EMAIL_UPDATE_NOT_ALLOWED(2024, "Email update is not allowed", HttpStatus.BAD_REQUEST),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {
