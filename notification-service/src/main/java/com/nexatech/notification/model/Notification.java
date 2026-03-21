@@ -50,6 +50,7 @@ public class Notification extends BaseEntity {
     public enum NotificationStatus {
         PENDING,
         SENT,
-        FAILED
+        FAILED,
+        READ
     }
 }
