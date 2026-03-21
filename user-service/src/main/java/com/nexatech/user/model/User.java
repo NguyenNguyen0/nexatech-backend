@@ -44,10 +44,6 @@ public class User extends BaseEntity {
     @Enumerated(EnumType.STRING)
     Gender gender;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "role_id")
-    Role role;
-
     @Column(name = "on_boarded", nullable = false)
     Boolean onBoarded;
 }

@@ -1,7 +1,6 @@
 package com.nexatech.user.dto.request;
 
 import java.time.LocalDate;
-import java.util.UUID;
 
 import com.nexatech.user.model.constant.Gender;
 
@@ -29,8 +28,5 @@ public class UserCreationRequest {
     LocalDate dob;
     Gender gender;
     String password;
-
-    // optional
-    UUID roleId;
     Boolean onBoarded;
 }
