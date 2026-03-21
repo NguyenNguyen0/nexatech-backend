@@ -1,4 +1,4 @@
-package com.nexatech.identity.controller.user;
+package com.nexatech.identity.controller;
 
 import java.util.List;
 import java.util.Map;
@@ -18,7 +18,7 @@ import com.nexatech.identity.dto.request.Credential;
 import com.nexatech.identity.dto.request.KeycloakRoleRef;
 import com.nexatech.identity.dto.request.UserCreationParam;
 import com.nexatech.identity.dto.request.UserUpdateParam;
-import com.nexatech.identity.service.user.UserService;
+import com.nexatech.identity.service.UserService;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

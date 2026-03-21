@@ -1,4 +1,4 @@
-package com.nexatech.identity.service.membership;
+package com.nexatech.identity.service;
 
 import java.util.List;
 import java.util.Map;
@@ -6,7 +6,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.nexatech.identity.client.keycloak.membership.KeycloakGroupUserClient;
+import com.nexatech.identity.client.keycloak.KeycloakGroupUserClient;
 import com.nexatech.identity.service.support.KeycloakAdminTokenProvider;
 
 import lombok.RequiredArgsConstructor;

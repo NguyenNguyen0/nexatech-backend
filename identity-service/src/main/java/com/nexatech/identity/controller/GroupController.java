@@ -1,4 +1,4 @@
-package com.nexatech.identity.controller.group;
+package com.nexatech.identity.controller;
 
 import java.util.List;
 import java.util.Map;
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.nexatech.identity.dto.base.ApiResponse;
 import com.nexatech.identity.dto.request.GroupCreateParam;
 import com.nexatech.identity.dto.request.KeycloakRoleRef;
-import com.nexatech.identity.service.group.GroupService;
+import com.nexatech.identity.service.GroupService;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

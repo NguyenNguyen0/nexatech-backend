@@ -1,4 +1,4 @@
-package com.nexatech.identity.service.user;
+package com.nexatech.identity.service;
 
 import java.util.List;
 import java.util.Map;
@@ -6,8 +6,8 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.nexatech.identity.client.keycloak.role.KeycloakRoleClient;
-import com.nexatech.identity.client.keycloak.user.KeycloakUserClient;
+import com.nexatech.identity.client.keycloak.KeycloakRoleClient;
+import com.nexatech.identity.client.keycloak.KeycloakUserClient;
 import com.nexatech.identity.dto.request.Credential;
 import com.nexatech.identity.dto.request.KeycloakRoleRef;
 import com.nexatech.identity.dto.request.UserCreationParam;

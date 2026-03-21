@@ -1,4 +1,4 @@
-package com.nexatech.identity.controller.membership;
+package com.nexatech.identity.controller;
 
 import java.util.List;
 import java.util.Map;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.identity.dto.base.ApiResponse;
-import com.nexatech.identity.service.membership.UserGroupMembershipService;
+import com.nexatech.identity.service.UserGroupMembershipService;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

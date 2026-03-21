@@ -1,4 +1,4 @@
-package com.nexatech.identity.client.keycloak.auth;
+package com.nexatech.identity.client.keycloak;
 
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.MediaType;

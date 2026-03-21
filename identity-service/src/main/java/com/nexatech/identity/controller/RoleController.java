@@ -1,4 +1,4 @@
-package com.nexatech.identity.controller.role;
+package com.nexatech.identity.controller;
 
 import java.util.List;
 import java.util.Map;
@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.nexatech.identity.dto.base.ApiResponse;
 import com.nexatech.identity.dto.request.KeycloakRoleRef;
 import com.nexatech.identity.dto.request.RoleCreateParam;
-import com.nexatech.identity.service.role.RoleService;
+import com.nexatech.identity.service.RoleService;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

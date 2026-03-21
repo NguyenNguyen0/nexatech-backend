@@ -1,11 +1,11 @@
-package com.nexatech.identity.service.auth;
+package com.nexatech.identity.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
-import com.nexatech.identity.client.keycloak.auth.KeycloakAuthClient;
+import com.nexatech.identity.client.keycloak.KeycloakAuthClient;
 import com.nexatech.identity.dto.request.IntrospectParam;
 import com.nexatech.identity.dto.request.IntrospectTokenRequest;
 import com.nexatech.identity.dto.request.LoginRequest;

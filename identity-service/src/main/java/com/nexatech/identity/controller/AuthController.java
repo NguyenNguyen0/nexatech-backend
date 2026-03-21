@@ -1,4 +1,4 @@
-package com.nexatech.identity.controller.auth;
+package com.nexatech.identity.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,7 +15,7 @@ import com.nexatech.identity.dto.request.LoginRequest;
 import com.nexatech.identity.dto.request.LogoutRequest;
 import com.nexatech.identity.dto.request.RefreshTokenRequest;
 import com.nexatech.identity.dto.response.UserTokenExchangeResponse;
-import com.nexatech.identity.service.auth.AuthService;
+import com.nexatech.identity.service.AuthService;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

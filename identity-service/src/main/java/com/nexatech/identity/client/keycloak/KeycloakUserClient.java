@@ -1,4 +1,4 @@
-package com.nexatech.identity.client.keycloak.user;
+package com.nexatech.identity.client.keycloak;
 
 import java.util.List;
 import java.util.Map;
