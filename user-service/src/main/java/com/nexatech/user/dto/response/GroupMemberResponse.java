@@ -1,4 +1,4 @@
-package com.nexatech.user.dto.keycloak;
+package com.nexatech.user.dto.response;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -8,13 +8,16 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
-@Setter
 @Getter
+@Setter
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class LoginRequest {
+public class GroupMemberResponse {
+    String id;
     String username;
-    String password;
+    String email;
+    String firstName;
+    String lastName;
 }

@@ -1,4 +1,4 @@
-package com.nexatech.user.dto.keycloak;
+package com.nexatech.user.dto.response;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -6,21 +6,16 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 
-@Setter
 @Getter
-@ToString
+@Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class UserTokenExchangeParam {
-    String username;
-    String password;
-    String grant_type;
-    String client_id;
-    String client_secret;
-    String scope;
+public class GroupSummaryResponse {
+    String id;
+    String name;
+    String path;
 }

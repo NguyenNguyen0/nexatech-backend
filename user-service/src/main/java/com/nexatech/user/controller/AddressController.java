@@ -2,6 +2,8 @@ package com.nexatech.user.controller;
 
 import java.util.List;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -9,12 +11,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.request.AddressRequest;
 import com.nexatech.user.dto.response.AddressResponse;
+import com.nexatech.user.exception.AppException;
+import com.nexatech.user.exception.ErrorCode;
 import com.nexatech.user.service.AddressService;
 
 import lombok.AccessLevel;
@@ -22,49 +25,65 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
 @RestController
-@RequestMapping("/addresses")
+@RequestMapping("/users/me/addresses")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AddressController {
 
-    AddressService addressService;
+        AddressService addressService;
 
-    @PostMapping
-    public ApiResponse<AddressResponse> create(@RequestBody AddressRequest request) {
-        return ApiResponse.<AddressResponse>builder()
-                .result(addressService.create(request))
-                .build();
-    }
+        @PostMapping
+        public ApiResponse<AddressResponse> createAddress(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @RequestBody AddressRequest request) {
+                return ApiResponse.<AddressResponse>builder()
+                                .result(addressService.createAddress(currentUserId(jwt), request))
+                                .build();
+        }
 
-    @GetMapping
-    public ApiResponse<List<AddressResponse>> getAll(@RequestParam(value = "userId", required = false) String userId) {
-        List<AddressResponse> result = (userId == null || userId.isBlank())
-                ? addressService.getAll()
-                : addressService.getByUserId(userId);
+        @GetMapping
+        public ApiResponse<List<AddressResponse>> findMyAddresses(@AuthenticationPrincipal Jwt jwt) {
+                return ApiResponse.<List<AddressResponse>>builder()
+                                .result(addressService.findMyAddresses(currentUserId(jwt)))
+                                .build();
+        }
 
-        return ApiResponse.<List<AddressResponse>>builder()
-                .result(result)
-                .build();
-    }
+        @GetMapping("/{id}")
+        public ApiResponse<AddressResponse> findMyAddressById(@AuthenticationPrincipal Jwt jwt,
+                        @PathVariable String id) {
+                return ApiResponse.<AddressResponse>builder()
+                                .result(addressService.findMyAddressById(currentUserId(jwt), id))
+                                .build();
+        }
 
-    @GetMapping("/{id}")
-    public ApiResponse<AddressResponse> getById(@PathVariable String id) {
-        return ApiResponse.<AddressResponse>builder()
-                .result(addressService.getById(id))
-                .build();
-    }
+        @PutMapping("/{id}")
+        public ApiResponse<AddressResponse> updateMyAddress(
+                        @AuthenticationPrincipal Jwt jwt,
+                        @PathVariable String id,
+                        @RequestBody AddressRequest request) {
+                return ApiResponse.<AddressResponse>builder()
+                                .result(addressService.updateMyAddress(currentUserId(jwt), id, request))
+                                .build();
+        }
 
-    @PutMapping("/{id}")
-    public ApiResponse<AddressResponse> update(@PathVariable String id, @RequestBody AddressRequest request) {
-        return ApiResponse.<AddressResponse>builder()
-                .result(addressService.update(id, request))
-                .build();
-    }
+        @PutMapping("/{id}/default")
+        public ApiResponse<AddressResponse> setDefaultMyAddress(@AuthenticationPrincipal Jwt jwt,
+                        @PathVariable String id) {
+                return ApiResponse.<AddressResponse>builder()
+                                .result(addressService.setDefaultMyAddress(currentUserId(jwt), id))
+                                .build();
+        }
 
-    @DeleteMapping("/{id}")
-    public ApiResponse<Void> delete(@PathVariable String id) {
-        addressService.delete(id);
-        return ApiResponse.<Void>builder().build();
-    }
+        @DeleteMapping("/{id}")
+        public ApiResponse<Void> deleteMyAddress(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
+                addressService.deleteMyAddress(currentUserId(jwt), id);
+                return ApiResponse.<Void>builder().build();
+        }
+
+        private String currentUserId(Jwt jwt) {
+                if (jwt == null || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
+                        throw new AppException(ErrorCode.UNAUTHENTICATED);
+                }
+                return jwt.getSubject();
+        }
 }
-

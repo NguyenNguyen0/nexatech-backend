@@ -14,13 +14,13 @@ public class KeycloakAdminTokenProvider {
 
     private final KeycloakAuthClient keycloakAuthClient;
 
-    @Value("${keycloak.realm}")
+    @Value("${openfeign.keycloak.realm}")
     private String realm;
 
-    @Value("${keycloak.client-id}")
+    @Value("${openfeign.keycloak.client-id}")
     private String clientId;
 
-    @Value("${keycloak.client-secret}")
+    @Value("${openfeign.keycloak.client-secret}")
     private String clientSecret;
 
     public String adminAuthorizationHeader() {

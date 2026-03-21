@@ -16,4 +16,6 @@ public interface UserService {
     UserResponse updateUser(String id, UserUpdatenRequest dto);
 
     void deleteUser(String id);
+
+    void enableUser(String id);
 }

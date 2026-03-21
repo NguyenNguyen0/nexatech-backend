@@ -18,7 +18,7 @@ import com.nexatech.identity.dto.request.KeycloakRoleRef;
 
 import feign.Response;
 
-@FeignClient(name = "keycloak", contextId = "keycloakGroup", url = "${keycloak.url}")
+@FeignClient(name = "keycloak", contextId = "keycloakGroup", url = "${openfeign.keycloak.url}")
 public interface KeycloakGroupClient {
 
     @PostMapping(value = "/admin/realms/{realm}/groups", consumes = MediaType.APPLICATION_JSON_VALUE)

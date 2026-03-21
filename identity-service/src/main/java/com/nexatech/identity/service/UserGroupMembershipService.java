@@ -18,7 +18,7 @@ public class UserGroupMembershipService {
     private final KeycloakGroupUserClient keycloakGroupUserClient;
     private final KeycloakAdminTokenProvider adminTokenProvider;
 
-    @Value("${keycloak.realm}")
+    @Value("${openfeign.keycloak.realm}")
     private String realm;
 
     public void addUserToGroup(String userId, String groupId) {

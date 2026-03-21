@@ -19,7 +19,7 @@ import com.nexatech.identity.dto.response.UserTokenExchangeResponse;
 
 import feign.QueryMap;
 
-@FeignClient(name = "keycloak", contextId = "keycloakAuth", url = "${keycloak.url}")
+@FeignClient(name = "keycloak", contextId = "keycloakAuth", url = "${openfeign.keycloak.url}")
 public interface KeycloakAuthClient {
 
     @PostMapping(value = "/realms/{realm}/protocol/openid-connect/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)

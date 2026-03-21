@@ -1,4 +1,4 @@
-package com.nexatech.user.dto.keycloak;
+package com.nexatech.user.dto.response;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -8,14 +8,14 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
-@Setter
 @Getter
+@Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class Credential {
-    String type;
-    String value;
-    boolean temporary;
+public class RoleSummaryResponse {
+    String id;
+    String name;
+    String description;
 }

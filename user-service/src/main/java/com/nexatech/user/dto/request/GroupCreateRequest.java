@@ -1,4 +1,4 @@
-package com.nexatech.user.dto.keycloak;
+package com.nexatech.user.dto.request;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -8,15 +8,12 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
-@Setter
 @Getter
+@Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class TokenExchangeParam {
-    String grant_type;
-    String client_id;
-    String client_secret;
-    String scope;
+public class GroupCreateRequest {
+    String name;
 }

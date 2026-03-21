@@ -19,6 +19,7 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserCreationRequest {
+    String id;
     String email;
     String username;
     String firstName;
@@ -27,6 +28,5 @@ public class UserCreationRequest {
     String phone;
     LocalDate dob;
     Gender gender;
-    String password;
     Boolean onBoarded;
 }

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 
-@FeignClient(name = "keycloak", contextId = "keycloakGroupUser", url = "${keycloak.url}")
+@FeignClient(name = "keycloak", contextId = "keycloakGroupUser", url = "${openfeign.keycloak.url}")
 public interface KeycloakGroupUserClient {
 
     @PutMapping("/admin/realms/{realm}/users/{userId}/groups/{groupId}")
