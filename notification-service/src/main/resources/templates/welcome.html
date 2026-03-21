@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Welcome to NexaTech</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .header { text-align: center; margin-bottom: 32px; }
+        .header h1 { color: #1a73e8; font-size: 28px; margin: 0; }
+        .body-text { color: #444444; font-size: 16px; line-height: 1.6; }
+        .cta-btn { display: inline-block; margin: 24px 0; padding: 14px 32px; background-color: #1a73e8; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold; }
+        .footer { margin-top: 40px; text-align: center; color: #999999; font-size: 12px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Welcome to NexaTech! 🎉</h1>
+    </div>
+    <div class="body-text">
+        <p>Hi <strong th:text="${displayName}">there</strong>,</p>
+        <p>We're thrilled to have you on board. Your NexaTech account is ready — start exploring our marketplace today.</p>
+        <p style="text-align:center;">
+            <a class="cta-btn" href="#">Start Shopping</a>
+        </p>
+        <p>If you have any questions, our support team is always here to help.</p>
+        <p>Cheers,<br/>The NexaTech Team</p>
+    </div>
+    <div class="footer">
+        <p>&copy; 2026 NexaTech. All rights reserved.</p>
+    </div>
+</div>
+</body>
+</html>
