@@ -31,9 +31,6 @@ public class UserResponse {
     LocalDate dob;
     Gender gender;
 
-    UUID roleId;
-    String roleName;
-
     Boolean onBoarded;
     Boolean active;
     Instant createdAt;

@@ -1,7 +1,6 @@
 package com.nexatech.user.dto.request;
 
 import java.time.LocalDate;
-import java.util.UUID;
 
 import com.nexatech.user.model.constant.Gender;
 
@@ -27,6 +26,5 @@ public class UserUpdatenRequest {
     String phone;
     LocalDate dob;
     Gender gender;
-    UUID roleId;
     Boolean onBoarded;
 }
