@@ -16,15 +16,14 @@ public class SecurityConfig {
                         "/actuator/**",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
-                        "/swagger-ui.html",
-                        "/users/**" };
+                        "/swagger-ui.html" };
 
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
-                httpSecurity.authorizeHttpRequests(request -> request.requestMatchers(PUBLIC_ENDPOINTS)
-                                .permitAll()
-                                .anyRequest()
-                                .authenticated());
+                httpSecurity.authorizeHttpRequests(request -> request
+                                .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                                .requestMatchers("/internal/**").permitAll()
+                                .anyRequest().authenticated());
 
                 httpSecurity.oauth2ResourceServer(oauth2 -> oauth2.jwt(
                                 jwtConfigurer -> jwtConfigurer.jwtAuthenticationConverter(jwtAuthenticationConverter()))

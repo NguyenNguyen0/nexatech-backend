@@ -7,8 +7,7 @@ import feign.Response;
 
 public final class KeycloakResponseUtils {
 
-    private KeycloakResponseUtils() {
-    }
+    private KeycloakResponseUtils() {}
 
     public static String idFromCreatedResourceLocation(Response response, int expectedStatus) {
         if (response.status() != expectedStatus) {

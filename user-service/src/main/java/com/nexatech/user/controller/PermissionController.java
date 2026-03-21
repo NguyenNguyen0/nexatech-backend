@@ -1,20 +1,20 @@
 package com.nexatech.user.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.nexatech.user.client.IdentityIamClient;
 import com.nexatech.user.dto.base.ApiResponse;
-import com.nexatech.user.dto.request.PermissionRequest;
-import com.nexatech.user.dto.response.PermissionResponse;
-import com.nexatech.user.service.PermissionService;
+import com.nexatech.user.dto.request.RoleCreateRequest;
+import com.nexatech.user.dto.response.RoleSummaryResponse;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -26,40 +26,49 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class PermissionController {
 
-    PermissionService permissionService;
+    IdentityIamClient identityIamClient;
 
     @PostMapping
-    public ApiResponse<PermissionResponse> create(@RequestBody PermissionRequest request) {
-        return ApiResponse.<PermissionResponse>builder()
-                .result(permissionService.create(request))
-                .build();
+    public ApiResponse<Void> createPermission(@RequestBody RoleCreateRequest request) {
+        identityIamClient.createRole(request);
+        return ApiResponse.<Void>builder().build();
     }
 
     @GetMapping
-    public ApiResponse<List<PermissionResponse>> getAll() {
-        return ApiResponse.<List<PermissionResponse>>builder()
-                .result(permissionService.getAll())
+    public ApiResponse<List<RoleSummaryResponse>> listPermissions() {
+        List<RoleSummaryResponse> permissions = identityIamClient.listRoles().getResult()
+                .stream()
+                .map(this::toRoleSummary)
+                .toList();
+        return ApiResponse.<List<RoleSummaryResponse>>builder().result(permissions).build();
+    }
+
+    @GetMapping("/{permissionName}")
+    public ApiResponse<RoleSummaryResponse> getPermissionByName(@PathVariable String permissionName) {
+        return ApiResponse.<RoleSummaryResponse>builder()
+                .result(toRoleSummary(identityIamClient.getRoleByName(permissionName).getResult()))
                 .build();
     }
 
-    @GetMapping("/{id}")
-    public ApiResponse<PermissionResponse> getById(@PathVariable String id) {
-        return ApiResponse.<PermissionResponse>builder()
-                .result(permissionService.getById(id))
-                .build();
-    }
-
-    @PutMapping("/{id}")
-    public ApiResponse<PermissionResponse> update(@PathVariable String id, @RequestBody PermissionRequest request) {
-        return ApiResponse.<PermissionResponse>builder()
-                .result(permissionService.update(id, request))
-                .build();
-    }
-
-    @DeleteMapping("/{id}")
-    public ApiResponse<Void> delete(@PathVariable String id) {
-        permissionService.delete(id);
+    @DeleteMapping("/{permissionName}")
+    public ApiResponse<Void> deletePermission(@PathVariable String permissionName) {
+        identityIamClient.deleteRole(permissionName);
         return ApiResponse.<Void>builder().build();
+    }
+
+    private RoleSummaryResponse toRoleSummary(Map<String, Object> source) {
+        if (source == null) {
+            return new RoleSummaryResponse();
+        }
+        return RoleSummaryResponse.builder()
+                .id(getString(source.get("id")))
+                .name(getString(source.get("name")))
+                .description(getString(source.get("description")))
+                .build();
+    }
+
+    private String getString(Object value) {
+        return value == null ? null : value.toString();
     }
 }
 

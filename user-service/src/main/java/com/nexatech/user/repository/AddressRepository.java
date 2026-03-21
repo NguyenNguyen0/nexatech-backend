@@ -13,6 +13,7 @@ import com.nexatech.user.model.Address;
 public interface AddressRepository extends JpaRepository<Address, UUID> {
 
     Optional<Address> findByIdAndActiveTrue(UUID id);
+    Optional<Address> findByIdAndUser_IdAndActiveTrue(UUID id, String userId);
 
     List<Address> findAllByActiveTrue();
 

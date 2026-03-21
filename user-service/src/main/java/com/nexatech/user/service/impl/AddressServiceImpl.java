@@ -2,6 +2,7 @@ package com.nexatech.user.service.impl;
 
 import java.util.List;
 import java.util.UUID;
+
 import org.springframework.stereotype.Service;
 
 import com.nexatech.user.dto.request.AddressRequest;
@@ -23,16 +24,18 @@ import lombok.experimental.FieldDefaults;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AddressServiceImpl implements AddressService {
+
     AddressRepository addressRepository;
     UserRepository userRepository;
     AddressMapper addressMapper;
 
     @Override
-    public AddressResponse create(AddressRequest request) {
-        if (request == null || request.getUserId() == null) {
+    public AddressResponse createAddress(String userId, AddressRequest request) {
+        if (request == null || userId == null || userId.isBlank()) {
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }
-        User user = userRepository.findByIdAndActiveTrue(request.getUserId())
+
+        User user = userRepository.findByIdAndActiveTrue(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         Address address = addressMapper.toEntity(request);
@@ -41,19 +44,15 @@ public class AddressServiceImpl implements AddressService {
             address.setDefault(request.getIsDefault());
         }
 
-        return addressMapper.toResponse(addressRepository.save(address));
+        Address created = addressRepository.save(address);
+        if (created.isDefault()) {
+            clearOtherDefaultAddresses(userId, created.getId());
+        }
+        return addressMapper.toResponse(created);
     }
 
     @Override
-    public List<AddressResponse> getAll() {
-        return addressRepository.findAllByActiveTrue()
-                .stream()
-                .map(addressMapper::toResponse)
-                .toList();
-    }
-
-    @Override
-    public List<AddressResponse> getByUserId(String userId) {
+    public List<AddressResponse> findMyAddresses(String userId) {
         return addressRepository.findAllByUser_IdAndActiveTrue(userId)
                 .stream()
                 .map(addressMapper::toResponse)
@@ -61,22 +60,18 @@ public class AddressServiceImpl implements AddressService {
     }
 
     @Override
-    public AddressResponse getById(String id) {
-        Address address = addressRepository.findByIdAndActiveTrue(parseUuid(id))
+    public AddressResponse findMyAddressById(String userId, String id) {
+        Address address = addressRepository.findByIdAndUser_IdAndActiveTrue(parseUuid(id), userId)
                 .orElseThrow(() -> new AppException(ErrorCode.ADDRESS_NOT_FOUND));
         return addressMapper.toResponse(address);
     }
 
     @Override
-    public AddressResponse update(String id, AddressRequest request) {
-        Address address = addressRepository.findByIdAndActiveTrue(parseUuid(id))
+    public AddressResponse updateMyAddress(String userId, String id, AddressRequest request) {
+        Address address = addressRepository.findByIdAndUser_IdAndActiveTrue(parseUuid(id), userId)
                 .orElseThrow(() -> new AppException(ErrorCode.ADDRESS_NOT_FOUND));
-
-        if (request != null && request.getUserId() != null) {
-            User user = userRepository.findByIdAndActiveTrue(request.getUserId())
-                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-            address.setUser(user);
-        }
+        userRepository.findByIdAndActiveTrue(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         if (request != null) {
             addressMapper.update(address, request);
@@ -84,12 +79,26 @@ public class AddressServiceImpl implements AddressService {
                 address.setDefault(request.getIsDefault());
             }
         }
-        return addressMapper.toResponse(addressRepository.save(address));
+        Address saved = addressRepository.save(address);
+        if (saved.isDefault()) {
+            clearOtherDefaultAddresses(userId, saved.getId());
+        }
+        return addressMapper.toResponse(saved);
     }
 
     @Override
-    public void delete(String id) {
-        Address address = addressRepository.findByIdAndActiveTrue(parseUuid(id))
+    public AddressResponse setDefaultMyAddress(String userId, String id) {
+        Address address = addressRepository.findByIdAndUser_IdAndActiveTrue(parseUuid(id), userId)
+                .orElseThrow(() -> new AppException(ErrorCode.ADDRESS_NOT_FOUND));
+        address.setDefault(true);
+        Address saved = addressRepository.save(address);
+        clearOtherDefaultAddresses(userId, saved.getId());
+        return addressMapper.toResponse(saved);
+    }
+
+    @Override
+    public void deleteMyAddress(String userId, String id) {
+        Address address = addressRepository.findByIdAndUser_IdAndActiveTrue(parseUuid(id), userId)
                 .orElseThrow(() -> new AppException(ErrorCode.ADDRESS_NOT_FOUND));
         address.setActive(false);
         addressRepository.save(address);
@@ -100,6 +109,20 @@ public class AddressServiceImpl implements AddressService {
             return UUID.fromString(value);
         } catch (Exception ex) {
             throw new AppException(ErrorCode.INVALID_UUID);
+        }
+    }
+
+    private void clearOtherDefaultAddresses(String userId, UUID keepDefaultId) {
+        List<Address> addresses = addressRepository.findAllByUser_IdAndActiveTrue(userId);
+        boolean changed = false;
+        for (Address item : addresses) {
+            if (item.isDefault() && !item.getId().equals(keepDefaultId)) {
+                item.setDefault(false);
+                changed = true;
+            }
+        }
+        if (changed) {
+            addressRepository.saveAll(addresses);
         }
     }
 }

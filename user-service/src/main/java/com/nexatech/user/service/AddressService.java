@@ -6,15 +6,15 @@ import com.nexatech.user.dto.request.AddressRequest;
 import com.nexatech.user.dto.response.AddressResponse;
 
 public interface AddressService {
-    AddressResponse create(AddressRequest request);
+    AddressResponse createAddress(String userId, AddressRequest request);
 
-    List<AddressResponse> getAll();
+    List<AddressResponse> findMyAddresses(String userId);
 
-    List<AddressResponse> getByUserId(String userId);
+    AddressResponse findMyAddressById(String userId, String id);
 
-    AddressResponse getById(String id);
+    AddressResponse updateMyAddress(String userId, String id, AddressRequest request);
 
-    AddressResponse update(String id, AddressRequest request);
+    AddressResponse setDefaultMyAddress(String userId, String id);
 
-    void delete(String id);
+    void deleteMyAddress(String userId, String id);
 }

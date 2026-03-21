@@ -1,26 +1,27 @@
 package com.nexatech.user.service.impl;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.nexatech.user.client.IdentityClient;
+import com.nexatech.user.dto.request.IdentityUserUpdateRequest;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.UserResponse;
 import com.nexatech.user.exception.AppException;
 import com.nexatech.user.exception.ErrorCode;
 import com.nexatech.user.mapper.UserMapper;
-import com.nexatech.user.model.Role;
 import com.nexatech.user.model.User;
-import com.nexatech.user.repository.RoleRepository;
 import com.nexatech.user.repository.UserRepository;
 import com.nexatech.user.service.UserService;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
 
 @Service
 @RequiredArgsConstructor
@@ -28,20 +29,8 @@ import lombok.experimental.NonFinal;
 public class UserServiceImpl implements UserService {
 
     UserRepository userRepository;
-    RoleRepository roleRepository;
     UserMapper userMapper;
-
-    @NonFinal
-    @Value("${keycloak.realm}")
-    String realm;
-
-    @NonFinal
-    @Value("${keycloak.client-id}")
-    String clientId;
-
-    @NonFinal
-    @Value("${keycloak.client-secret}")
-    String clientSecret;
+    IdentityClient identityClient;
 
     @Override
     public UserResponse createUser(UserCreationRequest request) {
@@ -53,13 +42,13 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = userMapper.toUser(request);
-
-        user.setOnBoarded(false);
-
-        if (request.getRoleId() != null) {
-            Role role = roleRepository.findById(request.getRoleId())
-                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
-            user.setRole(role);
+        if (request.getId() != null && !request.getId().isBlank()) {
+            user.setId(request.getId());
+        } else {
+            user.setId(UUID.randomUUID().toString());
+        }
+        if (user.getOnBoarded() == null) {
+            user.setOnBoarded(false);
         }
 
         return userMapper.toResponse(userRepository.save(user));
@@ -80,35 +69,65 @@ public class UserServiceImpl implements UserService {
         return userMapper.toResponse(user);
     }
 
+    @Transactional
     @Override
     public UserResponse updateUser(String id, UserUpdatenRequest dto) {
         User user = userRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        if (dto != null && dto.getEmail() != null && !dto.getEmail().isBlank()) {
-            if (!dto.getEmail().equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(dto.getEmail())) {
-                throw new AppException(ErrorCode.USER_EMAIL_EXISTS);
-            }
-        }
-
-        if (dto != null && dto.getRoleId() != null) {
-            Role role = roleRepository.findById(dto.getRoleId())
-                    .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
-            user.setRole(role);
-        }
+        boolean syncKeycloak = dto != null && (isChanged(user.getFirstName(), dto.getFirstName())
+                || isChanged(user.getLastName(), dto.getLastName()));
 
         if (dto != null) {
             userMapper.updateUser(user, dto);
         }
 
-        return userMapper.toResponse(userRepository.save(user));
+        User updatedUser = userRepository.save(user);
+        if (syncKeycloak) {
+            syncUserToIdentity(updatedUser, true);
+        }
+
+        return userMapper.toResponse(updatedUser);
     }
 
+    @Transactional
     @Override
     public void deleteUser(String id) {
         User user = userRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         user.setActive(false);
-        userRepository.save(user);
+        User deletedUser = userRepository.save(user);
+        syncUserToIdentity(deletedUser, false);
+    }
+
+    @Transactional
+    @Override
+    public void enableUser(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        user.setActive(true);
+        User enabledUser = userRepository.save(user);
+        syncUserToIdentity(enabledUser, true);
+    }
+
+    // private method: check if the value is changed
+    private boolean isChanged(String currentValue, String newValue) {
+        return newValue != null && !newValue.isBlank() && !Objects.equals(currentValue, newValue);
+    }
+
+    // private method: UPDATE OR DELETE
+    private void syncUserToIdentity(User user, boolean enabled) {
+        try {
+            identityClient.updateUser(user.getId(), IdentityUserUpdateRequest.builder()
+                    .username(user.getUsername())
+                    .firstName(user.getFirstName())
+                    .lastName(user.getLastName())
+                    .email(user.getEmail())
+                    .enabled(enabled)
+                    .emailVerified(true)
+                    .build());
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        }
     }
 }

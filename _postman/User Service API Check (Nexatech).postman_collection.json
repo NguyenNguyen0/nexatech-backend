@@ -1,0 +1,889 @@
+{
+  "info": {
+    "_postman_id": "4f35dc88-dc05-4b88-9d35-c6428839aa53",
+    "name": "User Service API Check (Nexatech)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "40740215"
+  },
+  "item": [
+    {
+      "name": "1. Users",
+      "item": [
+        {
+          "name": "create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{managedEmail}}\",\n  \"username\": \"{{managedUsername}}\",\n  \"firstName\": \"API\",\n  \"lastName\": \"User\"\n}"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/users",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "list",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/users",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getById",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/users/{{managedUserId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{managedUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{managedEmail}}\",\n  \"firstName\": \"Updated\",\n  \"lastName\": \"User\",\n  \"gender\": \"FEMALE\",\n  \"avatarUrl\": \"cc\"\n}"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/users/{{managedUserId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{managedUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "deleteSoft",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/users/{{managedUserId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{managedUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "enable",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/users/{{managedUserId}}/enable",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{managedUserId}}",
+                "enable"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Addresses",
+      "item": [
+        {
+          "name": "create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverName\": \"Minh Nguyen\",\n  \"phone\": \"0912345678\",\n  \"province\": \"HCM\",\n  \"ward\": \"Ward 3\",\n  \"detail\": \"123 Nguyen Trai 3\",\n  \"latitude\": 10.77692,\n  \"longitude\": 106.70092,\n  \"addressType\": \"WORK\",\n  \"isDefault\": true\n}"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/users/me/addresses",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "list",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/users/me/addresses",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getById",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/users/me/addresses/{{addressId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses",
+                "{{addressId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverName\": \"Minh Updated\",\n  \"isDefault\": false\n}"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/users/me/addresses/{{addressId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses",
+                "{{addressId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "setDefault",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/users/me/addresses/{{addressId}}/default",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses",
+                "{{addressId}}",
+                "default"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/users/me/addresses/{{addressId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "addresses",
+                "{{addressId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Roles",
+      "item": [
+        {
+          "name": "create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{roleName}}\",\n  \"description\": \"Created via user-service\"\n}"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/roles",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "list",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/roles",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getByName",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/roles/by-name/{{roleName}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "by-name",
+                "{{roleName}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getById",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/roles/by-id/{{roleId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "by-id",
+                "{{roleId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "addComposite",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  { \"id\": \"{{permissionRoleId}}\", \"name\": \"{{permissionRoleName}}\" }\n]"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/roles/{{roleName}}/composites",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "{{roleName}}",
+                "composites"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "listComposite",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/roles/{{roleName}}/composites",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "{{roleName}}",
+                "composites"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "removeComposite",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  { \"id\": \"{{permissionRoleId}}\", \"name\": \"{{permissionRoleName}}\" }\n]"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/roles/{{roleName}}/composites",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "{{roleName}}",
+                "composites"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/roles/{{roleName}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "{{roleName}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Permissions",
+      "item": [
+        {
+          "name": "create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{permissionRoleName}}\",\n  \"description\": \"Permission role\"\n}"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/permissions",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "permissions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "list",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/permissions",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "permissions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "getByName",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/permissions/{{permissionRoleName}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "permissions",
+                "{{permissionRoleName}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/permissions/{{permissionRoleName}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "permissions",
+                "{{permissionRoleName}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Groups",
+      "item": [
+        {
+          "name": "create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{groupName}}\"\n}"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/groups",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "groups"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "list",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/groups?search={{groupName}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "groups"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{groupName}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "roleMappings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/groups/{{groupId}}/role-mappings",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "role-mappings"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "assignRole",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  { \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }\n]"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/groups/{{groupId}}/realm-role-mappings",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "realm-role-mappings"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "removeRole",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  { \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }\n]"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/groups/{{groupId}}/realm-role-mappings",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "realm-role-mappings"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/groups/{{groupId}}/members",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "members"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "addUser",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/groups/{{groupId}}/users/{{managedUserId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "users",
+                "{{managedUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "groupsOfUser",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/groups/users/{{managedUserId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "users",
+                "{{managedUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "removeUser",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/groups/{{groupId}}/users/{{managedUserId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}",
+                "users",
+                "{{managedUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{userBaseUrl}}/groups/{{groupId}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "{{groupId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "0. Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const r = pm.response.json()?.result || {};",
+              "if (r.access_token) pm.collectionVariables.set('accessToken', r.access_token);",
+              "if (r.refresh_token) pm.collectionVariables.set('refreshToken', r.refresh_token);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{identityBaseUrl}}/auth/login",
+          "host": [
+            "{{identityBaseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const t = pm.collectionVariables.get('accessToken');",
+          "if (t && !pm.request.headers.has('Authorization')) pm.request.headers.add({ key: 'Authorization', value: `Bearer ${t}` });"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "identityBaseUrl",
+      "value": "http://localhost:8082"
+    },
+    {
+      "key": "userBaseUrl",
+      "value": "http://localhost:8083"
+    },
+    {
+      "key": "username",
+      "value": "nvminh162"
+    },
+    {
+      "key": "password",
+      "value": "123456789"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "managedUserId",
+      "value": ""
+    },
+    {
+      "key": "managedUsername",
+      "value": "api_user_001"
+    },
+    {
+      "key": "managedEmail",
+      "value": "api_user_001@nexatech.local"
+    },
+    {
+      "key": "addressId",
+      "value": ""
+    },
+    {
+      "key": "roleId",
+      "value": ""
+    },
+    {
+      "key": "roleName",
+      "value": "ADMIN"
+    },
+    {
+      "key": "permissionRoleId",
+      "value": ""
+    },
+    {
+      "key": "permissionRoleName",
+      "value": "USER_VIEW"
+    },
+    {
+      "key": "groupId",
+      "value": ""
+    },
+    {
+      "key": "groupName",
+      "value": "TEST_GROUP"
+    }
+  ]
+}
