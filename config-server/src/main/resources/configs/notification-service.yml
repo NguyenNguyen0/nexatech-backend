@@ -15,14 +15,8 @@ spring:
     enabled: true
     locations: classpath:db/migration
   kafka:
-    bootstrap-servers: localhost:9092
     consumer:
       group-id: notification-service-group
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: com.nexatech.*
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
@@ -34,6 +28,5 @@ spring:
           auth: true
           starttls:
             enable: true
-  thymeleaf:
-    prefix: classpath:/templates/
-    suffix: .html
+            required: true
+        debug: false
