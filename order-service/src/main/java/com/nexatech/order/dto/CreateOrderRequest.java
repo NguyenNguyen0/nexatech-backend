@@ -16,6 +16,9 @@ public class CreateOrderRequest {
     @NotBlank
     private String shippingAddress;
 
+    // Phương thức vận chuyển: STANDARD (mặc định), EXPRESS
+    private String shippingMethod = "STANDARD";
+
     private String note;
 
     @Data

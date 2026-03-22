@@ -40,6 +40,16 @@ public class Order extends BaseEntity {
 
     private String note;
 
+    // Phương thức vận chuyển (STANDARD, EXPRESS) — khách chọn khi đặt hàng
+    private String shippingMethod;
+
+    // Thông tin theo dõi vận chuyển — admin cập nhật sau khi gửi hàng
+    private String trackingNumber;
+    private String carrierName;     // Tên đơn vị vận chuyển (GHN, GHTK, VNPost, ...)
+    private Instant estimatedDelivery;
+    private Instant shippedAt;      // Tự động gán khi status → SHIPPED
+    private Instant deliveredAt;    // Tự động gán khi status → DELIVERED
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
