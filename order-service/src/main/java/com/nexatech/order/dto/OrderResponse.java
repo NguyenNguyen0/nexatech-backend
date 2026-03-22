@@ -21,9 +21,17 @@ public class OrderResponse {
     private BigDecimal shippingFee;
     private BigDecimal discount;
     private String shippingAddress;
+    private String shippingMethod;
     private String note;
     private List<OrderItemResponse> items;
     private Instant createdAt;
+
+    // Thông tin theo dõi vận chuyển
+    private String trackingNumber;
+    private String carrierName;
+    private Instant estimatedDelivery;
+    private Instant shippedAt;
+    private Instant deliveredAt;
 
     @Data
     @Builder
