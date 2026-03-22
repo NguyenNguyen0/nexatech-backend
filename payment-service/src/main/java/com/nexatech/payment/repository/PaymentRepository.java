@@ -15,6 +15,9 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     Optional<Payment> findByOrderId(UUID orderId);
 
+    /** Tra cứu giao dịch theo transactionId (dùng cho VNPay IPN callback). */
+    Optional<Payment> findByTransactionId(String transactionId);
+
     Page<Payment> findByCustomerId(UUID customerId, Pageable pageable);
 
     Page<Payment> findByStatus(PaymentStatus status, Pageable pageable);
