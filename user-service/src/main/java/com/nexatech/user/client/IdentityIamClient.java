@@ -39,8 +39,7 @@ public interface IdentityIamClient {
     ApiResponse<List<Map<String, Object>>> getCompositeRoles(@PathVariable("roleName") String roleName);
 
     @DeleteMapping("/internal/roles/{roleName}/composites")
-    ApiResponse<Void> removeCompositeRoles(@PathVariable("roleName") String roleName,
-            @RequestBody List<RoleRefRequest> roles);
+    ApiResponse<Void> removeCompositeRoles(@PathVariable("roleName") String roleName, @RequestBody List<RoleRefRequest> roles);
 
     @DeleteMapping("/internal/roles/{roleName}")
     ApiResponse<Void> deleteRole(@PathVariable("roleName") String roleName);
