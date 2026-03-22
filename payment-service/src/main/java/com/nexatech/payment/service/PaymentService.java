@@ -124,6 +124,43 @@ public class PaymentService {
         });
     }
 
+    /**
+     * Xác nhận thanh toán COD (tiền mặt khi giao hàng).
+     * Được gọi khi order-service publish sự kiện ORDER_STATUS_UPDATED với status DELIVERED.
+     * Chỉ xử lý nếu phương thức thanh toán là COD và trạng thái là PENDING.
+     */
+    @Transactional
+    public void confirmCodPayment(UUID orderId) {
+        paymentRepository.findByOrderId(orderId).ifPresent(payment -> {
+            if (payment.getMethod() == com.nexatech.payment.enums.PaymentMethod.COD
+                    && payment.getStatus() == PaymentStatus.PENDING) {
+                payment.setStatus(PaymentStatus.COMPLETED);
+                Payment saved = paymentRepository.save(payment);
+                publishEvent(saved, "PAYMENT_COMPLETED");
+                log.info("Xác nhận thanh toán COD thành công khi giao hàng, orderId={}", orderId);
+            }
+        });
+    }
+
+    /**
+     * Xử lý hoàn tiền khi admin duyệt yêu cầu trả hàng.
+     * Được gọi khi nhận sự kiện ORDER_RETURN_APPROVED từ order-service.
+     * Chỉ hoàn tiền nếu giao dịch đang ở trạng thái COMPLETED.
+     */
+    @Transactional
+    public void processReturnRefund(UUID orderId) {
+        paymentRepository.findByOrderId(orderId).ifPresent(payment -> {
+            if (payment.getStatus() == PaymentStatus.COMPLETED) {
+                payment.setStatus(PaymentStatus.REFUNDED);
+                Payment saved = paymentRepository.save(payment);
+                publishEvent(saved, "PAYMENT_REFUNDED");
+                log.info("Hoàn tiền thành công cho đơn trả hàng, orderId={}", orderId);
+            } else {
+                log.warn("Không thể hoàn tiền — trạng thái hiện tại: {}, orderId={}",
+                        payment.getStatus(), orderId);
+            }
+        });
+    }
     // ==================== Private helpers ====================
 
     private Payment findById(UUID paymentId) {

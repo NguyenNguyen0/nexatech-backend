@@ -21,3 +21,11 @@ spring:
         default.api.timeout.ms: 30000
         reconnect.backoff.ms: 1000
         reconnect.backoff.max.ms: 10000
+
+# ==================== VNPay Configuration ====================
+vnpay:
+  tmn-code: ${VNPAY_TMN_CODE:EMCFMDKQ}
+  hash-secret: ${VNPAY_HASH_SECRET:RAOEXHYVSDDIIENYWSLDIIZTANXUXZFJ}
+  payment-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+  return-url: http://localhost:8086/api/v1/payments/vnpay/return
+  ipn-url: http://localhost:8086/api/v1/payments/vnpay/ipn
