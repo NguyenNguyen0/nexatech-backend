@@ -5,7 +5,9 @@ import java.util.Objects;
 
 import jakarta.validation.ConstraintViolation;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
 import org.springframework.security.access.AccessDeniedException;
@@ -14,6 +16,8 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import com.nexatech.user.dto.base.ApiResponse;
+
+import feign.FeignException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -25,15 +29,46 @@ public class GlobalExceptionHandler {
 
     private static final String MAX_ATTRIBUTE = "max";
 
-    @ExceptionHandler(value = Exception.class)
-    ResponseEntity<ApiResponse> handlingRuntimeException(RuntimeException exception) {
-        log.error("Exception: ", exception);
-        ApiResponse apiResponse = new ApiResponse();
+    @ExceptionHandler(FeignException.class)
+    ResponseEntity<ApiResponse> handlingFeignException(FeignException exception) {
+        int status = exception.status();
+        log.warn("Feign/Keycloak error: httpStatus={} message={}", status, exception.getMessage());
 
-        apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
-        apiResponse.setMessage(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage());
+        ErrorCode errorCode;
+        HttpStatus responseStatus;
+        if (status == 401) {
+            errorCode = ErrorCode.INVALID_CREDENTIALS;
+            responseStatus = HttpStatus.BAD_REQUEST;
+        } else if (status == 403) {
+            errorCode = ErrorCode.UNAUTHORIZED;
+            responseStatus = HttpStatus.FORBIDDEN;
+        } else if (status >= 500) {
+            errorCode = ErrorCode.KEYCLOAK_ERROR;
+            responseStatus = HttpStatus.BAD_GATEWAY;
+        } else if (status >= 400) {
+            errorCode = ErrorCode.KEYCLOAK_ERROR;
+            responseStatus = HttpStatus.BAD_REQUEST;
+        } else {
+            errorCode = ErrorCode.KEYCLOAK_ERROR;
+            responseStatus = HttpStatus.BAD_REQUEST;
+        }
 
-        return ResponseEntity.badRequest().body(apiResponse);
+        return ResponseEntity.status(responseStatus)
+                .body(ApiResponse.builder()
+                        .code(errorCode.getCode())
+                        .message(errorCode.getMessage())
+                        .build());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ResponseEntity<ApiResponse> handlingHttpMessageNotReadable(HttpMessageNotReadableException exception) {
+        log.warn("Malformed JSON body: {}", exception.getMessage());
+        ErrorCode errorCode = ErrorCode.INVALID_JSON_BODY;
+        return ResponseEntity.status(errorCode.getStatusCode())
+                .body(ApiResponse.builder()
+                        .code(errorCode.getCode())
+                        .message(errorCode.getMessage())
+                        .build());
     }
 
     @ExceptionHandler(value = AppException.class)
@@ -106,5 +141,16 @@ public class GlobalExceptionHandler {
             result = result.replace("{" + MAX_ATTRIBUTE + "}", String.valueOf(attributes.get(MAX_ATTRIBUTE)));
         }
         return result;
+    }
+
+    @ExceptionHandler(value = Exception.class)
+    ResponseEntity<ApiResponse> handlingGenericException(Exception exception) {
+        log.error("Exception: ", exception);
+        ApiResponse apiResponse = new ApiResponse();
+
+        apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
+        apiResponse.setMessage(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage());
+
+        return ResponseEntity.status(ErrorCode.UNCATEGORIZED_EXCEPTION.getStatusCode()).body(apiResponse);
     }
 }

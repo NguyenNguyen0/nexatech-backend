@@ -43,6 +43,8 @@ public enum ErrorCode {
     USER_EXISTED(2022, "User already exists", HttpStatus.BAD_REQUEST),
     EMAIL_EXISTED(2022, "Email already exists", HttpStatus.BAD_REQUEST),
     USERNAME_IS_MISSING(2023, "Username is missing", HttpStatus.BAD_REQUEST),
+    INVALID_CREDENTIALS(2030, "Invalid username or password", HttpStatus.BAD_REQUEST),
+    INVALID_JSON_BODY(2031, "Invalid or malformed JSON", HttpStatus.BAD_REQUEST),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {
