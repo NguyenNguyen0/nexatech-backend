@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.user.dto.base.ApiResponse;
+import com.nexatech.user.dto.request.AdminUserCreateRequest;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.UserResponse;
+import com.nexatech.user.service.AdminUserService;
 import com.nexatech.user.service.UserService;
 
 import lombok.AccessLevel;
@@ -30,11 +32,12 @@ import lombok.extern.slf4j.Slf4j;
 public class UserController {
 
     UserService userService;
+    AdminUserService adminUserService;
 
     @PostMapping
-    public ApiResponse<UserResponse> createUser(@RequestBody UserCreationRequest request) {
+    public ApiResponse<UserResponse> createUser(@RequestBody AdminUserCreateRequest request) {
         return ApiResponse.<UserResponse>builder()
-                .result(userService.createUser(request))
+                .result(adminUserService.createUserWithKeycloakProvision(request))
                 .build();
     }
 

@@ -2,6 +2,9 @@ server:
   port: 8082
 
 spring:
+  main:
+    # OpenFeign + DevTools/context refresh can re-register FeignClientSpecification beans with the same name.
+    allow-bean-definition-overriding: true
   security:
     oauth2:
       resourceserver:

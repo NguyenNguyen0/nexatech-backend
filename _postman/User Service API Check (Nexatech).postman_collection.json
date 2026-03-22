@@ -3,17 +3,23 @@
     "_postman_id": "4f35dc88-dc05-4b88-9d35-c6428839aa53",
     "name": "User Service API Check (Nexatech)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "40740215"
+    "_exporter_id": "40740215",
+    "description": "Token: gọi **Login** → biến collection `accessToken` được gán.\n\nCác API cần JWT dùng header **Authorization: `Bearer {{accessToken}}`** (xem tab Headers). Không dùng tab Authorization của Postman."
   },
   "item": [
     {
       "name": "1. Users",
       "item": [
         {
-          "name": "create",
+          "name": "create (for Admin user)",
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -21,7 +27,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{managedEmail}}\",\n  \"username\": \"{{managedUsername}}\",\n  \"firstName\": \"API\",\n  \"lastName\": \"User\"\n}"
+              "raw": "{\n    \"email\": \"nvminh16999@gmail.com\",\n    \"username\": \"nvminh16999\",\n    \"firstName\": \"nvminh16999\",\n    \"lastName\": \"nvminh16999\",\n    \"avatarUrl\": \"nvminh16999\",\n    \"phone\": 999999999,\n    \"dob\": \"2020-10-10\",\n    \"gender\": \"FEMALE\",\n    \"onBoarded\": true,\n    \"credentials\": [\n        {\n            \"type\": \"password\",\n            \"value\": \"123456789\",\n            \"temporary\": false\n        }\n    ]\n}"
             },
             "url": {
               "raw": "{{userBaseUrl}}/users",
@@ -39,7 +45,13 @@
           "name": "list",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/users",
               "host": [
@@ -56,7 +68,13 @@
           "name": "getById",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/users/{{managedUserId}}",
               "host": [
@@ -75,6 +93,11 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -101,7 +124,13 @@
           "name": "deleteSoft",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/users/{{managedUserId}}",
               "host": [
@@ -119,7 +148,13 @@
           "name": "enable",
           "request": {
             "method": "PUT",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/users/{{managedUserId}}/enable",
               "host": [
@@ -144,6 +179,11 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -171,7 +211,13 @@
           "name": "list",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/users/me/addresses",
               "host": [
@@ -190,7 +236,13 @@
           "name": "getById",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/users/me/addresses/{{addressId}}",
               "host": [
@@ -211,6 +263,11 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -239,7 +296,13 @@
           "name": "setDefault",
           "request": {
             "method": "PUT",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/users/me/addresses/{{addressId}}/default",
               "host": [
@@ -260,7 +323,13 @@
           "name": "delete",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/users/me/addresses/{{addressId}}",
               "host": [
@@ -287,6 +356,11 @@
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -311,7 +385,13 @@
           "name": "list",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/roles",
               "host": [
@@ -328,7 +408,13 @@
           "name": "getByName",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/roles/by-name/{{roleName}}",
               "host": [
@@ -347,7 +433,13 @@
           "name": "getById",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/roles/by-id/{{roleId}}",
               "host": [
@@ -367,6 +459,11 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -394,7 +491,13 @@
           "name": "listComposite",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/roles/{{roleName}}/composites",
               "host": [
@@ -414,6 +517,11 @@
           "request": {
             "method": "DELETE",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -441,7 +549,13 @@
           "name": "delete",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/roles/{{roleName}}",
               "host": [
@@ -465,6 +579,11 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -490,7 +609,13 @@
           "name": "list",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/permissions",
               "host": [
@@ -507,7 +632,13 @@
           "name": "getByName",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/permissions/{{permissionRoleName}}",
               "host": [
@@ -525,7 +656,13 @@
           "name": "delete",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/permissions/{{permissionRoleName}}",
               "host": [
@@ -549,6 +686,11 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -574,7 +716,13 @@
           "name": "list",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/groups?search={{groupName}}",
               "host": [
@@ -597,7 +745,13 @@
           "name": "roleMappings",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/groups/{{groupId}}/role-mappings",
               "host": [
@@ -617,6 +771,11 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -646,6 +805,11 @@
             "method": "DELETE",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -672,7 +836,13 @@
           "name": "members",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/groups/{{groupId}}/members",
               "host": [
@@ -691,7 +861,13 @@
           "name": "addUser",
           "request": {
             "method": "PUT",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/groups/{{groupId}}/users/{{managedUserId}}",
               "host": [
@@ -711,7 +887,13 @@
           "name": "groupsOfUser",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/groups/users/{{managedUserId}}",
               "host": [
@@ -730,7 +912,13 @@
           "name": "removeUser",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/groups/{{groupId}}/users/{{managedUserId}}",
               "host": [
@@ -750,7 +938,13 @@
           "name": "delete",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/groups/{{groupId}}",
               "host": [
@@ -767,18 +961,20 @@
       ]
     },
     {
-      "name": "0. Login",
+      "name": "Login for test API User Service",
       "event": [
         {
           "listen": "test",
           "script": {
-            "type": "text/javascript",
             "exec": [
               "pm.test('200', () => pm.response.to.have.status(200));",
               "const r = pm.response.json()?.result || {};",
               "if (r.access_token) pm.collectionVariables.set('accessToken', r.access_token);",
               "if (r.refresh_token) pm.collectionVariables.set('refreshToken', r.refresh_token);"
-            ]
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
           }
         }
       ],
@@ -808,18 +1004,7 @@
       "response": []
     }
   ],
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "type": "text/javascript",
-        "exec": [
-          "const t = pm.collectionVariables.get('accessToken');",
-          "if (t && !pm.request.headers.has('Authorization')) pm.request.headers.add({ key: 'Authorization', value: `Bearer ${t}` });"
-        ]
-      }
-    }
-  ],
+  "event": [],
   "variable": [
     {
       "key": "identityBaseUrl",

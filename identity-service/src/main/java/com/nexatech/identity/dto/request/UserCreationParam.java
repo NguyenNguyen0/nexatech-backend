@@ -17,6 +17,8 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserCreationParam {
+    /** When set, Keycloak creates the user with this id (aligns with application user id). */
+    String id;
     String username;
     boolean enabled;
     String email;

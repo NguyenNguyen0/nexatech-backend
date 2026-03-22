@@ -6,8 +6,8 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.nexatech.identity.client.keycloak.KeycloakRoleClient;
-import com.nexatech.identity.client.keycloak.KeycloakUserClient;
+import com.nexatech.identity.client.KeycloakRoleClient;
+import com.nexatech.identity.client.KeycloakUserClient;
 import com.nexatech.identity.dto.request.Credential;
 import com.nexatech.identity.dto.request.KeycloakRoleRef;
 import com.nexatech.identity.dto.request.UserCreationParam;
@@ -35,6 +35,7 @@ public class UserService {
         }
 
         UserCreationParam body = UserCreationParam.builder()
+                .id(param.getId())
                 .username(param.getUsername())
                 .firstName(param.getFirstName())
                 .lastName(param.getLastName())

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.exception.AppException;
+import com.nexatech.user.exception.ErrorCode;
 import com.nexatech.user.service.UserService;
 
 import lombok.AccessLevel;
@@ -36,6 +37,14 @@ public class UserConsumer {
             exclude = { AppException.class }
     )
     public void onUserRegistered(UserCreationRequest request) {
-        userService.createUser(request);
+        try {
+            userService.createUser(request);
+        } catch (AppException e) {
+            if (e.getErrorCode() == ErrorCode.USER_EMAIL_EXISTS) {
+                log.info("User registration skipped (email already present): {}", request.getEmail());
+                return;
+            }
+            throw e;
+        }
     }
 }

@@ -3,7 +3,7 @@ package com.nexatech.identity.service.support;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import com.nexatech.identity.client.keycloak.KeycloakAuthClient;
+import com.nexatech.identity.client.KeycloakAuthClient;
 import com.nexatech.identity.dto.request.TokenExchangeParam;
 
 import lombok.RequiredArgsConstructor;

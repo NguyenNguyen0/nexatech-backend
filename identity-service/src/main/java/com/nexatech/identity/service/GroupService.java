@@ -6,7 +6,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.nexatech.identity.client.keycloak.KeycloakGroupClient;
+import com.nexatech.identity.client.KeycloakGroupClient;
 import com.nexatech.identity.dto.request.GroupCreateParam;
 import com.nexatech.identity.dto.request.KeycloakRoleRef;
 import com.nexatech.identity.service.support.KeycloakAdminTokenProvider;
