@@ -16,7 +16,7 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
 
 import com.nexatech.user.dto.request.UserCreationRequest;
 
@@ -66,7 +66,8 @@ public class KafkaConfig {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
-        JsonDeserializer<UserCreationRequest> jsonDeserializer = new JsonDeserializer<>(UserCreationRequest.class);
+        JacksonJsonDeserializer<UserCreationRequest> jsonDeserializer =
+                new JacksonJsonDeserializer<>(UserCreationRequest.class, false);
         jsonDeserializer.addTrustedPackages("com.nexatech.user.dto.request");
         return new DefaultKafkaConsumerFactory<>(
                 props,

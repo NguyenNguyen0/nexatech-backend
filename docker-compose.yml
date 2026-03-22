@@ -1,11 +1,3 @@
-  # ======================================================================================================================
-  # Docker for production environment
-  # TODO:
-  # + Tách database cho từng service
-  # + Viết Dockerfile cho từng service
-  # + Triển khai CICD tự động khi push code lên nhánh main => tự động push image lên Docker HUB
-  # + Viết github action tự động deploy máy chủ VPS 
-  # ======================================================================================================================
 services:
   postgres-identity:
     image: postgres:16-alpine
