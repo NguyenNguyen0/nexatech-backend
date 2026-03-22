@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +56,15 @@ public class UserServiceImpl implements UserService {
         }
         if (user.getOnBoarded() == null) {
             user.setOnBoarded(false);
+        }
+
+        // Kafka / internal API: no JWT — attribute created/updated "by" to the new user's Keycloak id (self).
+        if (!hasJwtAuthentication()) {
+            String selfId = user.getId();
+            if (selfId != null && !selfId.isBlank()) {
+                user.setCreatedBy(selfId);
+                user.setUpdatedBy(selfId);
+            }
         }
 
         return userMapper.toResponse(userRepository.save(user));
@@ -180,6 +191,11 @@ public class UserServiceImpl implements UserService {
         } catch (Exception ex) {
             throw new AppException(ErrorCode.KEYCLOAK_ERROR);
         }
+    }
+
+    private static boolean hasJwtAuthentication() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.isAuthenticated() && auth instanceof JwtAuthenticationToken;
     }
 
     /** Rejects values that are not email-shaped (e.g. UUID accidentally stored as email). */

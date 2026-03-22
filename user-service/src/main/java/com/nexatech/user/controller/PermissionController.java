@@ -3,6 +3,7 @@ package com.nexatech.user.controller;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import jakarta.validation.Valid;
 
@@ -44,12 +45,14 @@ public class PermissionController {
     }
 
     /**
-     * Catalog of grant permission codes (static list for admin UI).
+     * Catalog of grant permission codes (static list for admin UI), same shape as Keycloak role summaries.
      */
     @GetMapping("/accept")
     @RequiresPermission(PermissionsAccept.Definition.READ)
-    public ApiResponse<List<String>> listPermissionAcceptCatalog() {
-        return ApiResponse.<List<String>>builder().result(PermissionsAccept.allCodes()).build();
+    public ApiResponse<List<RoleSummaryResponse>> listPermissionAcceptCatalog() {
+        return ApiResponse.<List<RoleSummaryResponse>>builder()
+                .result(toCatalogRoleSummaries(PermissionsAccept.allCodes()))
+                .build();
     }
 
     /**
@@ -57,9 +60,9 @@ public class PermissionController {
      */
     @GetMapping("/deny")
     @RequiresPermission(PermissionsAccept.Definition.READ)
-    public ApiResponse<List<String>> listPermissionDenyCatalog() {
-        return ApiResponse.<List<String>>builder()
-                .result(PermissionsDeny.allCodes())
+    public ApiResponse<List<RoleSummaryResponse>> listPermissionDenyCatalog() {
+        return ApiResponse.<List<RoleSummaryResponse>>builder()
+                .result(toCatalogRoleSummaries(PermissionsDeny.allCodes()))
                 .build();
     }
 
@@ -124,6 +127,19 @@ public class PermissionController {
 
     private String getString(Object value) {
         return value == null ? null : value.toString();
+    }
+
+    /**
+     * Keycloak-shaped items; {@code id} is a new random UUID on each request (catalog is not persisted).
+     */
+    private List<RoleSummaryResponse> toCatalogRoleSummaries(List<String> codes) {
+        return codes.stream()
+                .map(code -> RoleSummaryResponse.builder()
+                        .id(UUID.randomUUID().toString())
+                        .name(code)
+                        .description("")
+                        .build())
+                .toList();
     }
 
     private List<RoleSummaryResponse> filterRealmRolesByDenySuffix(boolean denyOnly) {

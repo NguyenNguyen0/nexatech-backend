@@ -1,10 +1,10 @@
 {
   "info": {
-    "_postman_id": "4f35dc88-dc05-4b88-9d35-c6428839aa53",
+    "_postman_id": "cd3db0f9-1b6f-465e-b620-60aa96a6de27",
     "name": "User Service API Check (Nexatech)",
+    "description": "Token: gọi **Login** → biến collection `accessToken` được gán.\n\nCác API cần JWT dùng header **Authorization: `Bearer {{accessToken}}`** (xem tab Headers). Không dùng tab Authorization của Postman.\n\n**Permissions:** Catalog **tĩnh** (`/accept`, `/deny`) trả `result`: mảng object Keycloak-shaped `{ id, name, description }` (`id` UUID mới mỗi request, `description` rỗng). Keycloak real-time: `/accept/keycloak`, `/deny/keycloak`; toàn bộ roles: `GET /permissions`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "40740215",
-    "description": "Token: gọi **Login** → biến collection `accessToken` được gán.\n\nCác API cần JWT dùng header **Authorization: `Bearer {{accessToken}}`** (xem tab Headers). Không dùng tab Authorization của Postman.\n\n**Permissions:** `GET /permissions/accept` / `deny` = catalog **tĩnh** trong app; `GET /permissions/accept/keycloak` / `deny/keycloak` = realm roles **real-time** từ Keycloak (lọc theo hậu tố `_DENY`); `GET /permissions` = toàn bộ realm roles."
+    "_exporter_id": "40740215"
   },
   "item": [
     {
@@ -27,7 +27,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"email\": \"nvminh16999@gmail.com\",\n    \"username\": \"nvminh16999\",\n    \"firstName\": \"nvminh16999\",\n    \"lastName\": \"nvminh16999\",\n    \"avatarUrl\": \"nvminh16999\",\n    \"phone\": 999999999,\n    \"dob\": \"2020-10-10\",\n    \"gender\": \"FEMALE\",\n    \"onBoarded\": true,\n    \"credentials\": [\n        {\n            \"type\": \"password\",\n            \"value\": \"123456789\",\n            \"temporary\": false\n        }\n    ]\n}"
+              "raw": "{\n    \"email\": \"nvminh16999@gmail.com\",\n    \"username\": \"nvminh16999\",\n    \"firstName\": \"nvminh16999\",\n    \"lastName\": \"nvminh16999\",\n    \"avatarUrl\": \"nvminh16999\",\n    \"phone\": \"0999999999\",\n    \"dob\": \"2020-10-10\",\n    \"gender\": \"FEMALE\",\n    \"onBoarded\": true,\n    \"password\": \"123456789\",\n    \"temporaryPassword\": false,\n    \"enabled\": true,\n    \"emailVerified\": true\n}"
             },
             "url": {
               "raw": "{{userBaseUrl}}/users",
@@ -616,7 +616,6 @@
                 "type": "text"
               }
             ],
-            "description": "Catalog tĩnh các mã quyền **cấp** (grant), dùng cho UI admin — khớp `PermissionsAccept` trong code.",
             "url": {
               "raw": "{{userBaseUrl}}/permissions/accept",
               "host": [
@@ -626,7 +625,8 @@
                 "permissions",
                 "accept"
               ]
-            }
+            },
+            "description": "Catalog tĩnh **cấp** — cùng DTO `RoleSummaryResponse` như Keycloak: `result[]` = `{ id, name, description }` (id random mỗi request)."
           },
           "response": []
         },
@@ -641,7 +641,6 @@
                 "type": "text"
               }
             ],
-            "description": "Catalog tĩnh các mã quyền **chặn** (`*_DENY`), dùng cho UI admin — khớp `PermissionsDeny` trong code.",
             "url": {
               "raw": "{{userBaseUrl}}/permissions/deny",
               "host": [
@@ -651,12 +650,13 @@
                 "permissions",
                 "deny"
               ]
-            }
+            },
+            "description": "Catalog tĩnh **chặn** (`*_DENY`) — cùng format `result[]` như trên."
           },
           "response": []
         },
         {
-          "name": "listRealmRoles",
+          "name": "listCatalogAccept (from Keycloak)",
           "request": {
             "method": "GET",
             "header": [
@@ -666,7 +666,58 @@
                 "type": "text"
               }
             ],
-            "description": "Danh sách **tất cả realm roles** từ Keycloak (không giới hạn catalog tĩnh). Trước đây là `GET /permissions` (tên request cũ: list).",
+            "url": {
+              "raw": "{{userBaseUrl}}/permissions/accept/keycloak",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "permissions",
+                "accept",
+                "keycloak"
+              ]
+            },
+            "description": "Realm roles từ Keycloak real-time: quyền cấp (tên không kết thúc `_DENY`)."
+          },
+          "response": []
+        },
+        {
+          "name": "listCatalogDeny (from Keycloak)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{userBaseUrl}}/permissions/deny/keycloak",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "permissions",
+                "deny",
+                "keycloak"
+              ]
+            },
+            "description": "Realm roles từ Keycloak real-time: quyền chặn (`*_DENY`)."
+          },
+          "response": []
+        },
+        {
+          "name": "listRealmRoles (from Keycloak)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{userBaseUrl}}/permissions",
               "host": [
@@ -675,7 +726,8 @@
               "path": [
                 "permissions"
               ]
-            }
+            },
+            "description": "Danh sách **tất cả realm roles** từ Keycloak (không giới hạn catalog tĩnh). Trước đây là `GET /permissions` (tên request cũ: list)."
           },
           "response": []
         },
@@ -1055,7 +1107,6 @@
       "response": []
     }
   ],
-  "event": [],
   "variable": [
     {
       "key": "identityBaseUrl",

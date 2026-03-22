@@ -43,10 +43,10 @@ public class AdminUserCreateRequest {
     @NotBlank(message = "PASSWORD_REQUIRED")
     @Size(min = 8, message = "PASSWORD_TOO_SHORT")
     String password;
-    @Builder.Default
-    boolean temporaryPassword = false;
-    @Builder.Default
-    boolean enabled = true;
-    @Builder.Default
-    boolean emailVerified = false;
+    /** Keycloak credential.temporary; null = false (avoid primitive — JSON null breaks Jackson). */
+    Boolean temporaryPassword;
+    /** Keycloak user enabled; null = true. */
+    Boolean enabled;
+    /** Keycloak emailVerified; null = false. */
+    Boolean emailVerified;
 }

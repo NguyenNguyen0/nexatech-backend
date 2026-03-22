@@ -46,7 +46,7 @@ public class UserController {
     }
 
     @GetMapping
-    @RequiresPermission(PermissionsAccept.User.READ)
+    @RequiresPermission(PermissionsAccept.User.READ) // enable for production
     public ApiResponse<List<UserResponse>> getAllUsers() {
         return ApiResponse.<List<UserResponse>>builder()
                 .result(userService.getAllUsers())

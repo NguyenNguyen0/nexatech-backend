@@ -53,18 +53,22 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         String requestedId = request.getId() != null && !request.getId().isBlank() ? request.getId() : null;
 
+        boolean enabled = request.getEnabled() != null ? request.getEnabled() : true;
+        boolean emailVerified = Boolean.TRUE.equals(request.getEmailVerified());
+        boolean temporaryPassword = Boolean.TRUE.equals(request.getTemporaryPassword());
+
         KeycloakUserProvisionPayload provision = KeycloakUserProvisionPayload.builder()
                 .id(requestedId)
                 .username(request.getUsername())
-                .enabled(request.isEnabled())
+                .enabled(enabled)
                 .email(request.getEmail())
-                .emailVerified(request.isEmailVerified())
+                .emailVerified(emailVerified)
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .credentials(List.of(KeycloakCredentialPayload.builder()
                         .type("password")
                         .value(request.getPassword())
-                        .temporary(request.isTemporaryPassword())
+                        .temporary(temporaryPassword)
                         .build()))
                 .build();
 
