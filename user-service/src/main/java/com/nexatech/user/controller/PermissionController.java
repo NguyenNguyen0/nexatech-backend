@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.user.client.IdentityIamClient;
+import com.nexatech.user.constant.Permissions;
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.request.RoleCreateRequest;
 import com.nexatech.user.dto.response.RoleSummaryResponse;
+import com.nexatech.user.security.RequiresPermission;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -31,12 +33,14 @@ public class PermissionController {
     IdentityIamClient identityIamClient;
 
     @PostMapping
+    @RequiresPermission(Permissions.Definition.WRITE)
     public ApiResponse<Void> createPermission(@Valid @RequestBody RoleCreateRequest request) {
         identityIamClient.createRole(request);
         return ApiResponse.<Void>builder().build();
     }
 
     @GetMapping
+    @RequiresPermission(Permissions.Definition.READ)
     public ApiResponse<List<RoleSummaryResponse>> listPermissions() {
         List<RoleSummaryResponse> permissions = identityIamClient.listRoles().getResult()
                 .stream()
@@ -46,6 +50,7 @@ public class PermissionController {
     }
 
     @GetMapping("/{permissionName}")
+    @RequiresPermission(Permissions.Definition.READ)
     public ApiResponse<RoleSummaryResponse> getPermissionByName(@PathVariable String permissionName) {
         return ApiResponse.<RoleSummaryResponse>builder()
                 .result(toRoleSummary(identityIamClient.getRoleByName(permissionName).getResult()))
@@ -53,6 +58,7 @@ public class PermissionController {
     }
 
     @DeleteMapping("/{permissionName}")
+    @RequiresPermission(Permissions.Definition.WRITE)
     public ApiResponse<Void> deletePermission(@PathVariable String permissionName) {
         identityIamClient.deleteRole(permissionName);
         return ApiResponse.<Void>builder().build();
@@ -73,4 +79,3 @@ public class PermissionController {
         return value == null ? null : value.toString();
     }
 }
-

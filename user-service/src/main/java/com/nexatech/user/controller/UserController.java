@@ -13,11 +13,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.nexatech.user.constant.Permissions;
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.request.AdminUserCreateRequest;
-import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.UserResponse;
+import com.nexatech.user.security.RequiresPermission;
 import com.nexatech.user.service.AdminUserService;
 import com.nexatech.user.service.UserService;
 
@@ -37,6 +38,7 @@ public class UserController {
     AdminUserService adminUserService;
 
     @PostMapping
+    @RequiresPermission(Permissions.User.CREATE)
     public ApiResponse<UserResponse> createUser(@Valid @RequestBody AdminUserCreateRequest request) {
         return ApiResponse.<UserResponse>builder()
                 .result(adminUserService.createUserWithKeycloakProvision(request))
@@ -44,6 +46,7 @@ public class UserController {
     }
 
     @GetMapping
+    @RequiresPermission(Permissions.User.READ)
     public ApiResponse<List<UserResponse>> getAllUsers() {
         return ApiResponse.<List<UserResponse>>builder()
                 .result(userService.getAllUsers())
@@ -51,6 +54,7 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
+    @RequiresPermission(Permissions.User.READ)
     public ApiResponse<UserResponse> getUserById(@PathVariable String userId) {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.getUserById(userId))
@@ -58,6 +62,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}")
+    @RequiresPermission(Permissions.User.UPDATE)
     public ApiResponse<UserResponse> updateUser(@PathVariable String userId, @Valid @RequestBody UserUpdatenRequest request) {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.updateUser(userId, request))
@@ -65,6 +70,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{userId}")
+    @RequiresPermission(Permissions.User.DELETE)
     public ApiResponse<Void> deleteUser(@PathVariable String userId) {
         userService.deleteUser(userId);
         return ApiResponse.<Void>builder()
@@ -72,6 +78,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}/enable")
+    @RequiresPermission(Permissions.User.ENABLE)
     public ApiResponse<Void> enableUser(@PathVariable String userId) {
         userService.enableUser(userId);
         return ApiResponse.<Void>builder()
