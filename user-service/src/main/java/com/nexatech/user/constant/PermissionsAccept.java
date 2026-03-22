@@ -1,15 +1,14 @@
 package com.nexatech.user.constant;
 
-/**
- * Authority strings = Keycloak <strong>realm role names</strong> (no {@code ROLE_} prefix).
- * {@link com.nexatech.user.config.security.CustomAuthoritiesConverter} maps each JWT realm role to a
- * {@link org.springframework.security.core.GrantedAuthority} with the same string (e.g. {@code USER_READ}).
- * <p>
- * Nested types group permissions by area only.
- */
-public final class Permissions {
+import java.util.List;
 
-    private Permissions() {
+/**
+ * Realm role names that <strong>grant</strong> access (positive permissions).
+ * Must match Keycloak realm role names and {@link com.nexatech.user.config.security.CustomAuthoritiesConverter}.
+ */
+public final class PermissionsAccept {
+
+    private PermissionsAccept() {
     }
 
     /** {@link com.nexatech.user.controller.UserController} */
@@ -35,7 +34,6 @@ public final class Permissions {
 
     /**
      * Keycloak realm role CRUD ({@link com.nexatech.user.controller.RoleController}).
-     * Realm role names in Keycloak: {@code ROLE_READ}, {@code ROLE_WRITE} (names chosen to avoid clashing with {@code READ}/{@code WRITE} alone).
      */
     public static final class RealmRole {
         private RealmRole() {
@@ -52,5 +50,21 @@ public final class Permissions {
 
         public static final String READ = "PERMISSION_READ";
         public static final String WRITE = "PERMISSION_WRITE";
+    }
+
+    /** All grant permission codes (for admin UI / API catalog). */
+    public static List<String> allCodes() {
+        return List.of(
+                User.READ,
+                User.CREATE,
+                User.UPDATE,
+                User.DELETE,
+                User.ENABLE,
+                Group.READ,
+                Group.WRITE,
+                RealmRole.READ,
+                RealmRole.WRITE,
+                Definition.READ,
+                Definition.WRITE);
     }
 }

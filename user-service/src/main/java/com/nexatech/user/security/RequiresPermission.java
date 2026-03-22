@@ -15,7 +15,7 @@ import java.lang.annotation.Target;
 public @interface RequiresPermission {
 
     /**
-     * Authority string, typically {@link com.nexatech.user.constant.Permissions}.*.
+     * Authority string, typically {@link com.nexatech.user.constant.PermissionsAccept}.*.
      */
     String value();
 }

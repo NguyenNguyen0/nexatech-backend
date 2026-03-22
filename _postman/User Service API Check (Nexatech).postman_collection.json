@@ -4,7 +4,7 @@
     "name": "User Service API Check (Nexatech)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "40740215",
-    "description": "Token: gọi **Login** → biến collection `accessToken` được gán.\n\nCác API cần JWT dùng header **Authorization: `Bearer {{accessToken}}`** (xem tab Headers). Không dùng tab Authorization của Postman."
+    "description": "Token: gọi **Login** → biến collection `accessToken` được gán.\n\nCác API cần JWT dùng header **Authorization: `Bearer {{accessToken}}`** (xem tab Headers). Không dùng tab Authorization của Postman.\n\n**Permissions:** `GET /permissions/accept` / `deny` = catalog **tĩnh** trong app; `GET /permissions/accept/keycloak` / `deny/keycloak` = realm roles **real-time** từ Keycloak (lọc theo hậu tố `_DENY`); `GET /permissions` = toàn bộ realm roles."
   },
   "item": [
     {
@@ -606,7 +606,7 @@
           "response": []
         },
         {
-          "name": "list",
+          "name": "listCatalogAccept (from App)",
           "request": {
             "method": "GET",
             "header": [
@@ -616,6 +616,57 @@
                 "type": "text"
               }
             ],
+            "description": "Catalog tĩnh các mã quyền **cấp** (grant), dùng cho UI admin — khớp `PermissionsAccept` trong code.",
+            "url": {
+              "raw": "{{userBaseUrl}}/permissions/accept",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "permissions",
+                "accept"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "listCatalogDeny (from App)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "description": "Catalog tĩnh các mã quyền **chặn** (`*_DENY`), dùng cho UI admin — khớp `PermissionsDeny` trong code.",
+            "url": {
+              "raw": "{{userBaseUrl}}/permissions/deny",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "permissions",
+                "deny"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "listRealmRoles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "description": "Danh sách **tất cả realm roles** từ Keycloak (không giới hạn catalog tĩnh). Trước đây là `GET /permissions` (tên request cũ: list).",
             "url": {
               "raw": "{{userBaseUrl}}/permissions",
               "host": [
@@ -629,7 +680,7 @@
           "response": []
         },
         {
-          "name": "getByName",
+          "name": "getByName (from Keycloak)",
           "request": {
             "method": "GET",
             "header": [
@@ -653,7 +704,7 @@
           "response": []
         },
         {
-          "name": "delete",
+          "name": "delete (from Keycloak)",
           "request": {
             "method": "DELETE",
             "header": [
@@ -1060,7 +1111,7 @@
     },
     {
       "key": "permissionRoleName",
-      "value": "USER_VIEW"
+      "value": "USER_READ"
     },
     {
       "key": "groupId",
