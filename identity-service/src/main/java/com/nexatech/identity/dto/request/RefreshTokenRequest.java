@@ -1,5 +1,7 @@
 package com.nexatech.identity.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,6 +17,7 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RefreshTokenRequest {
+    @NotBlank(message = "REFRESH_TOKEN_REQUIRED")
     String refreshToken;
 }
 

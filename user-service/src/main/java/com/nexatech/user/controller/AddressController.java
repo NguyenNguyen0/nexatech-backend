@@ -2,6 +2,8 @@ package com.nexatech.user.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,7 +37,7 @@ public class AddressController {
         @PostMapping
         public ApiResponse<AddressResponse> createAddress(
                         @AuthenticationPrincipal Jwt jwt,
-                        @RequestBody AddressRequest request) {
+                        @Valid @RequestBody AddressRequest request) {
                 return ApiResponse.<AddressResponse>builder()
                                 .result(addressService.createAddress(currentUserId(jwt), request))
                                 .build();
@@ -60,7 +62,7 @@ public class AddressController {
         public ApiResponse<AddressResponse> updateMyAddress(
                         @AuthenticationPrincipal Jwt jwt,
                         @PathVariable String id,
-                        @RequestBody AddressRequest request) {
+                        @Valid @RequestBody AddressRequest request) {
                 return ApiResponse.<AddressResponse>builder()
                                 .result(addressService.updateMyAddress(currentUserId(jwt), id, request))
                                 .build();

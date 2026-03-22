@@ -2,6 +2,11 @@ package com.nexatech.identity.dto.request;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,12 +24,22 @@ import lombok.experimental.FieldDefaults;
 public class UserCreationParam {
     /** When set, Keycloak creates the user with this id (aligns with application user id). */
     String id;
+
+    @NotBlank(message = "USERNAME_IS_MISSING")
     String username;
+
     boolean enabled;
+
+    @NotBlank(message = "EMAIL_REQUIRED")
+    @Email(message = "INVALID_EMAIL_FORMAT")
     String email;
+
     boolean emailVerified;
     String firstName;
     String lastName;
+
+    @NotEmpty(message = "CREDENTIALS_REQUIRED")
+    @Valid
     List<Credential> credentials;
 }
 

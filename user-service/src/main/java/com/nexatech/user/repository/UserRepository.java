@@ -13,6 +13,8 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     boolean existsByEmail(String email);
 
+    boolean existsByEmailAndIdNot(String email, String id);
+
     boolean existsByUsername(String username);
 
     Optional<User> findByEmail(String email);

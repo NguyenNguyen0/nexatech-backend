@@ -2,6 +2,8 @@ package com.nexatech.user.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,7 +37,7 @@ public class UserController {
     AdminUserService adminUserService;
 
     @PostMapping
-    public ApiResponse<UserResponse> createUser(@RequestBody AdminUserCreateRequest request) {
+    public ApiResponse<UserResponse> createUser(@Valid @RequestBody AdminUserCreateRequest request) {
         return ApiResponse.<UserResponse>builder()
                 .result(adminUserService.createUserWithKeycloakProvision(request))
                 .build();
@@ -56,7 +58,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}")
-    public ApiResponse<UserResponse> updateUser(@PathVariable String userId, @RequestBody UserUpdatenRequest request) {
+    public ApiResponse<UserResponse> updateUser(@PathVariable String userId, @Valid @RequestBody UserUpdatenRequest request) {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.updateUser(userId, request))
                 .build();

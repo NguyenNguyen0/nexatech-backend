@@ -3,6 +3,8 @@ package com.nexatech.identity.controller.internal;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,7 +32,7 @@ public class InternalGroupController {
     GroupService groupService;
 
     @PostMapping
-    public ApiResponse<String> createGroup(@RequestBody GroupCreateParam param) {
+    public ApiResponse<String> createGroup(@Valid @RequestBody GroupCreateParam param) {
         return ApiResponse.<String>builder().result(groupService.createGroup(param)).build();
     }
 
@@ -50,13 +52,15 @@ public class InternalGroupController {
     }
 
     @PostMapping("/{groupId}/realm-role-mappings")
-    public ApiResponse<Void> assignRealmRoles(@PathVariable String groupId, @RequestBody List<KeycloakRoleRef> roles) {
+    public ApiResponse<Void> assignRealmRoles(@PathVariable String groupId,
+            @Valid @RequestBody List<KeycloakRoleRef> roles) {
         groupService.assignRealmRolesToGroup(groupId, roles);
         return ApiResponse.<Void>builder().build();
     }
 
     @DeleteMapping("/{groupId}/realm-role-mappings")
-    public ApiResponse<Void> removeRealmRoles(@PathVariable String groupId, @RequestBody List<KeycloakRoleRef> roles) {
+    public ApiResponse<Void> removeRealmRoles(@PathVariable String groupId,
+            @Valid @RequestBody List<KeycloakRoleRef> roles) {
         groupService.removeRealmRolesFromGroup(groupId, roles);
         return ApiResponse.<Void>builder().build();
     }

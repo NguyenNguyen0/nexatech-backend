@@ -3,6 +3,8 @@ package com.nexatech.user.controller;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,7 +35,7 @@ public class GroupController {
     IdentityIamClient identityIamClient;
 
     @PostMapping
-    public ApiResponse<String> createGroup(@RequestBody GroupCreateRequest request) {
+    public ApiResponse<String> createGroup(@Valid @RequestBody GroupCreateRequest request) {
         return ApiResponse.<String>builder().result(identityIamClient.createGroup(request).getResult()).build();
     }
 
@@ -55,13 +57,15 @@ public class GroupController {
     }
 
     @PostMapping("/{groupId}/realm-role-mappings")
-    public ApiResponse<Void> assignRealmRoles(@PathVariable String groupId, @RequestBody List<RoleRefRequest> roles) {
+    public ApiResponse<Void> assignRealmRoles(@PathVariable String groupId,
+            @Valid @RequestBody List<RoleRefRequest> roles) {
         identityIamClient.assignRealmRoles(groupId, roles);
         return ApiResponse.<Void>builder().build();
     }
 
     @DeleteMapping("/{groupId}/realm-role-mappings")
-    public ApiResponse<Void> removeRealmRoles(@PathVariable String groupId, @RequestBody List<RoleRefRequest> roles) {
+    public ApiResponse<Void> removeRealmRoles(@PathVariable String groupId,
+            @Valid @RequestBody List<RoleRefRequest> roles) {
         identityIamClient.removeRealmRoles(groupId, roles);
         return ApiResponse.<Void>builder().build();
     }

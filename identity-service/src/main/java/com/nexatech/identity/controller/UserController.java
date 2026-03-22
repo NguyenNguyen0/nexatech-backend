@@ -3,6 +3,8 @@ package com.nexatech.identity.controller;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,7 +35,7 @@ public class UserController {
     UserService userService;
 
     @PostMapping
-    public ApiResponse<String> createUser(@RequestBody UserCreationParam param) {
+    public ApiResponse<String> createUser(@Valid @RequestBody UserCreationParam param) {
         return ApiResponse.<String>builder().result(userService.createUser(param)).build();
     }
 
@@ -53,7 +55,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}")
-    public ApiResponse<Void> updateUser(@PathVariable String userId, @RequestBody UserUpdateParam param) {
+    public ApiResponse<Void> updateUser(@PathVariable String userId, @Valid @RequestBody UserUpdateParam param) {
         userService.updateUser(userId, param);
         return ApiResponse.<Void>builder().build();
     }
@@ -72,7 +74,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}/reset-password")
-    public ApiResponse<Void> resetPassword(@PathVariable String userId, @RequestBody Credential credential) {
+    public ApiResponse<Void> resetPassword(@PathVariable String userId, @Valid @RequestBody Credential credential) {
         userService.resetPassword(userId, credential);
         return ApiResponse.<Void>builder().build();
     }
@@ -98,7 +100,8 @@ public class UserController {
     }
 
     @DeleteMapping("/{userId}/realm-role-mappings")
-    public ApiResponse<Void> removeRealmRoles(@PathVariable String userId, @RequestBody List<KeycloakRoleRef> roles) {
+    public ApiResponse<Void> removeRealmRoles(@PathVariable String userId,
+            @Valid @RequestBody List<KeycloakRoleRef> roles) {
         userService.removeRealmRolesFromUser(userId, roles);
         return ApiResponse.<Void>builder().build();
     }

@@ -4,6 +4,8 @@ import java.time.LocalDate;
 
 import com.nexatech.user.model.constant.Gender;
 
+import jakarta.validation.constraints.Email;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,6 +21,7 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserUpdatenRequest {
+    @Email(message = "INVALID_EMAIL_FORMAT")
     String email;
     String firstName;
     String lastName;

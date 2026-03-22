@@ -3,6 +3,8 @@ package com.nexatech.identity.controller;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,7 +31,7 @@ public class RoleController {
     RoleService roleService;
 
     @PostMapping
-    public ApiResponse<Void> createRole(@RequestBody RoleCreateParam param) {
+    public ApiResponse<Void> createRole(@Valid @RequestBody RoleCreateParam param) {
         roleService.createRole(param);
         return ApiResponse.<Void>builder().build();
     }
@@ -56,7 +58,8 @@ public class RoleController {
     }
 
     @PostMapping("/{roleName}/composites")
-    public ApiResponse<Void> addCompositeRoles(@PathVariable String roleName, @RequestBody List<KeycloakRoleRef> roles) {
+    public ApiResponse<Void> addCompositeRoles(@PathVariable String roleName,
+            @Valid @RequestBody List<KeycloakRoleRef> roles) {
         roleService.addCompositeRoles(roleName, roles);
         return ApiResponse.<Void>builder().build();
     }
@@ -69,7 +72,8 @@ public class RoleController {
     }
 
     @DeleteMapping("/{roleName}/composites")
-    public ApiResponse<Void> removeCompositeRoles(@PathVariable String roleName, @RequestBody List<KeycloakRoleRef> roles) {
+    public ApiResponse<Void> removeCompositeRoles(@PathVariable String roleName,
+            @Valid @RequestBody List<KeycloakRoleRef> roles) {
         roleService.removeCompositeRoles(roleName, roles);
         return ApiResponse.<Void>builder().build();
     }

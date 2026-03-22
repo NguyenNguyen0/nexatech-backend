@@ -1,5 +1,7 @@
 package com.nexatech.identity.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,7 +17,10 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Credential {
+    @NotBlank(message = "CREDENTIAL_TYPE_REQUIRED")
     String type;
+
+    @NotBlank(message = "CREDENTIAL_VALUE_REQUIRED")
     String value;
     boolean temporary;
 }

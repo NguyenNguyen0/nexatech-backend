@@ -1,7 +1,6 @@
 package com.nexatech.user.service.impl;
 
 import java.util.List;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +10,7 @@ import com.nexatech.user.dto.event.KeycloakCredentialPayload;
 import com.nexatech.user.dto.event.KeycloakUserProvisionPayload;
 import com.nexatech.user.dto.request.AdminUserCreateRequest;
 import com.nexatech.user.dto.request.UserCreationRequest;
+import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.response.UserResponse;
 import com.nexatech.user.exception.AppException;
 import com.nexatech.user.exception.ErrorCode;
@@ -51,12 +51,36 @@ public class AdminUserServiceImpl implements AdminUserService {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
-        String userId = request.getId() != null && !request.getId().isBlank()
-                ? request.getId()
-                : UUID.randomUUID().toString();
+        String requestedId = request.getId() != null && !request.getId().isBlank() ? request.getId() : null;
+
+        KeycloakUserProvisionPayload provision = KeycloakUserProvisionPayload.builder()
+                .id(requestedId)
+                .username(request.getUsername())
+                .enabled(request.isEnabled())
+                .email(request.getEmail())
+                .emailVerified(request.isEmailVerified())
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .credentials(List.of(KeycloakCredentialPayload.builder()
+                        .type("password")
+                        .value(request.getPassword())
+                        .temporary(request.isTemporaryPassword())
+                        .build()))
+                .build();
+
+        ApiResponse<String> created;
+        try {
+            created = identityClient.createKeycloakUser(provision);
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        }
+        String keycloakUserId = created != null ? created.getResult() : null;
+        if (keycloakUserId == null || keycloakUserId.isBlank()) {
+            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        }
 
         UserCreationRequest profile = UserCreationRequest.builder()
-                .id(userId)
+                .id(keycloakUserId)
                 .email(request.getEmail())
                 .username(request.getUsername())
                 .firstName(request.getFirstName())
@@ -69,29 +93,8 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .build();
 
         User user = userMapper.toUser(profile);
-        user.setId(userId);
+        user.setId(keycloakUserId);
         User saved = userRepository.save(user);
-
-        KeycloakUserProvisionPayload provision = KeycloakUserProvisionPayload.builder()
-                .id(saved.getId())
-                .username(saved.getUsername())
-                .enabled(request.isEnabled())
-                .email(saved.getEmail())
-                .emailVerified(request.isEmailVerified())
-                .firstName(saved.getFirstName())
-                .lastName(saved.getLastName())
-                .credentials(List.of(KeycloakCredentialPayload.builder()
-                        .type("password")
-                        .value(request.getPassword())
-                        .temporary(request.isTemporaryPassword())
-                        .build()))
-                .build();
-
-        try {
-            identityClient.createKeycloakUser(provision);
-        } catch (Exception ex) {
-            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
-        }
         return userMapper.toResponse(saved);
     }
 }

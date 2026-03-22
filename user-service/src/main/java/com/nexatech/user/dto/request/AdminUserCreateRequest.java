@@ -4,6 +4,10 @@ import java.time.LocalDate;
 
 import com.nexatech.user.model.constant.Gender;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,7 +24,13 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AdminUserCreateRequest {
     String id;
+
+    @NotBlank(message = "EMAIL_REQUIRED")
+    @Email(message = "INVALID_EMAIL_FORMAT")
     String email;
+
+    @NotBlank(message = "USERNAME_IS_MISSING")
+    @Size(max = 50, message = "USERNAME_TOO_LONG")
     String username;
     String firstName;
     String lastName;
@@ -30,6 +40,8 @@ public class AdminUserCreateRequest {
     Gender gender;
     Boolean onBoarded;
     /** Password for Keycloak credential (required). */
+    @NotBlank(message = "PASSWORD_REQUIRED")
+    @Size(min = 8, message = "PASSWORD_TOO_SHORT")
     String password;
     @Builder.Default
     boolean temporaryPassword = false;

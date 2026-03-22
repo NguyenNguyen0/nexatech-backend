@@ -3,6 +3,8 @@ package com.nexatech.user.controller;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,7 +31,7 @@ public class PermissionController {
     IdentityIamClient identityIamClient;
 
     @PostMapping
-    public ApiResponse<Void> createPermission(@RequestBody RoleCreateRequest request) {
+    public ApiResponse<Void> createPermission(@Valid @RequestBody RoleCreateRequest request) {
         identityIamClient.createRole(request);
         return ApiResponse.<Void>builder().build();
     }

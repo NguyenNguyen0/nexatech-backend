@@ -3,6 +3,8 @@ package com.nexatech.user.controller;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,7 +32,7 @@ public class RoleController {
     IdentityIamClient identityIamClient;
 
     @PostMapping
-    public ApiResponse<Void> createRole(@RequestBody RoleCreateRequest request) {
+    public ApiResponse<Void> createRole(@Valid @RequestBody RoleCreateRequest request) {
         identityIamClient.createRole(request);
         return ApiResponse.<Void>builder().build();
     }
@@ -74,7 +76,8 @@ public class RoleController {
     }
 
     @DeleteMapping("/{roleName}/composites")
-    public ApiResponse<Void> removeCompositeRoles(@PathVariable String roleName, @RequestBody List<RoleRefRequest> roles) {
+    public ApiResponse<Void> removeCompositeRoles(@PathVariable String roleName,
+            @Valid @RequestBody List<RoleRefRequest> roles) {
         identityIamClient.removeCompositeRoles(roleName, roles);
         return ApiResponse.<Void>builder().build();
     }

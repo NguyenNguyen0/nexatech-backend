@@ -29,7 +29,9 @@ public interface KeycloakUserClient {
 
     @GetMapping("/admin/realms/{realm}/users")
     List<Map<String, Object>> listUsers(@PathVariable("realm") String realm, @RequestHeader("Authorization") String authorization,
-            @RequestParam(value = "username", required = false) String username);
+            @RequestParam(value = "username", required = false) String username,
+            @RequestParam(value = "email", required = false) String email,
+            @RequestParam(value = "exact", required = false) Boolean exact);
 
     @GetMapping("/admin/realms/{realm}/users/{userId}")
     Map<String, Object> getUserById(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
