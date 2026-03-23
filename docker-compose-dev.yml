@@ -25,21 +25,6 @@ services:
       - "5050:80"
     depends_on:
       - postgres
-  #  Mongodb
-  mongodb:
-    image: mongo:7
-    container_name: nexatech-mongodb
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-nexatech}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-nexatech123}
-      MONGO_INITDB_DATABASE: nexatech_products
-    ports:
-      - "27017:27017"
-    healthcheck:
-      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
   # ====== Kafka (KRaft mode) ======
   kafka:
     image: apache/kafka:latest

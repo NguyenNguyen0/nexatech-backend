@@ -38,20 +38,3 @@ logs:
 reset:
 	docker-compose down -v
 	docker-compose up -d --build
-
-## Docker - Dev environment (docker-compose-dev.yml)
-dev-up:
-	docker-compose -f docker-compose-dev.yml up -d
-
-dev-down:
-	docker-compose -f docker-compose-dev.yml down
-
-dev-rebuild:
-	docker-compose -f docker-compose-dev.yml up -d --build
-
-dev-logs:
-	docker-compose -f docker-compose-dev.yml logs -f
-
-dev-reset:
-	docker-compose -f docker-compose-dev.yml down -v
-	docker-compose -f docker-compose-dev.yml up -d --build

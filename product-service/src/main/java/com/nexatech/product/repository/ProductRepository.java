@@ -13,11 +13,19 @@ public interface ProductRepository extends MongoRepository<Product, String> {
 
     Optional<Product> findBySlug(String slug);
 
+    Optional<Product> findByIdAndActiveTrue(String id);
+
     Page<Product> findByCategoryId(String categoryId, Pageable pageable);
+
+    Page<Product> findByCategoryIdAndActiveTrue(String categoryId, Pageable pageable);
 
     Page<Product> findByBrandId(String brandId, Pageable pageable);
 
     Page<Product> findByActiveTrue(Pageable pageable);
 
     Page<Product> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+    Page<Product> findByNameContainingIgnoreCaseAndActiveTrue(String name, Pageable pageable);
+
+    boolean existsByCategoryIdAndActiveTrue(String categoryId);
 }
