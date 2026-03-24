@@ -36,6 +36,7 @@ public class StockMovement extends BaseEntity {
         OUTBOUND,
         RESERVED,
         RELEASED,
-        ADJUSTMENT
+        ADJUSTMENT,
+        SALE
     }
 }

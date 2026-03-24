@@ -1,9 +1,9 @@
 package com.nexatech.product.controller;
 
+import com.nexatech.product.dto.request.ProductRequest;
 import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.PageResponse;
-import com.nexatech.product.dto.ProductRequest;
-import com.nexatech.product.dto.ProductResponse;
+import com.nexatech.product.dto.response.ProductResponse;
 import com.nexatech.product.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
