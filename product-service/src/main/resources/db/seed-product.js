@@ -1,3 +1,5 @@
+// Chọn toàn bộ rồi -> Run Script -> Thêm datasource -> Chọn run
+
 // Chọn database
 db = db.getSiblingDB('nexatech_products');
 
