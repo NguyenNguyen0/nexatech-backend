@@ -1,19 +1,20 @@
 package com.nexatech.product.service;
 
-import com.nexatech.product.dto.ProductRequest;
-import com.nexatech.product.dto.ProductResponse;
+import com.nexatech.product.dto.request.ProductRequest;
+import com.nexatech.product.dto.response.ProductResponse;
 import com.nexatech.product.event.ProductCatalogEvent;
 import com.nexatech.product.event.ProductEventProducer;
-import com.nexatech.product.exception.BadRequestException;
 import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.ProductMapper;
 import com.nexatech.product.model.Product;
 import com.nexatech.product.repository.CategoryRepository;
 import com.nexatech.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageImpl;
+import org.bson.types.ObjectId;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.UncategorizedMongoDbException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -81,22 +82,26 @@ public class ProductService {
         }
 
         String normalizedKeyword = keyword.trim();
-        TextCriteria textCriteria = TextCriteria.forDefaultLanguage().matching(normalizedKeyword);
+        try {
+            TextCriteria textCriteria = TextCriteria.forDefaultLanguage().matching(normalizedKeyword);
 
-        Query query = TextQuery.queryText(textCriteria)
-                .sortByScore()
-                .with(pageable)
-                .addCriteria(Criteria.where("active").is(true));
+            Query query = TextQuery.queryText(textCriteria)
+                    .sortByScore()
+                    .with(pageable)
+                    .addCriteria(Criteria.where("active").is(true));
 
-        List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
-                .map(productMapper::toResponse)
-                .toList();
+            List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
+                    .map(productMapper::toResponse)
+                    .toList();
 
-        if (!content.isEmpty()) {
-            long total = mongoTemplate.count(
-                    TextQuery.queryText(textCriteria).addCriteria(Criteria.where("active").is(true)),
-                    Product.class);
-            return new PageImpl<>(content, pageable, total);
+            if (!content.isEmpty()) {
+                long total = mongoTemplate.count(
+                        TextQuery.queryText(textCriteria).addCriteria(Criteria.where("active").is(true)),
+                        Product.class);
+                return new PageImpl<>(content, pageable, total);
+            }
+        } catch (UncategorizedMongoDbException ex) {
+            // Fallback to regex search when text index is missing.
         }
 
         return productRepository.findByNameContainingIgnoreCaseAndActiveTrue(normalizedKeyword, pageable)
@@ -105,8 +110,22 @@ public class ProductService {
 
     public Page<ProductResponse> getProductsByCategory(String categoryId, Pageable pageable) {
         validateCategory(categoryId);
-        return productRepository.findByCategoryIdAndActiveTrue(categoryId, pageable)
-                .map(productMapper::toResponse);
+
+        Query query = Query.query(new Criteria().andOperator(
+                        Criteria.where("active").is(true),
+                        categoryIdCriteria("categoryId", categoryId)))
+                .with(pageable);
+
+        List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
+                .map(productMapper::toResponse)
+                .toList();
+        long total = mongoTemplate.count(
+                Query.query(new Criteria().andOperator(
+                        Criteria.where("active").is(true),
+                        categoryIdCriteria("categoryId", categoryId))),
+                Product.class);
+
+        return new PageImpl<>(content, pageable, total);
     }
 
     public void deleteProduct(String id) {
@@ -154,6 +173,13 @@ public class ProductService {
                 .replaceAll("\\s+", "-")
                 .replaceAll("-+", "-");
         return StringUtils.hasText(slug) ? slug : "product";
+    }
+
+    private Criteria categoryIdCriteria(String fieldName, String idValue) {
+        if (ObjectId.isValid(idValue)) {
+            return Criteria.where(fieldName).in(idValue, new ObjectId(idValue));
+        }
+        return Criteria.where(fieldName).is(idValue);
     }
 
     private void publishEvent(Product product, String eventType) {

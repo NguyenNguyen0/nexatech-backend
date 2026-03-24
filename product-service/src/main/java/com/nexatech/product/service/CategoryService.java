@@ -1,7 +1,7 @@
 package com.nexatech.product.service;
 
-import com.nexatech.product.dto.CategoryRequest;
-import com.nexatech.product.dto.CategoryResponse;
+import com.nexatech.product.dto.request.CategoryRequest;
+import com.nexatech.product.dto.response.CategoryResponse;
 import com.nexatech.product.exception.BadRequestException;
 import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.CategoryMapper;
