@@ -267,6 +267,12 @@ public class OrderService {
                     .customerId(order.getCustomerId())
                     .status(order.getStatus())
                     .totalAmount(order.getTotalAmount())
+                    .items(order.getItems().stream()
+                        .map(item -> OrderEvent.OrderItemEvent.builder()
+                            .productId(item.getProductId())
+                            .quantity(item.getQuantity())
+                            .build())
+                        .toList())
                     .build();
             orderEventProducer.publishOrderEvent(event);
         } catch (Exception e) {

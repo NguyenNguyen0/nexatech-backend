@@ -1,4 +1,4 @@
-package com.nexatech.product.dto;
+package com.nexatech.product.dto.response;
 
 import lombok.Builder;
 import lombok.Data;

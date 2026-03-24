@@ -1,4 +1,4 @@
-package com.nexatech.product.dto;
+package com.nexatech.product.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
