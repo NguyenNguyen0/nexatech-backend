@@ -6,6 +6,7 @@ import com.nexatech.order.client.dto.ProductInfo;
 import com.nexatech.order.client.dto.StockOperationRequest;
 import com.nexatech.order.dto.CreateOrderRequest;
 import com.nexatech.order.dto.OrderResponse;
+import com.nexatech.order.dto.UpdateShippingRequest;
 import com.nexatech.order.enums.OrderStatus;
 import com.nexatech.order.event.OrderEvent;
 import com.nexatech.order.event.OrderEventProducer;
@@ -78,6 +79,7 @@ public class OrderService {
                 .shippingFee(BigDecimal.ZERO)
                 .discount(BigDecimal.ZERO)
                 .shippingAddress(request.getShippingAddress())
+                .shippingMethod(request.getShippingMethod() != null ? request.getShippingMethod() : "STANDARD")
                 .note(request.getNote())
                 .items(items)
                 .build();
@@ -122,7 +124,7 @@ public class OrderService {
 
     /**
      * Cập nhật trạng thái đơn hàng (admin thực hiện).
-     * Publish OrderEvent để các service liên quan (payment, inventory, notification) phản ứng.
+     * Tự động gán timestamp vận chuyển khi status chuyển sang SHIPPED / DELIVERED.
      */
     @Transactional
     public OrderResponse updateOrderStatus(UUID orderId, OrderStatus newStatus) {
@@ -130,11 +132,32 @@ public class OrderService {
         OrderStatus oldStatus = order.getStatus();
 
         order.setStatus(newStatus);
-        Order saved = orderRepository.save(order);
 
+        // Tự động ghi nhận thời điểm gửi hàng và giao hàng thành công
+        if (newStatus == OrderStatus.SHIPPED && order.getShippedAt() == null) {
+            order.setShippedAt(Instant.now());
+        } else if (newStatus == OrderStatus.DELIVERED) {
+            order.setDeliveredAt(Instant.now());
+        }
+
+        Order saved = orderRepository.save(order);
         publishEvent(saved, "ORDER_STATUS_UPDATED");
         log.info("Cập nhật trạng thái đơn hàng {} : {} → {}", orderId, oldStatus, newStatus);
 
+        return orderMapper.toResponse(saved);
+    }
+
+    /**
+     * Cập nhật thông tin tracking vận chuyển (admin thực hiện sau khi bàn giao cho đơn vị vận chuyển).
+     */
+    @Transactional
+    public OrderResponse updateShipping(UUID orderId, UpdateShippingRequest request) {
+        Order order = findById(orderId);
+        order.setTrackingNumber(request.getTrackingNumber());
+        order.setCarrierName(request.getCarrierName());
+        order.setEstimatedDelivery(request.getEstimatedDelivery());
+        Order saved = orderRepository.save(order);
+        log.info("Cập nhật tracking đơn hàng {}: {} / {}", orderId, request.getCarrierName(), request.getTrackingNumber());
         return orderMapper.toResponse(saved);
     }
 

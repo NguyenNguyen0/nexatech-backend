@@ -1,5 +1,7 @@
 package com.nexatech.user.controller.internal;
 
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -24,7 +26,7 @@ public class InternalUserController {
     UserService userService;
 
     @PostMapping
-    public ApiResponse<?> createUser(@RequestBody UserCreationRequest request) {
+    public ApiResponse<?> createUser(@Valid @RequestBody UserCreationRequest request) {
         return ApiResponse.builder()
                 .result(userService.createUser(request))
                 .build();

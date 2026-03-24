@@ -41,3 +41,7 @@ desktop.ini
 ### Logs ###
 logs/
 *.log
+
+
+# ignore docker compose dev
+docker-compose-dev.yml

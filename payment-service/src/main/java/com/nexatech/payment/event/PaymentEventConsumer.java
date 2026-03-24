@@ -18,7 +18,11 @@ public class PaymentEventConsumer {
 
     /**
      * Lắng nghe các sự kiện từ order-service qua topic order.events.
-     * Khi đơn hàng chuyển sang trạng thái CONFIRMED → xác nhận thanh toán thành công.
+     *
+     * Xử lý:
+     *   ORDER_STATUS_UPDATED + CONFIRMED  → xác nhận thanh toán (non-COD)
+     *   ORDER_STATUS_UPDATED + DELIVERED  → xác nhận thanh toán COD (tiền mặt khi nhận hàng)
+     *   ORDER_RETURN_APPROVED             → xử lý hoàn tiền cho đơn trả hàng
      */
     @KafkaListener(topics = "order.events", groupId = "payment-service-group")
     public void handleOrderEvent(String message) {
@@ -27,11 +31,21 @@ public class PaymentEventConsumer {
             log.info("Nhận OrderEvent: type={}, orderId={}, status={}",
                     event.getEventType(), event.getOrderId(), event.getStatus());
 
-            // Chỉ xử lý khi admin xác nhận đơn hàng → tự động hoàn tất thanh toán
-            if ("ORDER_STATUS_UPDATED".equals(event.getEventType())
-                    && "CONFIRMED".equals(event.getStatus())) {
-                paymentService.confirmPayment(event.getOrderId());
+            if ("ORDER_STATUS_UPDATED".equals(event.getEventType())) {
+                if ("CONFIRMED".equals(event.getStatus())) {
+                    // Đơn được xác nhận → thanh toán online (non-COD) hoàn tất
+                    paymentService.confirmPayment(event.getOrderId());
+
+                } else if ("DELIVERED".equals(event.getStatus())) {
+                    // Đơn giao thành công → tự động xác nhận thanh toán COD
+                    paymentService.confirmCodPayment(event.getOrderId());
+                }
+
+            } else if ("ORDER_RETURN_APPROVED".equals(event.getEventType())) {
+                // Admin duyệt trả hàng → kích hoạt hoàn tiền
+                paymentService.processReturnRefund(event.getOrderId());
             }
+
         } catch (Exception e) {
             // Log lỗi và bỏ qua message — tránh vòng lặp re-consume vô hạn
             log.error("Lỗi xử lý OrderEvent: {} | message: {}", e.getMessage(), message);

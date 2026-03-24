@@ -5,8 +5,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
-import com.nexatech.identity.client.keycloak.KeycloakAuthClient;
-import com.nexatech.identity.client.user.UserClient;
+import com.nexatech.identity.client.KeycloakAuthClient;
 import com.nexatech.identity.dto.request.IntrospectParam;
 import com.nexatech.identity.dto.request.IntrospectTokenRequest;
 import com.nexatech.identity.dto.request.LoginRequest;
@@ -30,7 +29,7 @@ public class AuthService {
 
     private final KeycloakAuthClient keycloakAuthClient;
     private final UserService userService;
-    private final UserClient userClient;
+    private final KafkaService kafkaService;
     private final UserClientMapper userClientMapper;
 
     @Value("${openfeign.keycloak.realm}")
@@ -46,10 +45,13 @@ public class AuthService {
         String createdUserId = userService.createUser(param);
         try {
             UserClientRequest request = userClientMapper.toProvisionRequest(createdUserId, param);
-            userClient.createUser(request);
+            kafkaService.sendUserRegistered(request);
             return createdUserId;
+        } catch (AppException ex) {
+            userService.deleteUser(createdUserId);
+            throw ex;
         } catch (Exception ex) {
-            userService.deleteUser(createdUserId); // nếu lỗi thì bỏ hành động vừa tạo user trong keycloak
+            userService.deleteUser(createdUserId);
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }
     }
