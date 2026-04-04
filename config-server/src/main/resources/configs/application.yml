@@ -19,12 +19,11 @@ spring:
 eureka:
   client:
     service-url:
-      # Docker: override bằng env EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       defaultZone: http://${EUREKA_INSTANCE_HOSTNAME:localhost}:8761/eureka/
-    # Local dev: false → không cần discovery-server; Docker: set EUREKA_ENABLED=true
-    enabled: ${EUREKA_ENABLED:false}
-    register-with-eureka: ${EUREKA_ENABLED:false}
-    fetch-registry: ${EUREKA_ENABLED:false}
+    # Mặc định bật để API Gateway (lb://) thấy instance. Chạy 1 service tách rời: EUREKA_ENABLED=false
+    enabled: ${EUREKA_ENABLED:true}
+    register-with-eureka: ${EUREKA_ENABLED:true}
+    fetch-registry: ${EUREKA_ENABLED:true}
 
 management:
   endpoints:

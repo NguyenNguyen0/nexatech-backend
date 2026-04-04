@@ -21,7 +21,6 @@ import com.nexatech.user.constant.PermissionsDeny;
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.request.RoleCreateRequest;
 import com.nexatech.user.dto.response.RoleSummaryResponse;
-import com.nexatech.user.security.RequiresPermission;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +47,7 @@ public class PermissionController {
      * Catalog of grant permission codes (static list for admin UI), same shape as Keycloak role summaries.
      */
     @GetMapping("/accept")
-    @RequiresPermission(PermissionsAccept.Definition.READ)
+    // @RequiresPermission(PermissionsAccept.Definition.READ)
     public ApiResponse<List<RoleSummaryResponse>> listPermissionAcceptCatalog() {
         return ApiResponse.<List<RoleSummaryResponse>>builder()
                 .result(toCatalogRoleSummaries(PermissionsAccept.allCodes()))
