@@ -12,6 +12,8 @@ import com.nexatech.identity.dto.request.Credential;
 import com.nexatech.identity.dto.request.KeycloakRoleRef;
 import com.nexatech.identity.dto.request.UserCreationParam;
 import com.nexatech.identity.dto.request.UserUpdateParam;
+import com.nexatech.identity.exception.AppException;
+import com.nexatech.identity.exception.ErrorCode;
 import com.nexatech.identity.service.support.KeycloakAdminTokenProvider;
 import com.nexatech.identity.service.support.KeycloakResponseUtils;
 
@@ -46,6 +48,10 @@ public class UserService {
                 .build();
 
         try (Response response = keycloakUserClient.createUser(realm, adminTokenProvider.adminAuthorizationHeader(), body)) {
+            int status = response.status();
+            if (status == 409) {
+                throw new AppException(ErrorCode.USER_EXISTED);
+            }
             return KeycloakResponseUtils.idFromCreatedResourceLocation(response, 201);
         }
     }
