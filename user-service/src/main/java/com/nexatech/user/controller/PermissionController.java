@@ -38,7 +38,7 @@ public class PermissionController {
     IdentityIamClient identityIamClient;
 
     @PostMapping
-    @RequiresPermission(PermissionsAccept.Definition.WRITE)
+    // @RequiresPermission(PermissionsAccept.Definition.WRITE)
     public ApiResponse<Void> createPermission(@Valid @RequestBody RoleCreateRequest request) {
         identityIamClient.createRole(request);
         return ApiResponse.<Void>builder().build();
@@ -59,7 +59,7 @@ public class PermissionController {
      * Catalog of deny permission codes ({@code *_DENY}, static list for admin UI).
      */
     @GetMapping("/deny")
-    @RequiresPermission(PermissionsAccept.Definition.READ)
+    // @RequiresPermission(PermissionsAccept.Definition.READ)
     public ApiResponse<List<RoleSummaryResponse>> listPermissionDenyCatalog() {
         return ApiResponse.<List<RoleSummaryResponse>>builder()
                 .result(toCatalogRoleSummaries(PermissionsDeny.allCodes()))
@@ -70,7 +70,7 @@ public class PermissionController {
      * Grant-style realm roles from Keycloak in real time (names not ending with {@code _DENY}).
      */
     @GetMapping("/accept/keycloak")
-    @RequiresPermission(PermissionsAccept.Definition.READ)
+    // @RequiresPermission(PermissionsAccept.Definition.READ)
     public ApiResponse<List<RoleSummaryResponse>> listPermissionAcceptFromKeycloak() {
         return ApiResponse.<List<RoleSummaryResponse>>builder()
                 .result(filterRealmRolesByDenySuffix(false))
@@ -81,7 +81,7 @@ public class PermissionController {
      * Deny realm roles from Keycloak in real time ({@code *_DENY}).
      */
     @GetMapping("/deny/keycloak")
-    @RequiresPermission(PermissionsAccept.Definition.READ)
+    // @RequiresPermission(PermissionsAccept.Definition.READ)
     public ApiResponse<List<RoleSummaryResponse>> listPermissionDenyFromKeycloak() {
         return ApiResponse.<List<RoleSummaryResponse>>builder()
                 .result(filterRealmRolesByDenySuffix(true))
@@ -90,7 +90,7 @@ public class PermissionController {
 
     /** Lists all realm roles from Keycloak (not limited to the static catalog). */
     @GetMapping
-    @RequiresPermission(PermissionsAccept.Definition.READ)
+    // @RequiresPermission(PermissionsAccept.Definition.READ)
     public ApiResponse<List<RoleSummaryResponse>> listPermissions() {
         List<RoleSummaryResponse> permissions = identityIamClient.listRoles().getResult()
                 .stream()
@@ -100,7 +100,7 @@ public class PermissionController {
     }
 
     @GetMapping("/{permissionName}")
-    @RequiresPermission(PermissionsAccept.Definition.READ)
+    // @RequiresPermission(PermissionsAccept.Definition.READ)
     public ApiResponse<RoleSummaryResponse> getPermissionByName(@PathVariable String permissionName) {
         return ApiResponse.<RoleSummaryResponse>builder()
                 .result(toRoleSummary(identityIamClient.getRoleByName(permissionName).getResult()))
@@ -108,7 +108,7 @@ public class PermissionController {
     }
 
     @DeleteMapping("/{permissionName}")
-    @RequiresPermission(PermissionsAccept.Definition.WRITE)
+    // @RequiresPermission(PermissionsAccept.Definition.WRITE)
     public ApiResponse<Void> deletePermission(@PathVariable String permissionName) {
         identityIamClient.deleteRole(permissionName);
         return ApiResponse.<Void>builder().build();

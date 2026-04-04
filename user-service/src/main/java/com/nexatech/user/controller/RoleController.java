@@ -14,12 +14,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.user.client.IdentityIamClient;
-import com.nexatech.user.constant.PermissionsAccept;
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.request.RoleCreateRequest;
 import com.nexatech.user.dto.request.RoleRefRequest;
 import com.nexatech.user.dto.response.RoleSummaryResponse;
-import com.nexatech.user.security.RequiresPermission;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -34,14 +32,14 @@ public class RoleController {
     IdentityIamClient identityIamClient;
 
     @PostMapping
-    @RequiresPermission(PermissionsAccept.RealmRole.WRITE)
+    // @RequiresPermission(PermissionsAccept.RealmRole.WRITE)
     public ApiResponse<Void> createRole(@Valid @RequestBody RoleCreateRequest request) {
         identityIamClient.createRole(request);
         return ApiResponse.<Void>builder().build();
     }
 
     @GetMapping
-    @RequiresPermission(PermissionsAccept.RealmRole.READ)
+    // @RequiresPermission(PermissionsAccept.RealmRole.READ)
     public ApiResponse<List<RoleSummaryResponse>> listRoles() {
         List<RoleSummaryResponse> roles = identityIamClient.listRoles().getResult()
                 .stream()
@@ -51,7 +49,7 @@ public class RoleController {
     }
 
     @GetMapping("/by-id/{roleId}")
-    @RequiresPermission(PermissionsAccept.RealmRole.READ)
+    // @RequiresPermission(PermissionsAccept.RealmRole.READ)
     public ApiResponse<RoleSummaryResponse> getRoleById(@PathVariable String roleId) {
         return ApiResponse.<RoleSummaryResponse>builder()
                 .result(toRoleSummary(identityIamClient.getRoleById(roleId).getResult()))
@@ -59,7 +57,7 @@ public class RoleController {
     }
 
     @GetMapping("/by-name/{roleName}")
-    @RequiresPermission(PermissionsAccept.RealmRole.READ)
+    // @RequiresPermission(PermissionsAccept.RealmRole.READ)
     public ApiResponse<RoleSummaryResponse> getRoleByName(@PathVariable String roleName) {
         return ApiResponse.<RoleSummaryResponse>builder()
                 .result(toRoleSummary(identityIamClient.getRoleByName(roleName).getResult()))
@@ -67,14 +65,14 @@ public class RoleController {
     }
 
     @PostMapping("/{roleName}/composites")
-    @RequiresPermission(PermissionsAccept.RealmRole.WRITE)
+    // @RequiresPermission(PermissionsAccept.RealmRole.WRITE)
     public ApiResponse<Void> addCompositeRoles(@PathVariable String roleName, @RequestBody List<RoleRefRequest> roles) {
         identityIamClient.addCompositeRoles(roleName, roles);
         return ApiResponse.<Void>builder().build();
     }
 
     @GetMapping("/{roleName}/composites")
-    @RequiresPermission(PermissionsAccept.RealmRole.READ)
+    // @RequiresPermission(PermissionsAccept.RealmRole.READ)
     public ApiResponse<List<RoleSummaryResponse>> getCompositeRoles(@PathVariable String roleName) {
         List<RoleSummaryResponse> roles = identityIamClient.getCompositeRoles(roleName).getResult()
                 .stream()
@@ -84,7 +82,7 @@ public class RoleController {
     }
 
     @DeleteMapping("/{roleName}/composites")
-    @RequiresPermission(PermissionsAccept.RealmRole.WRITE)
+    // @RequiresPermission(PermissionsAccept.RealmRole.WRITE)
     public ApiResponse<Void> removeCompositeRoles(@PathVariable String roleName,
             @Valid @RequestBody List<RoleRefRequest> roles) {
         identityIamClient.removeCompositeRoles(roleName, roles);
@@ -92,7 +90,7 @@ public class RoleController {
     }
 
     @DeleteMapping("/{roleName}")
-    @RequiresPermission(PermissionsAccept.RealmRole.WRITE)
+    // @RequiresPermission(PermissionsAccept.RealmRole.WRITE)
     public ApiResponse<Void> deleteRole(@PathVariable String roleName) {
         identityIamClient.deleteRole(roleName);
         return ApiResponse.<Void>builder().build();
