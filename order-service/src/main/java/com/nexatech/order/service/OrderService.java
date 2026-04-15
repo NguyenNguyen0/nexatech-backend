@@ -171,7 +171,7 @@ public class OrderService {
      *   3. Cập nhật trạng thái CANCELLED và publish event
      */
     @Transactional
-    public void cancelOrder(UUID customerId, UUID orderId) {
+    public OrderResponse cancelOrder(UUID customerId, UUID orderId) {
         Order order = findById(orderId);
 
         // Xác thực quyền sở hữu
@@ -179,14 +179,14 @@ public class OrderService {
             throw new ForbiddenException("Bạn không có quyền huỷ đơn hàng này");
         }
 
-        // Chỉ cho phép huỷ khi đơn đang ở PENDING
-        if (order.getStatus() != OrderStatus.PENDING) {
+        // Cho phép huỷ khi đơn đang ở PENDING hoặc CONFIRMED
+        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
             throw new BadRequestException(
-                    "Chỉ có thể huỷ đơn hàng ở trạng thái PENDING, trạng thái hiện tại: " + order.getStatus()
+                    "Chỉ có thể huỷ đơn hàng ở trạng thái PENDING hoặc CONFIRMED, trạng thái hiện tại: " + order.getStatus()
             );
         }
 
-        // Giải phóng tồn kho — nếu thất bại thì dừng lại, đơn hàng vẫn PENDING (không mất hàng)
+        // Giải phóng tồn kho — nếu thất bại thì dừng lại, đơn hàng vẫn giữ nguyên (không mất hàng)
         try {
             inventoryClient.releaseStock(buildStockRequestFromOrder(order));
         } catch (Exception e) {
@@ -195,10 +195,11 @@ public class OrderService {
         }
 
         order.setStatus(OrderStatus.CANCELLED);
-        orderRepository.save(order);
+        Order saved = orderRepository.save(order);
 
-        publishEvent(order, "ORDER_CANCELLED");
+        publishEvent(saved, "ORDER_CANCELLED");
         log.info("Huỷ đơn hàng thành công: {} | customer: {}", orderId, customerId);
+        return orderMapper.toResponse(saved);
     }
 
     // ==================== Private helpers ====================

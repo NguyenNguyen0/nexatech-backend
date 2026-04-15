@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.UUID;
 
-@FeignClient(name = "payment-service", path = "/api/v1/payments", fallback = PaymentClientFallback.class)
+@FeignClient(name = "payment-service", url = "${payment-service.url:}", path = "/api/v1/payments", fallback = PaymentClientFallback.class)
 public interface PaymentClient {
 
     @PostMapping
