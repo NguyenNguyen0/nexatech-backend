@@ -80,6 +80,7 @@ public class OrderService {
                 .discount(BigDecimal.ZERO)
                 .shippingAddress(request.getShippingAddress())
                 .shippingMethod(request.getShippingMethod() != null ? request.getShippingMethod() : "STANDARD")
+                .paymentMethod(request.getPaymentMethod())
                 .note(request.getNote())
                 .items(items)
                 .build();
