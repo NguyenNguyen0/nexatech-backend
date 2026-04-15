@@ -2,7 +2,7 @@
   "info": {
     "name": "NexaTech — Cart + Order + Payment (Local Test)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Bộ sưu tập API để test Cart, Checkout, Order, Payment trên môi trường local.\n\nCách chạy:\n1. `docker compose -f docker-compose-local.yml up -d`\n2. Chạy order-service (port 8084) và payment-service (port 8086) với profile test\n3. Import collection này vào Postman, chọn environment \"NexaTech Local\"\n4. Chạy lần lượt các request"
+    "description": "Bộ sưu tập API để test Cart, Checkout, Order, Payment trên môi trường local.\n\nCách chạy:\n1. `docker compose -f docker-compose-local.yml up -d`\n2. Copy `payment-service/.env.example` → `payment-service/.env`, điền VNPay credentials\n3. Chạy services:\n   - Order:   set -a; source payment-service/.env; mvn -f order-service/pom.xml spring-boot:run -Dspring-boot.run.profiles=test\n   - Payment: set -a; source payment-service/.env; mvn -f payment-service/pom.xml spring-boot:run -Dspring-boot.run.profiles=test\n4. Import collection này vào Postman, chạy lần lượt các request"
   },
   "variable": [
     {
