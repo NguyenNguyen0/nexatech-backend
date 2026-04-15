@@ -2,6 +2,7 @@ package com.nexatech.order.model;
 
 import com.nexatech.order.entity.base.BaseEntity;
 import com.nexatech.order.enums.OrderStatus;
+import com.nexatech.order.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -43,6 +44,9 @@ public class Order extends BaseEntity {
 
     // Phương thức vận chuyển (STANDARD, EXPRESS) — khách chọn khi đặt hàng
     private String shippingMethod;
+
+    @Enumerated(EnumType.STRING)
+    private PaymentMethod paymentMethod;
 
     // Thông tin theo dõi vận chuyển — admin cập nhật sau khi gửi hàng
     private String trackingNumber;
