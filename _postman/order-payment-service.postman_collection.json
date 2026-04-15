@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Nexatech - Order & Payment Service",
-    "description": "Collection để test Order Service (port 8084) và Payment Service (port 8086).\n\nSprint 1: Đặt hàng, CRUD payment, Kafka event flow.\nSprint 2: Admin Stats, Shipping Tracking, VNPay, Return & Refund (COD flow).\n\nChạy theo thứ tự: tạo đơn hàng → tạo thanh toán → các thao tác khác.",
+    "description": "Collection để test Order Service (port 8084) và Payment Service (port 8086).\n\nSprint 1: Đặt hàng, CRUD payment, Kafka event flow.\nSprint 2: Admin Stats, Shipping Tracking, VNPay, Return & Refund (COD flow).\nSprint 3: Cart API (Redis), Checkout Flow.\n\nChạy theo thứ tự: tạo đơn hàng → tạo thanh toán → các thao tác khác.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -1373,6 +1373,265 @@
               "raw": "{{paymentBaseUrl}}/api/v1/payments/{{paymentId}}",
               "host": ["{{paymentBaseUrl}}"],
               "path": ["api", "v1", "payments", "{{paymentId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart Service (Redis)",
+      "description": "Cart API trên order-service (port 8084). Giỏ hàng lưu trong Redis, TTL 30 ngày.",
+      "item": [
+        {
+          "name": "1. Add Item to Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Cart có item', () => {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.data.items.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{customerId}}" }
+            ],
+            "url": {
+              "raw": "{{orderBaseUrl}}/api/v1/cart/items",
+              "host": ["{{orderBaseUrl}}"],
+              "path": ["api", "v1", "cart", "items"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId1}}\",\n  \"quantity\": 2\n}"
+            }
+          }
+        },
+        {
+          "name": "2. Get Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Cart data hợp lệ', () => {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.data).to.have.property('items');",
+                  "    pm.expect(res.data).to.have.property('totalItems');",
+                  "    pm.expect(res.data).to.have.property('totalPrice');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "{{customerId}}" }
+            ],
+            "url": {
+              "raw": "{{orderBaseUrl}}/api/v1/cart",
+              "host": ["{{orderBaseUrl}}"],
+              "path": ["api", "v1", "cart"]
+            }
+          }
+        },
+        {
+          "name": "3. Update Cart Item Quantity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{customerId}}" }
+            ],
+            "url": {
+              "raw": "{{orderBaseUrl}}/api/v1/cart/items/{{productId1}}",
+              "host": ["{{orderBaseUrl}}"],
+              "path": ["api", "v1", "cart", "items", "{{productId1}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 3\n}"
+            }
+          }
+        },
+        {
+          "name": "4. Remove Cart Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-User-Id", "value": "{{customerId}}" }
+            ],
+            "url": {
+              "raw": "{{orderBaseUrl}}/api/v1/cart/items/{{productId1}}",
+              "host": ["{{orderBaseUrl}}"],
+              "path": ["api", "v1", "cart", "items", "{{productId1}}"]
+            }
+          }
+        },
+        {
+          "name": "5. Clear Cart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-User-Id", "value": "{{customerId}}" }
+            ],
+            "url": {
+              "raw": "{{orderBaseUrl}}/api/v1/cart",
+              "host": ["{{orderBaseUrl}}"],
+              "path": ["api", "v1", "cart"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Checkout",
+      "description": "Checkout flow: cart → order → payment. Yêu cầu có giỏ hàng trước.",
+      "item": [
+        {
+          "name": "1. Add Items to Cart (Setup)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{customerId}}" }
+            ],
+            "url": {
+              "raw": "{{orderBaseUrl}}/api/v1/cart/items",
+              "host": ["{{orderBaseUrl}}"],
+              "path": ["api", "v1", "cart", "items"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId1}}\",\n  \"quantity\": 2\n}"
+            }
+          }
+        },
+        {
+          "name": "2. Checkout (COD)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.orderId) {",
+                  "    pm.collectionVariables.set('orderId', res.data.orderId);",
+                  "    console.log('orderId from checkout:', res.data.orderId);",
+                  "}",
+                  "if (res && res.data && res.data.paymentId) {",
+                  "    pm.collectionVariables.set('paymentId', res.data.paymentId);",
+                  "}",
+                  "",
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Checkout thành công', () => {",
+                  "    pm.expect(res.data.orderNumber).to.match(/^ORD-/);",
+                  "    pm.expect(res.data.paymentMethod).to.equal('COD');",
+                  "    pm.expect(res.data.paymentUrl).to.be.null;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{customerId}}" }
+            ],
+            "url": {
+              "raw": "{{orderBaseUrl}}/api/v1/checkout",
+              "host": ["{{orderBaseUrl}}"],
+              "path": ["api", "v1", "checkout"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shippingAddress\": \"123 Nguyễn Huệ, Quận 1, TP.HCM\",\n  \"shippingMethod\": \"STANDARD\",\n  \"paymentMethod\": \"COD\",\n  \"note\": \"Giao buổi sáng\"\n}"
+            }
+          }
+        },
+        {
+          "name": "3. Checkout (VNPay)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.orderId) {",
+                  "    pm.collectionVariables.set('orderId', res.data.orderId);",
+                  "}",
+                  "",
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('VNPay checkout trả về paymentUrl', () => {",
+                  "    pm.expect(res.data.paymentMethod).to.equal('VNPAY');",
+                  "    pm.expect(res.data.paymentUrl).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{customerId}}" }
+            ],
+            "url": {
+              "raw": "{{orderBaseUrl}}/api/v1/checkout",
+              "host": ["{{orderBaseUrl}}"],
+              "path": ["api", "v1", "checkout"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shippingAddress\": \"456 Lê Lợi, Quận 1, TP.HCM\",\n  \"shippingMethod\": \"EXPRESS\",\n  \"paymentMethod\": \"VNPAY\",\n  \"note\": \"Thanh toán online\"\n}"
             }
           }
         }

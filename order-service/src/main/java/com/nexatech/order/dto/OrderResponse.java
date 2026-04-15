@@ -1,6 +1,7 @@
 package com.nexatech.order.dto;
 
 import com.nexatech.order.enums.OrderStatus;
+import com.nexatech.order.enums.PaymentMethod;
 import lombok.Builder;
 import lombok.Data;
 
@@ -22,6 +23,7 @@ public class OrderResponse {
     private BigDecimal discount;
     private String shippingAddress;
     private String shippingMethod;
+    private PaymentMethod paymentMethod;
     private String note;
     private List<OrderItemResponse> items;
     private Instant createdAt;
