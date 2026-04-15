@@ -102,8 +102,7 @@ services:
   discovery-server:
     build:
       context: .
-      args:
-        SERVICE_NAME: discovery-server
+      dockerfile: discovery-server/Dockerfile
     image: nexatech/discovery-server:latest
     container_name: nexatech-discovery
     ports:
@@ -122,8 +121,7 @@ services:
   config-server:
     build:
       context: .
-      args:
-        SERVICE_NAME: config-server
+      dockerfile: config-server/Dockerfile
     image: nexatech/config-server:latest
     container_name: nexatech-config
     ports:
@@ -146,8 +144,7 @@ services:
   order-service:
     build:
       context: .
-      args:
-        SERVICE_NAME: order-service
+      dockerfile: order-service/Dockerfile
     image: nexatech/order-service:latest
     container_name: nexatech-order
     ports:
@@ -176,8 +173,7 @@ services:
   payment-service:
     build:
       context: .
-      args:
-        SERVICE_NAME: payment-service
+      dockerfile: payment-service/Dockerfile
     image: nexatech/payment-service:latest
     container_name: nexatech-payment
     ports:

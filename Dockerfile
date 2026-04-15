@@ -19,7 +19,6 @@ COPY order-service/pom.xml order-service/pom.xml
 COPY inventory-service/pom.xml inventory-service/pom.xml
 COPY payment-service/pom.xml payment-service/pom.xml
 COPY notification-service/pom.xml notification-service/pom.xml
-COPY chat-service/pom.xml chat-service/pom.xml
 
 # Download dependencies (cached layer)
 RUN mvn dependency:go-offline -pl ${SERVICE_NAME} -am -q
@@ -35,7 +34,6 @@ COPY order-service/src order-service/src
 COPY inventory-service/src inventory-service/src
 COPY payment-service/src payment-service/src
 COPY notification-service/src notification-service/src
-COPY chat-service/src chat-service/src
 
 # Build only the target service
 RUN mvn clean package -pl ${SERVICE_NAME} -am -DskipTests -q
