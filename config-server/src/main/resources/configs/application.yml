@@ -19,7 +19,11 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://${EUREKA_INSTANCE_HOSTNAME:localhost}:8761/eureka/
+    # Mặc định bật để API Gateway (lb://) thấy instance. Chạy 1 service tách rời: EUREKA_ENABLED=false
+    enabled: ${EUREKA_ENABLED:true}
+    register-with-eureka: ${EUREKA_ENABLED:true}
+    fetch-registry: ${EUREKA_ENABLED:true}
 
 management:
   endpoints:

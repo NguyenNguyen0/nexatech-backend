@@ -1,5 +1,6 @@
 package com.nexatech.order.dto;
 
+import com.nexatech.order.enums.PaymentMethod;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -15,6 +16,10 @@ public class CreateOrderRequest {
 
     @NotBlank
     private String shippingAddress;
+
+    private String shippingMethod = "STANDARD";
+
+    private PaymentMethod paymentMethod;
 
     private String note;
 

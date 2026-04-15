@@ -2,10 +2,12 @@ package com.nexatech.order.model;
 
 import com.nexatech.order.entity.base.BaseEntity;
 import com.nexatech.order.enums.OrderStatus;
+import com.nexatech.order.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -39,6 +41,19 @@ public class Order extends BaseEntity {
     private String shippingAddress;
 
     private String note;
+
+    // Phương thức vận chuyển (STANDARD, EXPRESS) — khách chọn khi đặt hàng
+    private String shippingMethod;
+
+    @Enumerated(EnumType.STRING)
+    private PaymentMethod paymentMethod;
+
+    // Thông tin theo dõi vận chuyển — admin cập nhật sau khi gửi hàng
+    private String trackingNumber;
+    private String carrierName;     // Tên đơn vị vận chuyển (GHN, GHTK, VNPost, ...)
+    private Instant estimatedDelivery;
+    private Instant shippedAt;      // Tự động gán khi status → SHIPPED
+    private Instant deliveredAt;    // Tự động gán khi status → DELIVERED
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

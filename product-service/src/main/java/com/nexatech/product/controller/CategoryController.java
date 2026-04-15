@@ -1,8 +1,8 @@
 package com.nexatech.product.controller;
 
+import com.nexatech.product.dto.request.CategoryRequest;
 import com.nexatech.product.dto.response.ApiResponse;
-import com.nexatech.product.dto.CategoryRequest;
-import com.nexatech.product.dto.CategoryResponse;
+import com.nexatech.product.dto.response.CategoryResponse;
 import com.nexatech.product.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

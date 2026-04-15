@@ -1,5 +1,7 @@
 package com.nexatech.identity.dto.request;
 
+import jakarta.validation.constraints.Email;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,6 +20,8 @@ public class UserUpdateParam {
     String username;
     String firstName;
     String lastName;
+
+    @Email(message = "INVALID_EMAIL_FORMAT")
     String email;
     boolean enabled;
     boolean emailVerified;

@@ -1,5 +1,6 @@
 server:
-  port: 8081
+  # Port chuẩn Spring Cloud Config - services client kết nối localhost:8888
+  port: 8888
 
 spring:
   application:
@@ -14,8 +15,11 @@ spring:
 
 eureka:
   client:
+    # Docker: hostname truyền qua env var; local dev: mặc định localhost
     service-url:
-      defaultZone: http://${EUREKA_INSTANCE_HOSTNAME}:8761/eureka/
+      defaultZone: http://${EUREKA_INSTANCE_HOSTNAME:localhost}:8761/eureka/
+    # Không bắt buộc Eureka phải online khi chạy local
+    enabled: ${EUREKA_ENABLED:false}
 
 management:
   endpoints:

@@ -1,5 +1,7 @@
 package com.nexatech.identity.controller;
 
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,28 +33,28 @@ public class AuthController {
     AuthService authService;
 
     @PostMapping("/register")
-    public ApiResponse<String> register(@RequestBody UserCreationParam param) {
+    public ApiResponse<String> register(@Valid @RequestBody UserCreationParam param) {
         return ApiResponse.<String>builder()
                 .result(authService.register(param))
                 .build();
     }
 
     @PostMapping("/login")
-    public ApiResponse<UserTokenExchangeResponse> login(@RequestBody LoginRequest request) {
+    public ApiResponse<UserTokenExchangeResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.<UserTokenExchangeResponse>builder()
                 .result(authService.login(request))
                 .build();
     }
 
     @PostMapping("/refresh")
-    public ApiResponse<UserTokenExchangeResponse> refresh(@RequestBody RefreshTokenRequest request) {
+    public ApiResponse<UserTokenExchangeResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return ApiResponse.<UserTokenExchangeResponse>builder()
                 .result(authService.refreshToken(request))
                 .build();
     }
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(@RequestBody LogoutRequest request) {
+    public ApiResponse<Void> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
         return ApiResponse.<Void>builder().build();
     }
@@ -73,7 +75,7 @@ public class AuthController {
     }
 
     @PostMapping("/introspect")
-    public ApiResponse<Map<String, Object>> introspect(@RequestBody IntrospectTokenRequest request) {
+    public ApiResponse<Map<String, Object>> introspect(@Valid @RequestBody IntrospectTokenRequest request) {
         return ApiResponse.<Map<String, Object>>builder()
                 .result(authService.introspect(request))
                 .build();
