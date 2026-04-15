@@ -24,6 +24,7 @@ services:
         paths:
           - /api/v1/products
           - /api/v1/categories
+          - /api/v1/brands
         strip_path: false
 
   - name: order-service
@@ -56,6 +57,14 @@ services:
       - name: notification-route
         paths:
           - /api/v1/notifications
+        strip_path: false
+
+  - name: storage-service
+    url: http://storage-service:8088
+    routes:
+      - name: storage-route
+        paths:
+          - /api/v1/files
         strip_path: false
 
 plugins:
