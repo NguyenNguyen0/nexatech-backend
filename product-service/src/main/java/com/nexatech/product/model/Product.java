@@ -1,9 +1,13 @@
 package com.nexatech.product.model;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
@@ -21,16 +25,19 @@ public class Product {
     @Id
     private String id;
 
+    @TextIndexed(weight = 5)
     private String name;
 
     private String slug;
 
+    @TextIndexed(weight = 2)
     private String description;
 
     private BigDecimal price;
 
     private BigDecimal compareAtPrice;
 
+    @TextIndexed(weight = 3)
     private String sku;
 
     private String categoryId;

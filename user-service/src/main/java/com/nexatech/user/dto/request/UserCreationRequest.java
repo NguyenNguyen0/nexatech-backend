@@ -4,6 +4,9 @@ import java.time.LocalDate;
 
 import com.nexatech.user.model.constant.Gender;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,7 +23,12 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserCreationRequest {
     String id;
+
+    @NotBlank(message = "EMAIL_REQUIRED")
+    @Email(message = "INVALID_EMAIL_FORMAT")
     String email;
+
+    @NotBlank(message = "USERNAME_IS_MISSING")
     String username;
     String firstName;
     String lastName;
