@@ -2,4 +2,4 @@ spring:
   application:
     name: payment-service
   config:
-    import: "configserver:"
+    import: "optional:configserver:"
