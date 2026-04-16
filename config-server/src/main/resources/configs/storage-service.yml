@@ -6,6 +6,8 @@ minio:
   access-key: ${MINIO_ACCESS_KEY:nexatech-minio}
   secret-key: ${MINIO_SECRET_KEY:nexatech-minio-secret}
   bucket: ${MINIO_BUCKET:nexatech-products}
+  # Base URL accessible by clients (via Kong gateway). Override in production with your public domain.
+  public-url: ${MINIO_PUBLIC_URL:http://localhost:8000}
 
 spring:
   servlet:

@@ -496,6 +496,7 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-nexatech-minio}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-nexatech-minio-secret}
       - MINIO_BUCKET=${MINIO_BUCKET:-nexatech-products}
+      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-http://localhost:8000}
       - JAVA_TOOL_OPTIONS=-Xmx200m
     depends_on:
       config-server:
