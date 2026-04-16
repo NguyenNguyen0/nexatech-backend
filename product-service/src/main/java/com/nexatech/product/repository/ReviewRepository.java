@@ -3,9 +3,9 @@ package com.nexatech.product.repository;
 import com.nexatech.product.model.Review;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,5 +17,9 @@ public interface ReviewRepository extends MongoRepository<Review, String> {
 
     Page<Review> findByProductId(String productId, Pageable pageable);
 
-    List<Review> findByProductIdAndApprovedTrue(String productId);
+    @Aggregation(pipeline = {
+            "{ $match: { productId: ?0, approved: true } }",
+            "{ $group: { _id: null, avg: { $avg: '$rating' } } }"
+    })
+    Double getAverageRatingByProductId(String productId);
 }

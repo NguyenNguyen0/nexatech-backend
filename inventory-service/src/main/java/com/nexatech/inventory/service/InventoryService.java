@@ -101,7 +101,6 @@ public class InventoryService {
                 .toList();
     }
 
-    @Transactional
     public BulkImportResult bulkImport(List<StockUpdateRequest> requests) {
         if (requests == null || requests.isEmpty()) {
             throw new BadRequestException("Import list must not be empty");

@@ -51,11 +51,9 @@ public class JwtHeaderRelayFilter extends OncePerRequestFilter {
                 extraHeaders.put(HEADER_USER_EMAIL, email);
             }
 
-            // realm_access.roles → X-User-Role (first non-default role, or fallback to "USER")
+            // realm_access.roles → X-User-Role (first non-default role, fallback to "USER")
             String role = extractRole(jwt);
-            if (role != null) {
-                extraHeaders.put(HEADER_USER_ROLE, role);
-            }
+            extraHeaders.put(HEADER_USER_ROLE, role != null ? role : "USER");
 
             if (!extraHeaders.isEmpty()) {
                 filterChain.doFilter(new HeaderInjectingRequest(request, extraHeaders), response);
@@ -66,7 +64,6 @@ public class JwtHeaderRelayFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    @SuppressWarnings("unchecked")
     private String extractRole(Jwt jwt) {
         Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
         if (realmAccess == null) {

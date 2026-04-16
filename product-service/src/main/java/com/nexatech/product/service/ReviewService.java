@@ -54,9 +54,8 @@ public class ReviewService {
                 .map(reviewMapper::toResponse);
     }
 
-    public ReviewResponse approveReview(String reviewId) {
-        Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
+    public ReviewResponse approveReview(String productId, String reviewId) {
+        Review review = findReviewForProduct(productId, reviewId);
 
         review.setApproved(true);
         Review saved = reviewRepository.save(review);
@@ -66,10 +65,18 @@ public class ReviewService {
         return reviewMapper.toResponse(saved);
     }
 
-    public void deleteReview(String reviewId) {
+    public void deleteReview(String productId, String reviewId) {
+        Review review = findReviewForProduct(productId, reviewId);
+        reviewRepository.delete(review);
+    }
+
+    private Review findReviewForProduct(String productId, String reviewId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new ResourceNotFoundException("Review", "id", reviewId));
-        reviewRepository.delete(review);
+        if (!review.getProductId().equals(productId)) {
+            throw new ResourceNotFoundException("Review", "id", reviewId);
+        }
+        return review;
     }
 
     private void publishReviewApprovedEvent(Review review) {

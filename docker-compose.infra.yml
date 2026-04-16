@@ -114,6 +114,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # ====== MinIO Init (Auto-create bucket) ======
+  minio-init:
+    image: minio/mc:latest
+    container_name: nexatech-infra-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 nexatech-minio nexatech-minio-secret;
+      mc mb --ignore-existing local/nexatech-products;
+      mc anonymous set download local/nexatech-products;
+      echo 'Bucket nexatech-products ready';
+      "
+
 volumes:
   postgres_data:
   mongodb_data:

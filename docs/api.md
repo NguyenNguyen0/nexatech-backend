@@ -40,10 +40,23 @@ Tất cả các public API đều được truy cập thông qua API Gateway v�
 - `GET/POST/PUT/DELETE /api/v1/users/me/addresses/**`: Quản lý địa chỉ cá nhân.
 
 ### Product Service
-- `GET/POST/PUT/DELETE /api/v1/products/**`: Quản lý sản phẩm.
+- `GET /api/v1/products`: Danh sách sản phẩm (phân trang).
+- `GET /api/v1/products/{id}`: Chi tiết sản phẩm (bao gồm `averageRating`).
+- `GET /api/v1/products/search?keyword=`: Tìm kiếm sản phẩm (full-text + fallback regex).
+- `GET /api/v1/products/category/{categoryId}`: Lọc sản phẩm theo danh mục.
+- `POST /api/v1/products`: Tạo sản phẩm.
+- `PUT /api/v1/products/{id}`: Cập nhật sản phẩm.
+- `DELETE /api/v1/products/{id}`: Xóa mềm sản phẩm.
 - `GET/POST/PUT/DELETE /api/v1/categories/**`: Quản lý danh mục.
 - `GET/POST/PUT/DELETE /api/v1/brands/**`: Quản lý thương hiệu.
-- `POST/PUT/DELETE /api/v1/products/{id}/images/**`: Quản lý hình ảnh sản phẩm.
+- `POST /api/v1/products/{id}/images`: Upload hình ảnh sản phẩm (multipart, tối đa 10 ảnh).
+- `DELETE /api/v1/products/{id}/images`: Xóa hình ảnh sản phẩm.
+- `PUT /api/v1/products/{id}/images/reorder`: Sắp xếp lại thứ tự ảnh.
+- `POST /api/v1/products/{productId}/reviews`: Tạo đánh giá sản phẩm (cần `X-User-Id`, 1 review/user/product).
+- `GET /api/v1/products/{productId}/reviews`: Danh sách đánh giá đã duyệt (phân trang, public).
+- `GET /api/v1/products/{productId}/reviews/all`: Tất cả đánh giá bao gồm chưa duyệt (ADMIN, cần `X-User-Role`).
+- `PATCH /api/v1/products/{productId}/reviews/{reviewId}/approve`: Duyệt đánh giá (ADMIN).
+- `DELETE /api/v1/products/{productId}/reviews/{reviewId}`: Xóa đánh giá (ADMIN).
 
 ### Order Service
 - `GET/POST /api/v1/orders/**`: Quản lý đơn hàng (User & Admin).
@@ -59,10 +72,14 @@ Tất cả các public API đều được truy cập thông qua API Gateway v�
 
 ### Inventory Service
 - `GET /api/v1/inventory/{productId}`: Kiểm tra tồn kho sản phẩm.
+- `GET /api/v1/inventory/list`: Danh sách tồn kho (phân trang, lọc theo `warehouseLocation`).
+- `GET /api/v1/inventory/low-stock`: Sản phẩm tồn kho thấp.
 - `PUT /api/v1/inventory`: Cập nhật tồn kho.
 - `POST /api/v1/inventory/check`: Kiểm tra số lượng khả dụng.
 - `POST /api/v1/inventory/reserve`: Giữ hàng.
 - `POST /api/v1/inventory/release`: Giải phóng hàng đã giữ.
+- `POST /api/v1/inventory/bulk-import`: Import tồn kho hàng loạt (partial success).
+- `PATCH /api/v1/inventory/{productId}/warehouse`: Cập nhật vị trí kho và reorder level.
 
 ### Storage Service
 - `GET /api/v1/files/{bucket}/{key}`: Truy xuất file (Public).
@@ -134,14 +151,63 @@ Tất cả các public API đều được truy cập thông qua API Gateway v�
 }
 ```
 
-### Product Catalog Events (Topic: `product.catalog.events`)
+### Product Catalog Events (Topic: `product.events`)
 - **Published by:** `product-service`
 - **Schema:**
 ```json
 {
+  "eventId": "UUID",
+  "eventType": "String (PRODUCT_CREATED, PRODUCT_UPDATED, PRODUCT_DELETED)",
+  "timestamp": "ISO-8601 Timestamp",
   "productId": "String",
   "name": "String",
   "categoryId": "String",
   "active": "Boolean"
 }
 ```
+
+### Review Events (Topic: `review.events`)
+- **Published by:** `product-service` (khi admin approve review)
+- **Consumed by:** `notification-service`
+- **Schema:**
+```json
+{
+  "eventId": "UUID",
+  "eventType": "REVIEW_APPROVED",
+  "timestamp": "ISO-8601 Timestamp",
+  "reviewId": "String",
+  "productId": "String",
+  "userId": "UUID",
+  "rating": "Integer (1-5)"
+}
+```
+
+---
+
+## 4. API Gateway
+
+### Header Relay
+API Gateway tự động extract claims từ JWT (Keycloak) và inject vào request headers gửi đến downstream services:
+
+| Header | Source | Description |
+|---|---|---|
+| `X-User-Id` | JWT `sub` claim | UUID người dùng (Keycloak credential ID) |
+| `X-User-Role` | JWT `realm_access.roles` | Role đầu tiên (non-default), fallback `USER` |
+| `X-User-Email` | JWT `email` claim | Email người dùng |
+
+### Public Routes (không cần JWT)
+- `/actuator/**`
+- `/api/v1/auth/**`
+
+### Gateway Routes
+
+| Route ID | Target Service | Predicates |
+|---|---|---|
+| `identity-auth` | `identity-service` | `/api/v1/auth/**` (StripPrefix=2) |
+| `user-service` | `user-service` | `/api/v1/users/**`, `/api/v1/groups/**`, `/api/v1/roles/**`, `/api/v1/permissions/**` (StripPrefix=2) |
+| `product-service` | `product-service` | `/api/v1/products/**`, `/api/v1/categories/**`, `/api/v1/brands/**` |
+| `order-service` | `order-service` | `/api/v1/orders/**`, `/api/v1/admin/orders/**`, `/api/v1/returns/**` |
+| `inventory-service` | `inventory-service` | `/api/v1/inventory/**` |
+| `payment-service` | `payment-service` | `/api/v1/payments/**` |
+| `notification-service` | `notification-service` | `/api/v1/notifications/**` |
+| `storage-service` | `storage-service` | `/api/v1/files/**` |

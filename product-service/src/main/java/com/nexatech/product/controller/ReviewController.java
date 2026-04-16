@@ -52,7 +52,7 @@ public class ReviewController {
             @PathVariable String reviewId,
             @RequestHeader("X-User-Role") String role) {
         requireAdmin(role);
-        return ApiResponse.ok(reviewService.approveReview(reviewId));
+        return ApiResponse.ok(reviewService.approveReview(productId, reviewId));
     }
 
     @DeleteMapping("/{reviewId}")
@@ -61,7 +61,7 @@ public class ReviewController {
             @PathVariable String reviewId,
             @RequestHeader("X-User-Role") String role) {
         requireAdmin(role);
-        reviewService.deleteReview(reviewId);
+        reviewService.deleteReview(productId, reviewId);
         return ApiResponse.ok(null);
     }
 

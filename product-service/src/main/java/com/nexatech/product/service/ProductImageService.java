@@ -10,6 +10,7 @@ import com.nexatech.product.model.Brand;
 import com.nexatech.product.model.Product;
 import com.nexatech.product.repository.BrandRepository;
 import com.nexatech.product.repository.ProductRepository;
+import com.nexatech.product.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class ProductImageService {
 
     private final ProductRepository productRepository;
     private final BrandRepository brandRepository;
+    private final ReviewRepository reviewRepository;
     private final StorageClient storageClient;
     private final ProductMapper productMapper;
 
@@ -130,6 +132,10 @@ public class ProductImageService {
                     brandRepository.findById(response.getBrandId())
                             .map(Brand::getName)
                             .orElse(null));
+        }
+        Double avg = reviewRepository.getAverageRatingByProductId(response.getId());
+        if (avg != null) {
+            response.setAverageRating(Math.round(avg * 10.0) / 10.0);
         }
         return response;
     }
