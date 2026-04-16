@@ -34,7 +34,7 @@ spring:
             - id: product-service
               uri: lb://product-service
               predicates:
-                - Path=/api/v1/products/**,/api/v1/categories/**
+                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/brands/**
             - id: order-service
               uri: lb://order-service
               predicates:
@@ -51,3 +51,7 @@ spring:
               uri: lb://notification-service
               predicates:
                 - Path=/api/v1/notifications/**
+            - id: storage-service
+              uri: lb://storage-service
+              predicates:
+                - Path=/api/v1/files/**

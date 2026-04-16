@@ -1,0 +1,1 @@
+CREATE INDEX idx_inventory_warehouse_location ON inventory_items(warehouse_location);

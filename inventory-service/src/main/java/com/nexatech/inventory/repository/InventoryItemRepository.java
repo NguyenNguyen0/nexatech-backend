@@ -1,6 +1,8 @@
 package com.nexatech.inventory.repository;
 
 import com.nexatech.inventory.model.InventoryItem;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -16,4 +18,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
     List<InventoryItem> findByProductIdIn(List<String> productIds);
 
     List<InventoryItem> findByQuantityLessThanEqual(int threshold);
+
+    Page<InventoryItem> findByWarehouseLocation(String warehouseLocation, Pageable pageable);
 }

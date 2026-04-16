@@ -120,6 +120,7 @@
 | Build | Apache Maven | 3.x |
 | Code Gen | Lombok | - |
 | Email | Spring Mail (Thymeleaf templates) | - |
+| Object Storage | MinIO (S3-compatible) | latest |
 
 ---
 
@@ -136,6 +137,7 @@
 | `inventory-service` | 8085 | PostgreSQL + Redis | Stock tracking, movements, and reservation |
 | `payment-service` | 8086 | PostgreSQL | Payment processing |
 | `notification-service` | 8087 | PostgreSQL | Email/notification consumer from Kafka events |
+| `storage-service` | 8088 | MinIO | File upload & retrieval (product images) |
 | `kong` | 8000 (proxy) / 8001 (admin) | — | API Gateway |
 
 ---
@@ -185,9 +187,16 @@ MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USERNAME=your-email@gmail.com
 MAIL_PASSWORD=your-gmail-app-password
+
+# === MinIO Object Storage ===
+MINIO_ACCESS_KEY=nexatech-minio
+MINIO_SECRET_KEY=your-strong-minio-secret
+MINIO_BUCKET=nexatech-products
 ```
 
 > ⚠️ **Security:** Never commit the `.env` file to the repository. It is already excluded in `.gitignore`.
+
+> **MinIO bucket setup:** After starting the stack, create the bucket manually via the MinIO Console at `http://localhost:9001` (login with `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY`). Create a bucket named after your `MINIO_BUCKET` env value (default: `nexatech-products`) and set its access policy to **public** for read access.
 
 ### 2. Run with Docker Compose
 
@@ -272,6 +281,7 @@ mvn spring-boot:run
 | Inventory Service | `http://localhost:8085` | `GET /actuator/health` |
 | Payment Service | `http://localhost:8086` | `GET /actuator/health` |
 | Notification Service | `http://localhost:8087` | `GET /actuator/health` |
+| Storage Service | `http://localhost:8088` | `GET /actuator/health` |
 
 ### Infrastructure
 
@@ -281,6 +291,8 @@ mvn spring-boot:run
 | Kafka | `localhost:9092` |
 | Redis | `localhost:6379` |
 | MongoDB | `localhost:27017` |
+| MinIO S3 API | `localhost:9000` |
+| MinIO Console | `http://localhost:9001` |
 | PostgreSQL (identity) | `localhost:5433` |
 | PostgreSQL (user) | `localhost:5434` |
 | PostgreSQL (order) | `localhost:5435` |
@@ -515,7 +527,8 @@ config-server/src/main/resources/configs/
 ├── order-service.yml
 ├── inventory-service.yml
 ├── payment-service.yml
-└── notification-service.yml
+├── notification-service.yml
+└── storage-service.yml
 ```
 
 Each service needs only a minimal bootstrap `application.yml`:
