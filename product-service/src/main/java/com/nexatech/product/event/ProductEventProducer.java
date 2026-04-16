@@ -13,4 +13,8 @@ public class ProductEventProducer {
     public void publishProductEvent(String productId, Object event) {
         kafkaTemplate.send("product.events", productId, event);
     }
+
+    public void publishReviewEvent(String productId, Object event) {
+        kafkaTemplate.send("review.events", productId, event);
+    }
 }

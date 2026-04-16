@@ -2,7 +2,7 @@ server:
   port: 8088
 
 minio:
-  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9002}
   access-key: ${MINIO_ACCESS_KEY:nexatech-minio}
   secret-key: ${MINIO_SECRET_KEY:nexatech-minio-secret}
   bucket: ${MINIO_BUCKET:nexatech-products}

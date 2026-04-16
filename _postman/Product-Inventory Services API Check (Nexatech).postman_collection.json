@@ -38,6 +38,15 @@
     {
       "key": "brandId",
       "value": ""
+    },
+    {
+      "key": "reviewId",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": "00000000-0000-0000-0000-000000000001",
+      "description": "Test user UUID — replace with real UUID from Keycloak"
     }
   ],
   "item": [
@@ -968,6 +977,118 @@
               ]
             },
             "description": "Internal endpoint. Replace bucket/key values with actual data. Not exposed through Kong."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Review APIs",
+      "item": [
+        {
+          "name": "create review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var body = pm.response.json();",
+                  "  if (body.data && body.data.id) {",
+                  "    pm.collectionVariables.set('reviewId', body.data.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{userId}}", "description": "UUID of the reviewer (from JWT)" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Excellent product, highly recommended!\"\n}"
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "products", "{{productId}}", "reviews"]
+            },
+            "description": "Create a review for a product. Requires X-User-Id header. One review per user per product."
+          },
+          "response": []
+        },
+        {
+          "name": "get approved reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews?page=0&size=10",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "products", "{{productId}}", "reviews"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Get approved reviews for a product (paginated). Public endpoint."
+          },
+          "response": []
+        },
+        {
+          "name": "get all reviews (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Role", "value": "ADMIN", "description": "Admin role required" }
+            ],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews/all?page=0&size=10",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "products", "{{productId}}", "reviews", "all"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Get all reviews (including unapproved) for a product. ADMIN only."
+          },
+          "response": []
+        },
+        {
+          "name": "approve review (ADMIN)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "X-User-Role", "value": "ADMIN", "description": "Admin role required" }
+            ],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews/{{reviewId}}/approve",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "products", "{{productId}}", "reviews", "{{reviewId}}", "approve"]
+            },
+            "description": "Approve a review. Publishes ReviewApprovedEvent to Kafka topic review.events. ADMIN only."
+          },
+          "response": []
+        },
+        {
+          "name": "delete review (ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-User-Role", "value": "ADMIN", "description": "Admin role required" }
+            ],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews/{{reviewId}}",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "products", "{{productId}}", "reviews", "{{reviewId}}"]
+            },
+            "description": "Delete a review. ADMIN only."
           },
           "response": []
         }

@@ -8,9 +8,11 @@ import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.ProductMapper;
 import com.nexatech.product.model.Brand;
 import com.nexatech.product.model.Product;
+import com.nexatech.product.model.Review;
 import com.nexatech.product.repository.BrandRepository;
 import com.nexatech.product.repository.CategoryRepository;
 import com.nexatech.product.repository.ProductRepository;
+import com.nexatech.product.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Page;
@@ -37,6 +39,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
+    private final ReviewRepository reviewRepository;
     private final ProductMapper productMapper;
     private final ProductEventProducer productEventProducer;
     private final MongoTemplate mongoTemplate;
@@ -168,6 +171,9 @@ public class ProductService {
                             .map(Brand::getName)
                             .orElse(null));
         }
+        double avg = reviewRepository.findByProductIdAndApprovedTrue(response.getId())
+                .stream().mapToInt(Review::getRating).average().orElse(0.0);
+        response.setAverageRating(avg > 0 ? Math.round(avg * 10.0) / 10.0 : null);
         return response;
     }
 

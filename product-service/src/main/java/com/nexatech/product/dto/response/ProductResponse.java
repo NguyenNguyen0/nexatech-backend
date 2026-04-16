@@ -25,5 +25,6 @@ public class ProductResponse {
     private List<String> images;
     private Map<String, String> attributes;
     private boolean active;
+    private Double averageRating;
     private Instant createdAt;
 }
