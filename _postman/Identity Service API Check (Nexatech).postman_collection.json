@@ -203,828 +203,863 @@
       ]
     },
     {
-      "name": "2. Users (2 - 4 keycloak only)",
+      "name": "Internal Endpoint (Keycloak)",
       "item": [
         {
-          "name": "create",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"username\": \"{{newUsername}}\",\n  \"enabled\": true,\n  \"email\": \"{{newEmail}}\",\n  \"emailVerified\": true,\n  \"firstName\": \"API\",\n  \"lastName\": \"User\",\n  \"credentials\": [\n    { \"type\": \"password\", \"value\": \"123456789\", \"temporary\": false }\n  ]\n}"
-            },
-            "url": {
-              "raw": "{{identityBaseUrl}}/users",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "list (param?id)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/users",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users"
-              ],
-              "query": [
-                {
-                  "key": "username",
-                  "value": "{{newUsername}}",
-                  "disabled": true
+          "name": "2. Users",
+          "item": [
+            {
+              "name": "create",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"{{newUsername}}\",\n  \"enabled\": true,\n  \"email\": \"{{newEmail}}\",\n  \"emailVerified\": true,\n  \"firstName\": \"API\",\n  \"lastName\": \"User\",\n  \"credentials\": [\n    { \"type\": \"password\", \"value\": \"123456789\", \"temporary\": false }\n  ]\n}"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users"
+                  ]
                 }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "getById",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "update",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
               },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{ \"firstName\": \"Updated\", \"lastName\": \"User\", \"email\": \"{{newEmail}}\", \"enabled\": true, \"emailVerified\": true }"
+              "response": []
             },
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "credentials",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}/credentials",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}",
-                "credentials"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "reset-password",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{ \"type\": \"password\", \"value\": \"123456789\", \"temporary\": false }"
-            },
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}/reset-password",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}",
-                "reset-password"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "role-mappings",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}/role-mappings",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}",
-                "role-mappings"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "sessions",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}/sessions",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}",
-                "sessions"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "assign-realm-roles",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
-            },
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}/realm-role-mappings",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}",
-                "realm-role-mappings"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "remove-realm-roles",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
-            },
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}/realm-role-mappings",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}",
-                "realm-role-mappings"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "delete",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}"
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "3. Roles",
-      "item": [
-        {
-          "name": "create",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{ \"name\": \"{{roleName}}\", \"description\": \"Created via Postman\" }"
-            },
-            "url": {
-              "raw": "{{identityBaseUrl}}/roles",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "roles"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "list",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/roles",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "roles"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "by-name",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/roles/by-name/{{roleName}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "roles",
-                "by-name",
-                "{{roleName}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "by-id",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/roles/by-id/{{roleId}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "roles",
-                "by-id",
-                "{{roleId}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "add-composite",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "[{ \"id\": \"{{permissionRoleId}}\", \"name\": \"{{permissionRoleName}}\" }]"
-            },
-            "url": {
-              "raw": "{{identityBaseUrl}}/roles/{{roleName}}/composites",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "roles",
-                "{{roleName}}",
-                "composites"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "list-composite",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/roles/{{roleName}}/composites",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "roles",
-                "{{roleName}}",
-                "composites"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "remove-composite",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "[{ \"id\": \"{{permissionRoleId}}\", \"name\": \"{{permissionRoleName}}\" }]"
-            },
-            "url": {
-              "raw": "{{identityBaseUrl}}/roles/{{roleName}}/composites",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "roles",
-                "{{roleName}}",
-                "composites"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "delete",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/roles/{{roleName}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "roles",
-                "{{roleName}}"
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "4. Groups & Membership",
-      "item": [
-        {
-          "name": "create-group",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{ \"name\": \"{{groupName}}\" }"
-            },
-            "url": {
-              "raw": "{{identityBaseUrl}}/groups",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "groups"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "list-groups",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/groups?search={{groupName}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "groups"
-              ],
-              "query": [
-                {
-                  "key": "search",
-                  "value": "{{groupName}}"
+            {
+              "name": "list (param?id)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users"
+                  ],
+                  "query": [
+                    {
+                      "key": "username",
+                      "value": "{{newUsername}}",
+                      "disabled": true
+                    }
+                  ]
                 }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "group-role-mappings",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/groups/{{groupId}}/role-mappings",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "groups",
-                "{{groupId}}",
-                "role-mappings"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "assign-group-roles",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
               },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
+              "response": []
             },
-            "url": {
-              "raw": "{{identityBaseUrl}}/groups/{{groupId}}/realm-role-mappings",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "groups",
-                "{{groupId}}",
-                "realm-role-mappings"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "remove-group-roles",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
+            {
+              "name": "getById",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}"
+                  ]
+                }
               },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
+              "response": []
             },
-            "url": {
-              "raw": "{{identityBaseUrl}}/groups/{{groupId}}/realm-role-mappings",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "groups",
-                "{{groupId}}",
-                "realm-role-mappings"
-              ]
+            {
+              "name": "update",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"firstName\": \"Updated\",\r\n    \"lastName\": \"User\",\r\n    \"email\": \"{{newEmail}}\",\r\n    \"enabled\": true,\r\n    \"emailVerified\": true\r\n}"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "credentials",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}/credentials",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}",
+                    "credentials"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "reset-password",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"type\": \"password\", \"value\": \"123456789\", \"temporary\": false }"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}/reset-password",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}",
+                    "reset-password"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "role-mappings",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}/role-mappings",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}",
+                    "role-mappings"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "sessions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}/sessions",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}",
+                    "sessions"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "assign-realm-roles",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}/realm-role-mappings",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}",
+                    "realm-role-mappings"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "remove-realm-roles",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}/realm-role-mappings",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}",
+                    "realm-role-mappings"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "delete",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}"
+                  ]
+                }
+              },
+              "response": []
             }
-          },
-          "response": []
+          ]
         },
         {
-          "name": "group-members",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/groups/{{groupId}}/members",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "groups",
-                "{{groupId}}",
-                "members"
-              ]
+          "name": "3. Roles",
+          "item": [
+            {
+              "name": "create",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"name\": \"{{roleName}}\", \"description\": \"Created via Postman\" }"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/roles",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "roles"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "list",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/roles",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "roles"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "by-name",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/roles/by-name/{{roleName}}",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "roles",
+                    "by-name",
+                    "{{roleName}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "by-id",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/roles/by-id/{{roleId}}",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "roles",
+                    "by-id",
+                    "{{roleId}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "add-composite",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[{ \"id\": \"{{permissionRoleId}}\", \"name\": \"{{permissionRoleName}}\" }]"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/roles/{{roleName}}/composites",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "roles",
+                    "{{roleName}}",
+                    "composites"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "list-composite",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/roles/{{roleName}}/composites",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "roles",
+                    "{{roleName}}",
+                    "composites"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "remove-composite",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[{ \"id\": \"{{permissionRoleId}}\", \"name\": \"{{permissionRoleName}}\" }]"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/roles/{{roleName}}/composites",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "roles",
+                    "{{roleName}}",
+                    "composites"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "delete",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/roles/{{roleName}}",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "roles",
+                    "{{roleName}}"
+                  ]
+                }
+              },
+              "response": []
             }
-          },
-          "response": []
+          ]
         },
         {
-          "name": "add-user-to-group",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}/groups/{{groupId}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}",
-                "groups",
-                "{{groupId}}"
-              ]
+          "name": "4. Groups & Membership",
+          "item": [
+            {
+              "name": "create-group",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{ \"name\": \"{{groupName}}\" }"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/groups",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "groups"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "list-groups",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/groups",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "groups"
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "{{groupName}}",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "group-role-mappings",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/groups/{{groupId}}/role-mappings",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "groups",
+                    "{{groupId}}",
+                    "role-mappings"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "assign-group-roles",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/groups/{{groupId}}/realm-role-mappings",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "groups",
+                    "{{groupId}}",
+                    "realm-role-mappings"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "remove-group-roles",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[{ \"id\": \"{{roleId}}\", \"name\": \"{{roleName}}\" }]"
+                },
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/groups/{{groupId}}/realm-role-mappings",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "groups",
+                    "{{groupId}}",
+                    "realm-role-mappings"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "group-members",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/groups/{{groupId}}/members",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "groups",
+                    "{{groupId}}",
+                    "members"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "add-user-to-group",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}/groups/{{groupId}}",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}",
+                    "groups",
+                    "{{groupId}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "groups-of-user",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}/groups",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}",
+                    "groups"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "remove-user-from-group",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/users/{{userId}}/groups/{{groupId}}",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "users",
+                    "{{userId}}",
+                    "groups",
+                    "{{groupId}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "delete-group",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/groups/{{groupId}}",
+                  "host": [
+                    "{{identityBaseUrl}}"
+                  ],
+                  "path": [
+                    "internal",
+                    "groups",
+                    "{{groupId}}"
+                  ]
+                }
+              },
+              "response": []
             }
-          },
-          "response": []
-        },
-        {
-          "name": "groups-of-user",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}/groups",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}",
-                "groups"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "remove-user-from-group",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/users/{{userId}}/groups/{{groupId}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}",
-                "groups",
-                "{{groupId}}"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "delete-group",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{identityBaseUrl}}/groups/{{groupId}}",
-              "host": [
-                "{{identityBaseUrl}}"
-              ],
-              "path": [
-                "groups",
-                "{{groupId}}"
-              ]
-            }
-          },
-          "response": []
+          ]
         }
       ]
     }

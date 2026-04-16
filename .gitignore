@@ -45,3 +45,4 @@ logs/
 
 # ignore docker compose dev
 docker-compose-dev.yml
+realm-export.json

@@ -1064,7 +1064,7 @@
       ]
     },
     {
-      "name": "Login for test API User Service",
+      "name": "Login for TEST User Service (Call Identity)",
       "event": [
         {
           "listen": "test",
