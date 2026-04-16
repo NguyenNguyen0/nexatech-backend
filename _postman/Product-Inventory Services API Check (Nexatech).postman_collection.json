@@ -674,6 +674,100 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "list inventory (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{inventoryBaseUrl}}/api/v1/inventory/list?page=0&size=10",
+              "host": [
+                "{{inventoryBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "inventory",
+                "list"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "warehouseLocation",
+                  "value": "Warehouse-A",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "bulk import stock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"productId\": \"{{productId}}\",\n    \"quantity\": 200,\n    \"reason\": \"Bulk import batch 1\"\n  },\n  {\n    \"productId\": \"product-002\",\n    \"quantity\": 150,\n    \"reason\": \"Bulk import batch 1\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{inventoryBaseUrl}}/api/v1/inventory/bulk-import",
+              "host": [
+                "{{inventoryBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "inventory",
+                "bulk-import"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update warehouse info",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"warehouseLocation\": \"Warehouse-A\",\n  \"reorderLevel\": 20\n}"
+            },
+            "url": {
+              "raw": "{{inventoryBaseUrl}}/api/v1/inventory/{{productId}}/warehouse",
+              "host": [
+                "{{inventoryBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "inventory",
+                "{{productId}}",
+                "warehouse"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
