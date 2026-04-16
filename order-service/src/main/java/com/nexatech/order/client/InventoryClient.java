@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  * Feign client giao tiếp với inventory-service qua Eureka.
  * Sử dụng ApiResponse wrapper để khớp với chuẩn response của inventory-service.
  */
-@FeignClient(name = "inventory-service", path = "/api/v1/inventory", fallback = InventoryClientFallback.class)
+@FeignClient(name = "inventory-service", url = "${inventory-service.url:}", path = "/api/v1/inventory", fallback = InventoryClientFallback.class)
 public interface InventoryClient {
 
     // Kiểm tra tồn kho — trả về true nếu đủ hàng, false nếu không

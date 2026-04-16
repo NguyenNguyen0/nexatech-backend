@@ -50,11 +50,13 @@ public class CartService {
             existing.setSubtotal(product.getPrice().multiply(BigDecimal.valueOf(newQty)));
             existing.setProductName(product.getName());
             existing.setUnitPrice(product.getPrice());
+            existing.setImageUrl(product.getImageUrl());
         } else {
             BigDecimal subtotal = product.getPrice().multiply(BigDecimal.valueOf(request.getQuantity()));
             CartDto.CartItemDto item = CartDto.CartItemDto.builder()
                     .productId(product.getId())
                     .productName(product.getName())
+                    .imageUrl(product.getImageUrl())
                     .unitPrice(product.getPrice())
                     .quantity(request.getQuantity())
                     .subtotal(subtotal)
@@ -156,6 +158,7 @@ public class CartService {
                 .map(i -> CartResponse.CartItemResponse.builder()
                         .productId(i.getProductId())
                         .productName(i.getProductName())
+                        .imageUrl(i.getImageUrl())
                         .unitPrice(i.getUnitPrice())
                         .quantity(i.getQuantity())
                         .subtotal(i.getSubtotal())
