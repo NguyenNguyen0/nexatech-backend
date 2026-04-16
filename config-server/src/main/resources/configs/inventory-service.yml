@@ -3,13 +3,13 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/nexatech_inventory
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/nexatech_inventory
     username: ${DB_USERNAME:nexatech}
-    password: ${DB_PASSWORD:nexatech}
+    password: ${DB_PASSWORD:nexatech123}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: false
   flyway:
     enabled: true

@@ -26,6 +26,27 @@
     {
       "key": "searchKeyword",
       "value": "iphone"
+    },
+    {
+      "key": "imageUrl",
+      "value": ""
+    },
+    {
+      "key": "storageBaseUrl",
+      "value": "http://localhost:8088"
+    },
+    {
+      "key": "brandId",
+      "value": ""
+    },
+    {
+      "key": "reviewId",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": "00000000-0000-0000-0000-000000000001",
+      "description": "Test user UUID — replace with real UUID from Keycloak"
     }
   ],
   "item": [
@@ -149,7 +170,146 @@
       ]
     },
     {
-      "name": "2. Product APIs",
+      "name": "2. Brand APIs",
+      "item": [
+        {
+          "name": "create brand",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 201', function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});",
+                  "var res = pm.response.json();",
+                  "var id = res && res.data && res.data.id;",
+                  "if (id) {",
+                  "    pm.collectionVariables.set('brandId', id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Apple\",\n  \"logoUrl\": \"https://dummyimage.com/200x200\"\n}"
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "list brands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get brand by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands/{{brandId}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands",
+                "{{brandId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update brand",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Apple Inc.\",\n  \"logoUrl\": \"https://dummyimage.com/200x200/apple\"\n}"
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands/{{brandId}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands",
+                "{{brandId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete brand",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands/{{brandId}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands",
+                "{{brandId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Product APIs",
       "item": [
         {
           "name": "create product",
@@ -181,7 +341,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"iPhone 15 Pro API\",\n  \"description\": \"San pham test tu Postman\",\n  \"price\": 29990000,\n  \"compareAtPrice\": 31990000,\n  \"sku\": \"IP15PRO-API-001\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"images\": [\"https://dummyimage.com/600x600\"],\n  \"attributes\": {\n    \"color\": \"Black\",\n    \"storage\": \"256GB\"\n  }\n}"
+              "raw": "{\n  \"name\": \"iPhone 15 Pro API\",\n  \"description\": \"San pham test tu Postman\",\n  \"price\": 29990000,\n  \"compareAtPrice\": 31990000,\n  \"sku\": \"IP15PRO-API-001\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"brandId\": \"{{brandId}}\",\n  \"images\": [\"https://dummyimage.com/600x600\"],\n  \"attributes\": {\n    \"color\": \"Black\",\n    \"storage\": \"256GB\"\n  }\n}"
             },
             "url": {
               "raw": "{{productBaseUrl}}/api/v1/products",
@@ -327,7 +487,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"iPhone 15 Pro API Updated\",\n  \"description\": \"San pham test update\",\n  \"price\": 28990000,\n  \"compareAtPrice\": 30990000,\n  \"sku\": \"IP15PRO-API-002\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"images\": [\"https://dummyimage.com/600x600\"],\n  \"attributes\": {\n    \"color\": \"Titanium\",\n    \"storage\": \"256GB\"\n  }\n}"
+              "raw": "{\n  \"name\": \"iPhone 15 Pro API Updated\",\n  \"description\": \"San pham test update\",\n  \"price\": 28990000,\n  \"compareAtPrice\": 30990000,\n  \"sku\": \"IP15PRO-API-002\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"brandId\": \"{{brandId}}\",\n  \"images\": [\"https://dummyimage.com/600x600\"],\n  \"attributes\": {\n    \"color\": \"Titanium\",\n    \"storage\": \"256GB\"\n  }\n}"
             },
             "url": {
               "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}",
@@ -367,7 +527,7 @@
       ]
     },
     {
-      "name": "3. Inventory APIs",
+      "name": "4. Inventory APIs",
       "item": [
         {
           "name": "update stock",
@@ -521,6 +681,414 @@
                 "low-stock"
               ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "list inventory (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{inventoryBaseUrl}}/api/v1/inventory/list?page=0&size=10",
+              "host": [
+                "{{inventoryBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "inventory",
+                "list"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "warehouseLocation",
+                  "value": "Warehouse-A",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "bulk import stock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"productId\": \"{{productId}}\",\n    \"quantity\": 200,\n    \"reason\": \"Bulk import batch 1\"\n  },\n  {\n    \"productId\": \"product-002\",\n    \"quantity\": 150,\n    \"reason\": \"Bulk import batch 1\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{inventoryBaseUrl}}/api/v1/inventory/bulk-import",
+              "host": [
+                "{{inventoryBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "inventory",
+                "bulk-import"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update warehouse info",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"warehouseLocation\": \"Warehouse-A\",\n  \"reorderLevel\": 20\n}"
+            },
+            "url": {
+              "raw": "{{inventoryBaseUrl}}/api/v1/inventory/{{productId}}/warehouse",
+              "host": [
+                "{{inventoryBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "inventory",
+                "{{productId}}",
+                "warehouse"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Product Image APIs",
+      "item": [
+        {
+          "name": "upload images",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "    pm.expect(pm.response.code).to.eql(201);",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res && res.data && res.data.images && res.data.images.length > 0) {",
+                  "    pm.collectionVariables.set('imageUrl', res.data.images[0]);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select one or more image files (JPEG, PNG, WebP, GIF). Max 5MB each, max 10 images per product."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/images",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}",
+                "images"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "reorder images",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageUrls\": [\"{{imageUrl}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/images/reorder",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}",
+                "images",
+                "reorder"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete image",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageUrl\": \"{{imageUrl}}\"\n}"
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/images",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}",
+                "images"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Storage Service APIs",
+      "item": [
+        {
+          "name": "get file (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{storageBaseUrl}}/api/v1/files/nexatech-products/sample-key.jpg",
+              "host": [
+                "{{storageBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "files",
+                "nexatech-products",
+                "sample-key.jpg"
+              ]
+            },
+            "description": "Replace 'sample-key.jpg' with the actual key from an upload response. This endpoint streams the file content directly."
+          },
+          "response": []
+        },
+        {
+          "name": "upload file (internal)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select an image file (JPEG, PNG, WebP, GIF). Max 5MB."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{storageBaseUrl}}/internal/files/upload",
+              "host": [
+                "{{storageBaseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "files",
+                "upload"
+              ]
+            },
+            "description": "Internal endpoint. Normally called by other services via Feign, not exposed through Kong."
+          },
+          "response": []
+        },
+        {
+          "name": "delete file (internal)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{storageBaseUrl}}/internal/files?bucket=nexatech-products&key=sample-key.jpg",
+              "host": [
+                "{{storageBaseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "files"
+              ],
+              "query": [
+                {
+                  "key": "bucket",
+                  "value": "nexatech-products"
+                },
+                {
+                  "key": "key",
+                  "value": "sample-key.jpg"
+                }
+              ]
+            },
+            "description": "Internal endpoint. Replace bucket/key values with actual data. Not exposed through Kong."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Review APIs",
+      "item": [
+        {
+          "name": "create review",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var body = pm.response.json();",
+                  "  if (body.data && body.data.id) {",
+                  "    pm.collectionVariables.set('reviewId', body.data.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{userId}}", "description": "UUID of the reviewer (from JWT)" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Excellent product, highly recommended!\"\n}"
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "products", "{{productId}}", "reviews"]
+            },
+            "description": "Create a review for a product. Requires X-User-Id header. One review per user per product."
+          },
+          "response": []
+        },
+        {
+          "name": "get approved reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews?page=0&size=10",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "products", "{{productId}}", "reviews"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Get approved reviews for a product (paginated). Public endpoint."
+          },
+          "response": []
+        },
+        {
+          "name": "get all reviews (ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Role", "value": "ADMIN", "description": "Admin role required" }
+            ],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews/all?page=0&size=10",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "products", "{{productId}}", "reviews", "all"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Get all reviews (including unapproved) for a product. ADMIN only."
+          },
+          "response": []
+        },
+        {
+          "name": "approve review (ADMIN)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "X-User-Role", "value": "ADMIN", "description": "Admin role required" }
+            ],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews/{{reviewId}}/approve",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "products", "{{productId}}", "reviews", "{{reviewId}}", "approve"]
+            },
+            "description": "Approve a review. Publishes ReviewApprovedEvent to Kafka topic review.events. ADMIN only."
+          },
+          "response": []
+        },
+        {
+          "name": "delete review (ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-User-Role", "value": "ADMIN", "description": "Admin role required" }
+            ],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews/{{reviewId}}",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "products", "{{productId}}", "reviews", "{{reviewId}}"]
+            },
+            "description": "Delete a review. ADMIN only."
           },
           "response": []
         }

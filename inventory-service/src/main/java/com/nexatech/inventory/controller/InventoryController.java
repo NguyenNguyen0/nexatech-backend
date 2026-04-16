@@ -1,12 +1,16 @@
 package com.nexatech.inventory.controller;
 
 import com.nexatech.inventory.dto.response.ApiResponse;
+import com.nexatech.inventory.dto.BulkImportResult;
 import com.nexatech.inventory.dto.InventoryResponse;
 import com.nexatech.inventory.dto.StockCheckRequest;
 import com.nexatech.inventory.dto.StockUpdateRequest;
+import com.nexatech.inventory.dto.WarehouseUpdateRequest;
 import com.nexatech.inventory.service.InventoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +21,13 @@ import java.util.List;
 public class InventoryController {
 
     private final InventoryService inventoryService;
+
+    @GetMapping("/list")
+    public ApiResponse<Page<InventoryResponse>> getAllInventory(
+            @RequestParam(required = false) String warehouseLocation,
+            Pageable pageable) {
+        return ApiResponse.ok(inventoryService.getAllInventory(warehouseLocation, pageable));
+    }
 
     @GetMapping("/{productId}")
     public ApiResponse<InventoryResponse> getStock(@PathVariable String productId) {
@@ -48,5 +59,17 @@ public class InventoryController {
     @GetMapping("/low-stock")
     public ApiResponse<List<InventoryResponse>> getLowStockItems() {
         return ApiResponse.ok(inventoryService.getLowStockItems());
+    }
+
+    @PostMapping("/bulk-import")
+    public ApiResponse<BulkImportResult> bulkImport(@Valid @RequestBody List<StockUpdateRequest> requests) {
+        return ApiResponse.ok(inventoryService.bulkImport(requests));
+    }
+
+    @PatchMapping("/{productId}/warehouse")
+    public ApiResponse<InventoryResponse> updateWarehouseInfo(
+            @PathVariable String productId,
+            @Valid @RequestBody WarehouseUpdateRequest request) {
+        return ApiResponse.ok(inventoryService.updateWarehouseInfo(productId, request));
     }
 }
