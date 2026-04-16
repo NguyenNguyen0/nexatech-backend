@@ -26,6 +26,14 @@
     {
       "key": "searchKeyword",
       "value": "iphone"
+    },
+    {
+      "key": "imageUrl",
+      "value": ""
+    },
+    {
+      "key": "storageBaseUrl",
+      "value": "http://localhost:8088"
     }
   ],
   "item": [
@@ -521,6 +529,208 @@
                 "low-stock"
               ]
             }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Product Image APIs",
+      "item": [
+        {
+          "name": "upload images",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "    pm.expect(pm.response.code).to.eql(201);",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res && res.data && res.data.images && res.data.images.length > 0) {",
+                  "    pm.collectionVariables.set('imageUrl', res.data.images[0]);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select one or more image files (JPEG, PNG, WebP, GIF). Max 5MB each, max 10 images per product."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/images",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}",
+                "images"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "reorder images",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageUrls\": [\"{{imageUrl}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/images/reorder",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}",
+                "images",
+                "reorder"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete image",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageUrl\": \"{{imageUrl}}\"\n}"
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/images",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}",
+                "images"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Storage Service APIs",
+      "item": [
+        {
+          "name": "get file (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{storageBaseUrl}}/api/v1/files/nexatech-products/sample-key.jpg",
+              "host": [
+                "{{storageBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "files",
+                "nexatech-products",
+                "sample-key.jpg"
+              ]
+            },
+            "description": "Replace 'sample-key.jpg' with the actual key from an upload response. This endpoint streams the file content directly."
+          },
+          "response": []
+        },
+        {
+          "name": "upload file (internal)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select an image file (JPEG, PNG, WebP, GIF). Max 5MB."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{storageBaseUrl}}/internal/files/upload",
+              "host": [
+                "{{storageBaseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "files",
+                "upload"
+              ]
+            },
+            "description": "Internal endpoint. Normally called by other services via Feign, not exposed through Kong."
+          },
+          "response": []
+        },
+        {
+          "name": "delete file (internal)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{storageBaseUrl}}/internal/files?bucket=nexatech-products&key=sample-key.jpg",
+              "host": [
+                "{{storageBaseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "files"
+              ],
+              "query": [
+                {
+                  "key": "bucket",
+                  "value": "nexatech-products"
+                },
+                {
+                  "key": "key",
+                  "value": "sample-key.jpg"
+                }
+              ]
+            },
+            "description": "Internal endpoint. Replace bucket/key values with actual data. Not exposed through Kong."
           },
           "response": []
         }
