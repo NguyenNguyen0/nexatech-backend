@@ -54,10 +54,9 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/cancel")
-    public ApiResponse<Void> cancelOrder(
+    public ApiResponse<OrderResponse> cancelOrder(
             @RequestHeader("X-User-Id") UUID customerId,
             @PathVariable UUID id) {
-        orderService.cancelOrder(customerId, id);
-        return ApiResponse.ok(null);
+        return ApiResponse.ok(orderService.cancelOrder(customerId, id));
     }
 }

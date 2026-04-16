@@ -1,0 +1,381 @@
+services:
+  postgres-order:
+    image: postgres:16-alpine
+    container_name: test-postgres-order
+    environment:
+      POSTGRES_DB: nexatech_orders
+      POSTGRES_USER: nexatech
+      POSTGRES_PASSWORD: nexatech123
+    ports:
+      - "5435:5432"
+    volumes:
+      - test-postgres-order-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexatech -d nexatech_orders"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-net
+
+  postgres-inventory:
+    image: postgres:16-alpine
+    container_name: test-postgres-inventory
+    environment:
+      POSTGRES_DB: nexatech_inventory
+      POSTGRES_USER: nexatech
+      POSTGRES_PASSWORD: nexatech123
+    ports:
+      - "5436:5432"
+    volumes:
+      - test-postgres-inventory-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexatech -d nexatech_inventory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-net
+
+  postgres-payment:
+    image: postgres:16-alpine
+    container_name: test-postgres-payment
+    environment:
+      POSTGRES_DB: nexatech_payments
+      POSTGRES_USER: nexatech
+      POSTGRES_PASSWORD: nexatech123
+    ports:
+      - "5437:5432"
+    volumes:
+      - test-postgres-payment-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexatech -d nexatech_payments"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-net
+
+  postgres-identity:
+    image: postgres:16-alpine
+    container_name: test-postgres-identity
+    environment:
+      POSTGRES_DB: nexatech_identity
+      POSTGRES_USER: nexatech
+      POSTGRES_PASSWORD: nexatech123
+    ports:
+      - "5433:5432"
+    volumes:
+      - test-postgres-identity-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexatech -d nexatech_identity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-net
+
+  mongodb:
+    image: mongo:7
+    container_name: test-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: nexatech
+      MONGO_INITDB_ROOT_PASSWORD: nexatech123
+      MONGO_INITDB_DATABASE: nexatech_products
+    ports:
+      - "27017:27017"
+    volumes:
+      - test-mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: test-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - test-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: test-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_4LW_COMMANDS_WHITELIST: "ruok,srvr,stat,mntr"
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/2181 && echo ruok >&3 && cat <&3' | grep -q imok"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 20s
+    networks:
+      - test-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: test-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: "-Xmx512m -Xms256m"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - test-net
+
+  discovery-server:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: discovery-server
+    image: nexatech/discovery-server:latest
+    container_name: test-discovery
+    ports:
+      - "8761:8761"
+    environment:
+      - JAVA_TOOL_OPTIONS=-Xmx192m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
+    networks:
+      - test-net
+
+  config-server:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: config-server
+    image: nexatech/config-server:latest
+    container_name: test-config
+    ports:
+      - "8888:8888"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - JAVA_TOOL_OPTIONS=-Xmx192m
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
+    networks:
+      - test-net
+
+  identity-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: identity-service
+    image: nexatech/identity-service:latest
+    container_name: test-identity
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-identity:5432/nexatech_identity
+      - SPRING_DATASOURCE_USERNAME=nexatech
+      - SPRING_DATASOURCE_PASSWORD=nexatech123
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_DATA_REDIS_HOST=redis
+      - JAVA_TOOL_OPTIONS=-Xmx200m
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres-identity:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - test-net
+
+  product-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: product-service
+    image: nexatech/product-service:latest
+    container_name: test-product
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATA_MONGODB_URI=mongodb://nexatech:nexatech123@mongodb:27017/nexatech_products?authSource=admin
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_DATA_REDIS_HOST=redis
+      - JAVA_TOOL_OPTIONS=-Xmx200m
+    depends_on:
+      config-server:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - test-net
+
+  inventory-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: inventory-service
+    image: nexatech/inventory-service:latest
+    container_name: test-inventory
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-inventory:5432/nexatech_inventory
+      - SPRING_DATASOURCE_USERNAME=nexatech
+      - SPRING_DATASOURCE_PASSWORD=nexatech123
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_DATA_REDIS_HOST=redis
+      - JAVA_TOOL_OPTIONS=-Xmx200m
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres-inventory:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - test-net
+
+  order-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: order-service
+    image: nexatech/order-service:latest
+    container_name: test-order
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-order:5432/nexatech_orders
+      - SPRING_DATASOURCE_USERNAME=nexatech
+      - SPRING_DATASOURCE_PASSWORD=nexatech123
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_DATA_REDIS_HOST=redis
+      - JAVA_TOOL_OPTIONS=-Xmx200m
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres-order:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - test-net
+
+  payment-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: payment-service
+    image: nexatech/payment-service:latest
+    container_name: test-payment
+    ports:
+      - "8086:8086"
+    environment:
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-payment:5432/nexatech_payments
+      - SPRING_DATASOURCE_USERNAME=nexatech
+      - SPRING_DATASOURCE_PASSWORD=nexatech123
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JAVA_TOOL_OPTIONS=-Xmx200m
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres-payment:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - test-net
+
+  kong:
+    image: kong:3.6
+    container_name: test-kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /_kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    volumes:
+      - ./_kong:/_kong:ro
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    depends_on:
+      - identity-service
+      - product-service
+      - order-service
+      - inventory-service
+      - payment-service
+    networks:
+      - test-net
+
+volumes:
+  test-postgres-order-data:
+  test-postgres-inventory-data:
+  test-postgres-payment-data:
+  test-postgres-identity-data:
+  test-mongodb-data:
+  test-redis-data:
+
+networks:
+  test-net:
+    driver: bridge
