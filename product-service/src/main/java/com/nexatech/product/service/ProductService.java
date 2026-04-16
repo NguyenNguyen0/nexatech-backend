@@ -6,7 +6,9 @@ import com.nexatech.product.event.ProductCatalogEvent;
 import com.nexatech.product.event.ProductEventProducer;
 import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.ProductMapper;
+import com.nexatech.product.model.Brand;
 import com.nexatech.product.model.Product;
+import com.nexatech.product.repository.BrandRepository;
 import com.nexatech.product.repository.CategoryRepository;
 import com.nexatech.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,12 +36,14 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final BrandRepository brandRepository;
     private final ProductMapper productMapper;
     private final ProductEventProducer productEventProducer;
     private final MongoTemplate mongoTemplate;
 
     public ProductResponse createProduct(ProductRequest request) {
         validateCategory(request.getCategoryId());
+        validateBrand(request.getBrandId());
 
         Product product = productMapper.toEntity(request);
         product.setName(normalizeName(request.getName()));
@@ -48,12 +52,13 @@ public class ProductService {
 
         Product saved = productRepository.save(product);
         publishEvent(saved, "PRODUCT_CREATED");
-        return productMapper.toResponse(saved);
+        return enrichWithBrandName(productMapper.toResponse(saved));
     }
 
     public ProductResponse updateProduct(String id, ProductRequest request) {
         Product product = getActiveProduct(id);
         validateCategory(request.getCategoryId());
+        validateBrand(request.getBrandId());
 
         String oldName = product.getName();
         productMapper.updateEntity(request, product);
@@ -65,15 +70,15 @@ public class ProductService {
 
         Product saved = productRepository.save(product);
         publishEvent(saved, "PRODUCT_UPDATED");
-        return productMapper.toResponse(saved);
+        return enrichWithBrandName(productMapper.toResponse(saved));
     }
 
     public ProductResponse getProduct(String id) {
-        return productMapper.toResponse(getActiveProduct(id));
+        return enrichWithBrandName(productMapper.toResponse(getActiveProduct(id)));
     }
 
     public Page<ProductResponse> getProducts(Pageable pageable) {
-        return productRepository.findByActiveTrue(pageable).map(productMapper::toResponse);
+        return productRepository.findByActiveTrue(pageable).map(p -> enrichWithBrandName(productMapper.toResponse(p)));
     }
 
     public Page<ProductResponse> searchProducts(String keyword, Pageable pageable) {
@@ -91,7 +96,7 @@ public class ProductService {
                     .addCriteria(Criteria.where("active").is(true));
 
             List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
-                    .map(productMapper::toResponse)
+                    .map(p -> enrichWithBrandName(productMapper.toResponse(p)))
                     .toList();
 
             if (!content.isEmpty()) {
@@ -105,7 +110,7 @@ public class ProductService {
         }
 
         return productRepository.findByNameContainingIgnoreCaseAndActiveTrue(normalizedKeyword, pageable)
-                .map(productMapper::toResponse);
+                .map(p -> enrichWithBrandName(productMapper.toResponse(p)));
     }
 
     public Page<ProductResponse> getProductsByCategory(String categoryId, Pageable pageable) {
@@ -117,7 +122,7 @@ public class ProductService {
                 .with(pageable);
 
         List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
-                .map(productMapper::toResponse)
+                .map(p -> enrichWithBrandName(productMapper.toResponse(p)))
                 .toList();
         long total = mongoTemplate.count(
                 Query.query(new Criteria().andOperator(
@@ -146,6 +151,24 @@ public class ProductService {
         }
         categoryRepository.findByIdAndActiveTrue(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", categoryId));
+    }
+
+    private void validateBrand(String brandId) {
+        if (!StringUtils.hasText(brandId)) {
+            return;
+        }
+        brandRepository.findByIdAndActiveTrue(brandId)
+                .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", brandId));
+    }
+
+    private ProductResponse enrichWithBrandName(ProductResponse response) {
+        if (StringUtils.hasText(response.getBrandId())) {
+            response.setBrandName(
+                    brandRepository.findById(response.getBrandId())
+                            .map(Brand::getName)
+                            .orElse(null));
+        }
+        return response;
     }
 
     private String normalizeName(String name) {

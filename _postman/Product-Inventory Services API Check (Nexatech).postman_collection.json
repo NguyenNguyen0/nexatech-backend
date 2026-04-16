@@ -34,6 +34,10 @@
     {
       "key": "storageBaseUrl",
       "value": "http://localhost:8088"
+    },
+    {
+      "key": "brandId",
+      "value": ""
     }
   ],
   "item": [
@@ -157,7 +161,146 @@
       ]
     },
     {
-      "name": "2. Product APIs",
+      "name": "2. Brand APIs",
+      "item": [
+        {
+          "name": "create brand",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 201', function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});",
+                  "var res = pm.response.json();",
+                  "var id = res && res.data && res.data.id;",
+                  "if (id) {",
+                  "    pm.collectionVariables.set('brandId', id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Apple\",\n  \"logoUrl\": \"https://dummyimage.com/200x200\"\n}"
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "list brands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get brand by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands/{{brandId}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands",
+                "{{brandId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update brand",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Apple Inc.\",\n  \"logoUrl\": \"https://dummyimage.com/200x200/apple\"\n}"
+            },
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands/{{brandId}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands",
+                "{{brandId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete brand",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands/{{brandId}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands",
+                "{{brandId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Product APIs",
       "item": [
         {
           "name": "create product",
@@ -189,7 +332,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"iPhone 15 Pro API\",\n  \"description\": \"San pham test tu Postman\",\n  \"price\": 29990000,\n  \"compareAtPrice\": 31990000,\n  \"sku\": \"IP15PRO-API-001\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"images\": [\"https://dummyimage.com/600x600\"],\n  \"attributes\": {\n    \"color\": \"Black\",\n    \"storage\": \"256GB\"\n  }\n}"
+              "raw": "{\n  \"name\": \"iPhone 15 Pro API\",\n  \"description\": \"San pham test tu Postman\",\n  \"price\": 29990000,\n  \"compareAtPrice\": 31990000,\n  \"sku\": \"IP15PRO-API-001\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"brandId\": \"{{brandId}}\",\n  \"images\": [\"https://dummyimage.com/600x600\"],\n  \"attributes\": {\n    \"color\": \"Black\",\n    \"storage\": \"256GB\"\n  }\n}"
             },
             "url": {
               "raw": "{{productBaseUrl}}/api/v1/products",
@@ -335,7 +478,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"iPhone 15 Pro API Updated\",\n  \"description\": \"San pham test update\",\n  \"price\": 28990000,\n  \"compareAtPrice\": 30990000,\n  \"sku\": \"IP15PRO-API-002\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"images\": [\"https://dummyimage.com/600x600\"],\n  \"attributes\": {\n    \"color\": \"Titanium\",\n    \"storage\": \"256GB\"\n  }\n}"
+              "raw": "{\n  \"name\": \"iPhone 15 Pro API Updated\",\n  \"description\": \"San pham test update\",\n  \"price\": 28990000,\n  \"compareAtPrice\": 30990000,\n  \"sku\": \"IP15PRO-API-002\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"brandId\": \"{{brandId}}\",\n  \"images\": [\"https://dummyimage.com/600x600\"],\n  \"attributes\": {\n    \"color\": \"Titanium\",\n    \"storage\": \"256GB\"\n  }\n}"
             },
             "url": {
               "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}",
@@ -375,7 +518,7 @@
       ]
     },
     {
-      "name": "3. Inventory APIs",
+      "name": "4. Inventory APIs",
       "item": [
         {
           "name": "update stock",
@@ -535,7 +678,7 @@
       ]
     },
     {
-      "name": "4. Product Image APIs",
+      "name": "5. Product Image APIs",
       "item": [
         {
           "name": "upload images",
@@ -650,7 +793,7 @@
       ]
     },
     {
-      "name": "5. Storage Service APIs",
+      "name": "6. Storage Service APIs",
       "item": [
         {
           "name": "get file (public)",

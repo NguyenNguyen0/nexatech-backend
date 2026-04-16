@@ -6,11 +6,14 @@ import com.nexatech.product.dto.response.StorageUploadResult;
 import com.nexatech.product.exception.BadRequestException;
 import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.ProductMapper;
+import com.nexatech.product.model.Brand;
 import com.nexatech.product.model.Product;
+import com.nexatech.product.repository.BrandRepository;
 import com.nexatech.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
@@ -25,6 +28,7 @@ public class ProductImageService {
     private static final int MAX_IMAGES = 10;
 
     private final ProductRepository productRepository;
+    private final BrandRepository brandRepository;
     private final StorageClient storageClient;
     private final ProductMapper productMapper;
 
@@ -53,7 +57,7 @@ public class ProductImageService {
         }
 
         product.setImages(current);
-        return productMapper.toResponse(productRepository.save(product));
+        return enrichWithBrandName(productMapper.toResponse(productRepository.save(product)));
     }
 
     /**
@@ -73,7 +77,7 @@ public class ProductImageService {
         List<String> updated = new ArrayList<>(current);
         updated.remove(imageUrl);
         product.setImages(updated);
-        return productMapper.toResponse(productRepository.save(product));
+        return enrichWithBrandName(productMapper.toResponse(productRepository.save(product)));
     }
 
     /**
@@ -92,7 +96,7 @@ public class ProductImageService {
         }
 
         product.setImages(new ArrayList<>(orderedUrls));
-        return productMapper.toResponse(productRepository.save(product));
+        return enrichWithBrandName(productMapper.toResponse(productRepository.save(product)));
     }
 
     // -------------------------------------------------------------------------
@@ -118,5 +122,15 @@ public class ProductImageService {
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Invalid image URL format: " + url);
         }
+    }
+
+    private ProductResponse enrichWithBrandName(ProductResponse response) {
+        if (StringUtils.hasText(response.getBrandId())) {
+            response.setBrandName(
+                    brandRepository.findById(response.getBrandId())
+                            .map(Brand::getName)
+                            .orElse(null));
+        }
+        return response;
     }
 }

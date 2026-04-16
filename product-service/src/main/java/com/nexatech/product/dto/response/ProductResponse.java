@@ -21,6 +21,7 @@ public class ProductResponse {
     private String sku;
     private String categoryId;
     private String brandId;
+    private String brandName;
     private List<String> images;
     private Map<String, String> attributes;
     private boolean active;
