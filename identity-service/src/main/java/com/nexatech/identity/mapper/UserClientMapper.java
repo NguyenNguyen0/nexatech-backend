@@ -15,6 +15,11 @@ public class UserClientMapper {
                 .username(param.getUsername())
                 .firstName(param.getFirstName())
                 .lastName(param.getLastName())
+                .avatarUrl(param.getAvatarUrl())
+                .phone(param.getPhone())
+                .dob(param.getDob())
+                .gender(param.getGender())
+                .onBoarded(param.getOnBoarded())
                 .build();
     }
 }

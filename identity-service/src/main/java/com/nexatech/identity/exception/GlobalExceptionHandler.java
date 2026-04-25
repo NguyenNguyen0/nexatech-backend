@@ -101,6 +101,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(value = Exception.class)
     ResponseEntity<ApiResponse<?>> handlingGenericException(Exception exception) {
         log.error("Exception: ", exception);
+        if (exception instanceof IllegalStateException
+                && exception.getMessage() != null
+                && exception.getMessage().startsWith("Keycloak expected HTTP")) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.builder()
+                            .code(ErrorCode.KEYCLOAK_ERROR.getCode())
+                            .message(exception.getMessage())
+                            .build());
+        }
+
         ApiResponse<?> apiResponse = new ApiResponse<>();
 
         apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());

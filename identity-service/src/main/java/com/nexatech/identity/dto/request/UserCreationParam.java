@@ -37,6 +37,11 @@ public class UserCreationParam {
     boolean emailVerified;
     String firstName;
     String lastName;
+    String avatarUrl;
+    String phone;
+    String dob;
+    String gender;
+    Boolean onBoarded;
 
     @NotEmpty(message = "CREDENTIALS_REQUIRED")
     @Valid

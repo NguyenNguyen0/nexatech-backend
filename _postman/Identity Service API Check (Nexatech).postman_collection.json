@@ -40,7 +40,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{registerUsername}}\",\n  \"enabled\": true,\n  \"email\": \"{{registerEmail}}\",\n  \"emailVerified\": true,\n  \"firstName\": \"Minh\",\n  \"lastName\": \"Nguyen\",\n  \"credentials\": [\n    { \"type\": \"password\", \"value\": \"{{registerPassword}}\", \"temporary\": false }\n  ]\n}"
+              "raw": "{\n  \"username\": \"{{registerUsername}}\",\n  \"enabled\": true,\n  \"email\": \"{{registerEmail}}\",\n  \"emailVerified\": false,\n  \"firstName\": \"Minh\",\n  \"lastName\": \"Nguyen\",\n  \"phone\": \"0987654321\",\n  \"dob\": \"2000-01-01\",\n  \"gender\": \"MALE\",\n  \"onBoarded\": false,\n  \"credentials\": [\n    { \"type\": \"password\", \"value\": \"{{registerPassword}}\", \"temporary\": false }\n  ]\n}"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/auth/register",
