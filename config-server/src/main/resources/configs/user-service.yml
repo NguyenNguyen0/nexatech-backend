@@ -26,3 +26,13 @@ spring:
 openfeign:
   identity-service:
     url: ${IDENTITY_SERVICE_URL}
+
+resilience4j:
+  retry:
+    instances:
+      identityService:
+        base-config: default
+  circuitbreaker:
+    instances:
+      identityService:
+        base-config: default
