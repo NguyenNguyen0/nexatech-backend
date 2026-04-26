@@ -5,7 +5,6 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.nexatech.user.client.IdentityClient;
 import com.nexatech.user.dto.event.KeycloakCredentialPayload;
 import com.nexatech.user.dto.event.KeycloakUserProvisionPayload;
 import com.nexatech.user.dto.request.AdminUserCreateRequest;
@@ -18,6 +17,8 @@ import com.nexatech.user.mapper.UserMapper;
 import com.nexatech.user.model.User;
 import com.nexatech.user.repository.UserRepository;
 import com.nexatech.user.service.AdminUserService;
+import com.nexatech.user.service.IdentityResilienceService;
+import com.nexatech.user.service.IdentityServiceDependencyGuard;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -30,11 +31,13 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     UserRepository userRepository;
     UserMapper userMapper;
-    IdentityClient identityClient;
+    IdentityResilienceService identityResilienceService;
+    IdentityServiceDependencyGuard identityServiceDependencyGuard;
 
     @Override
     @Transactional
     public UserResponse createUserWithKeycloakProvision(AdminUserCreateRequest request) {
+        identityServiceDependencyGuard.assertIdentityServiceReady();
         if (request == null || request.getEmail() == null || request.getEmail().isBlank()) {
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }
@@ -74,8 +77,11 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         ApiResponse<String> created;
         try {
-            created = identityClient.createKeycloakUser(provision);
+            created = identityResilienceService.createKeycloakUser(provision);
         } catch (Exception ex) {
+            if (ex instanceof AppException appException && appException.getErrorCode() == ErrorCode.DEPENDENCY_UNAVAILABLE) {
+                throw appException;
+            }
             throw new AppException(ErrorCode.KEYCLOAK_ERROR);
         }
         String keycloakUserId = created != null ? created.getResult() : null;

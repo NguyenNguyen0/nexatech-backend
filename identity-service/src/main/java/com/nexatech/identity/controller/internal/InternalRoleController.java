@@ -58,7 +58,8 @@ public class InternalRoleController {
     }
 
     @PostMapping("/{roleName}/composites")
-    public ApiResponse<Void> addCompositeRoles(@PathVariable String roleName, @RequestBody List<KeycloakRoleRef> roles) {
+    public ApiResponse<Void> addCompositeRoles(@PathVariable String roleName,
+            @Valid @RequestBody List<KeycloakRoleRef> roles) {
         roleService.addCompositeRoles(roleName, roles);
         return ApiResponse.<Void>builder().build();
     }

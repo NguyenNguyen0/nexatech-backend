@@ -35,6 +35,7 @@ public class CartDto {
     public static class CartItemDto {
         private String productId;
         private String productName;
+        private String imageUrl;
         private BigDecimal unitPrice;
         private int quantity;
         private BigDecimal subtotal;

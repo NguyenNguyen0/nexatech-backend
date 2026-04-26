@@ -45,3 +45,7 @@ logs/
 
 # ignore docker compose dev
 docker-compose-dev.yml
+task.md
+plans.md
+plan.md
+realm-export.json

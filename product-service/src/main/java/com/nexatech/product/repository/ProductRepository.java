@@ -28,4 +28,6 @@ public interface ProductRepository extends MongoRepository<Product, String> {
     Page<Product> findByNameContainingIgnoreCaseAndActiveTrue(String name, Pageable pageable);
 
     boolean existsByCategoryIdAndActiveTrue(String categoryId);
+
+    boolean existsByBrandIdAndActiveTrue(String brandId);
 }

@@ -785,37 +785,6 @@
       "name": "5. Groups",
       "item": [
         {
-          "name": "create",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"{{groupName}}\"\n}"
-            },
-            "url": {
-              "raw": "{{userBaseUrl}}/groups",
-              "host": [
-                "{{userBaseUrl}}"
-              ],
-              "path": [
-                "groups"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
           "name": "list",
           "request": {
             "method": "GET",
@@ -1064,7 +1033,38 @@
       ]
     },
     {
-      "name": "Login for test API User Service",
+      "name": "create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{groupName}}\"\n}"
+        },
+        "url": {
+          "raw": "{{userBaseUrl}}/groups",
+          "host": [
+            "{{userBaseUrl}}"
+          ],
+          "path": [
+            "groups"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Login for TEST User Service (Call Identity)",
       "event": [
         {
           "listen": "test",

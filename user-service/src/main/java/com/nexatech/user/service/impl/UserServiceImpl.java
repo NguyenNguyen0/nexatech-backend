@@ -9,7 +9,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.nexatech.user.client.IdentityClient;
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.request.IdentityUserUpdateRequest;
 import com.nexatech.user.dto.request.UserCreationRequest;
@@ -20,6 +19,7 @@ import com.nexatech.user.exception.ErrorCode;
 import com.nexatech.user.mapper.UserMapper;
 import com.nexatech.user.model.User;
 import com.nexatech.user.repository.UserRepository;
+import com.nexatech.user.service.IdentityResilienceService;
 import com.nexatech.user.service.UserService;
 
 import feign.FeignException;
@@ -37,7 +37,7 @@ public class UserServiceImpl implements UserService {
 
     UserRepository userRepository;
     UserMapper userMapper;
-    IdentityClient identityClient;
+    IdentityResilienceService identityResilienceService;
 
     @Override
     public UserResponse createUser(UserCreationRequest request) {
@@ -124,9 +124,11 @@ public class UserServiceImpl implements UserService {
         }
         ApiResponse<Boolean> kc;
         try {
-            kc = identityClient.isKeycloakEmailAvailable(newEmail, id);
+            kc = identityResilienceService.isKeycloakEmailAvailable(newEmail, id);
         } catch (FeignException e) {
             throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        } catch (AppException e) {
+            throw e;
         } catch (Exception ex) {
             throw new AppException(ErrorCode.KEYCLOAK_ERROR);
         }
@@ -169,7 +171,7 @@ public class UserServiceImpl implements UserService {
             return;
         }
         try {
-            identityClient.updateUser(user.getId(), IdentityUserUpdateRequest.builder()
+            identityResilienceService.updateIdentityUser(user.getId(), IdentityUserUpdateRequest.builder()
                     .username(user.getUsername())
                     .firstName(user.getFirstName())
                     .lastName(user.getLastName())

@@ -15,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.identity.dto.base.ApiResponse;
 
 import feign.FeignException;
@@ -26,42 +27,11 @@ import lombok.extern.slf4j.Slf4j;
 public class GlobalExceptionHandler {
 
     private static final String MIN_ATTRIBUTE = "min";
-
     private static final String MAX_ATTRIBUTE = "max";
-
-    @ExceptionHandler(FeignException.class)
-    ResponseEntity<ApiResponse> handlingFeignException(FeignException exception) {
-        int status = exception.status();
-        log.warn("Feign/Keycloak error: httpStatus={} message={}", status, exception.getMessage());
-
-        ErrorCode errorCode;
-        HttpStatus responseStatus;
-        if (status == 401) {
-            errorCode = ErrorCode.INVALID_CREDENTIALS;
-            responseStatus = HttpStatus.BAD_REQUEST;
-        } else if (status == 403) {
-            errorCode = ErrorCode.UNAUTHORIZED;
-            responseStatus = HttpStatus.FORBIDDEN;
-        } else if (status >= 500) {
-            errorCode = ErrorCode.KEYCLOAK_ERROR;
-            responseStatus = HttpStatus.BAD_GATEWAY;
-        } else if (status >= 400) {
-            errorCode = ErrorCode.KEYCLOAK_ERROR;
-            responseStatus = HttpStatus.BAD_REQUEST;
-        } else {
-            errorCode = ErrorCode.KEYCLOAK_ERROR;
-            responseStatus = HttpStatus.BAD_REQUEST;
-        }
-
-        return ResponseEntity.status(responseStatus)
-                .body(ApiResponse.builder()
-                        .code(errorCode.getCode())
-                        .message(errorCode.getMessage())
-                        .build());
-    }
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    ResponseEntity<ApiResponse> handlingHttpMessageNotReadable(HttpMessageNotReadableException exception) {
+    ResponseEntity<ApiResponse<?>> handlingHttpMessageNotReadable(HttpMessageNotReadableException exception) {
         log.warn("Malformed JSON body: {}", exception.getMessage());
         ErrorCode errorCode = ErrorCode.INVALID_JSON_BODY;
         return ResponseEntity.status(errorCode.getStatusCode())
@@ -72,20 +42,17 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(value = AppException.class)
-    ResponseEntity<ApiResponse> handlingAppException(AppException exception) {
+    ResponseEntity<ApiResponse<?>> handlingAppException(AppException exception) {
         ErrorCode errorCode = exception.getErrorCode();
-        ApiResponse apiResponse = new ApiResponse();
-
+        ApiResponse<?> apiResponse = new ApiResponse<>();
         apiResponse.setCode(errorCode.getCode());
         apiResponse.setMessage(errorCode.getMessage());
-
         return ResponseEntity.status(errorCode.getStatusCode()).body(apiResponse);
     }
 
     @ExceptionHandler(value = AccessDeniedException.class)
-    ResponseEntity<ApiResponse> handlingAccessDeniedException(AccessDeniedException exception) {
+    ResponseEntity<ApiResponse<?>> handlingAccessDeniedException(AccessDeniedException exception) {
         ErrorCode errorCode = ErrorCode.UNAUTHORIZED;
-
         return ResponseEntity.status(errorCode.getStatusCode())
                 .body(ApiResponse.builder()
                         .code(errorCode.getCode())
@@ -94,7 +61,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(value = MethodArgumentNotValidException.class)
-    ResponseEntity<ApiResponse> handlingValidation(MethodArgumentNotValidException exception) {
+    ResponseEntity<ApiResponse<?>> handlingValidation(MethodArgumentNotValidException exception) {
         ObjectError first = exception.getBindingResult().getAllErrors().isEmpty()
                 ? null
                 : exception.getBindingResult().getAllErrors().getFirst();
@@ -119,17 +86,79 @@ public class GlobalExceptionHandler {
                 ConstraintViolation<?> unwrapped = first.unwrap(ConstraintViolation.class);
                 attributes = unwrapped.getConstraintDescriptor().getAttributes();
             } catch (Exception ignored) {
-                // Not all validators expose ConstraintViolation on FieldError
             }
         }
 
-        ApiResponse apiResponse = new ApiResponse();
+        ApiResponse<?> apiResponse = new ApiResponse<>();
         apiResponse.setCode(errorCode.getCode());
         apiResponse.setMessage(
                 Objects.nonNull(attributes)
                         ? mapAttribute(errorCode.getMessage(), attributes)
                         : errorCode.getMessage());
         return ResponseEntity.badRequest().body(apiResponse);
+    }
+
+    @ExceptionHandler(value = Exception.class)
+    ResponseEntity<ApiResponse<?>> handlingGenericException(Exception exception) {
+        log.error("Exception: ", exception);
+        if (exception instanceof IllegalStateException
+                && exception.getMessage() != null
+                && exception.getMessage().startsWith("Keycloak expected HTTP")) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.builder()
+                            .code(ErrorCode.KEYCLOAK_ERROR.getCode())
+                            .message(exception.getMessage())
+                            .build());
+        }
+
+        ApiResponse<?> apiResponse = new ApiResponse<>();
+
+        apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
+        apiResponse.setMessage(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage());
+
+        return ResponseEntity.status(ErrorCode.UNCATEGORIZED_EXCEPTION.getStatusCode()).body(apiResponse);
+    }
+
+    @ExceptionHandler(FeignException.class)
+    ResponseEntity<ApiResponse<?>> handlingFeignException(FeignException exception) {
+        int status = exception.status();
+        log.warn("Feign/Keycloak error: httpStatus={} message={}", status, exception.getMessage());
+
+        String dynamicMessage = extractKeycloakErrorMessage(exception);
+
+        ErrorCode errorCode = switch (status) {
+            case 401 -> ErrorCode.INVALID_CREDENTIALS;
+            case 403 -> ErrorCode.UNAUTHORIZED;
+            default -> ErrorCode.KEYCLOAK_ERROR;
+        };
+
+        HttpStatus responseStatus = status >= 500 ? HttpStatus.BAD_GATEWAY : (HttpStatus) errorCode.getStatusCode();
+
+        return ResponseEntity.status(responseStatus)
+                .body(ApiResponse.builder()
+                        .code(errorCode.getCode())
+                        .message(dynamicMessage != null ? dynamicMessage : errorCode.getMessage())
+                        .build());
+    }
+
+    private String extractKeycloakErrorMessage(FeignException exception) {
+        try {
+            String content = exception.contentUTF8();
+            if (content != null && !content.isEmpty()) {
+                com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(content);
+                if (node.isArray() && !node.isEmpty()) {
+                    node = node.get(0);
+                }
+                if (node.has("errorMessage")) {
+                    return node.get("errorMessage").asText();
+                } else if (node.has("error")) {
+                    return node.get("error").asText();
+                }
+            }
+        } catch (Exception e) {
+            log.trace("Could not parse Keycloak error body: ", e);
+        }
+        return null;
     }
 
     private String mapAttribute(String message, Map<String, Object> attributes) {
@@ -141,16 +170,5 @@ public class GlobalExceptionHandler {
             result = result.replace("{" + MAX_ATTRIBUTE + "}", String.valueOf(attributes.get(MAX_ATTRIBUTE)));
         }
         return result;
-    }
-
-    @ExceptionHandler(value = Exception.class)
-    ResponseEntity<ApiResponse> handlingGenericException(Exception exception) {
-        log.error("Exception: ", exception);
-        ApiResponse apiResponse = new ApiResponse();
-
-        apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
-        apiResponse.setMessage(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage());
-
-        return ResponseEntity.status(ErrorCode.UNCATEGORIZED_EXCEPTION.getStatusCode()).body(apiResponse);
     }
 }

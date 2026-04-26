@@ -1,8 +1,10 @@
 package com.nexatech.inventory.service;
 
+import com.nexatech.inventory.dto.BulkImportResult;
 import com.nexatech.inventory.dto.InventoryResponse;
 import com.nexatech.inventory.dto.StockCheckRequest;
 import com.nexatech.inventory.dto.StockUpdateRequest;
+import com.nexatech.inventory.dto.WarehouseUpdateRequest;
 import com.nexatech.inventory.event.InventoryEvent;
 import com.nexatech.inventory.event.InventoryEventProducer;
 import com.nexatech.inventory.exception.BadRequestException;
@@ -12,8 +14,11 @@ import com.nexatech.inventory.model.StockMovement;
 import com.nexatech.inventory.repository.InventoryItemRepository;
 import com.nexatech.inventory.repository.StockMovementRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -94,6 +99,54 @@ public class InventoryService {
                 .filter(this::isLowStock)
                 .map(this::toResponse)
                 .toList();
+    }
+
+    public BulkImportResult bulkImport(List<StockUpdateRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new BadRequestException("Import list must not be empty");
+        }
+
+        int successCount = 0;
+        int failureCount = 0;
+        List<String> errors = new java.util.ArrayList<>();
+
+        for (int i = 0; i < requests.size(); i++) {
+            StockUpdateRequest req = requests.get(i);
+            try {
+                updateStock(req);
+                successCount++;
+            } catch (Exception e) {
+                failureCount++;
+                errors.add("Item[" + i + "] productId=" + req.getProductId() + ": " + e.getMessage());
+            }
+        }
+
+        return BulkImportResult.builder()
+                .successCount(successCount)
+                .failureCount(failureCount)
+                .errors(errors)
+                .build();
+    }
+
+    public Page<InventoryResponse> getAllInventory(String warehouseLocation, Pageable pageable) {
+        if (StringUtils.hasText(warehouseLocation)) {
+            return inventoryItemRepository.findByWarehouseLocation(warehouseLocation, pageable)
+                    .map(this::toResponse);
+        }
+        return inventoryItemRepository.findAll(pageable).map(this::toResponse);
+    }
+
+    @Transactional
+    public InventoryResponse updateWarehouseInfo(String productId, WarehouseUpdateRequest request) {
+        InventoryItem item = inventoryItemRepository.findByProductId(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inventory item", "productId", productId));
+
+        item.setWarehouseLocation(request.getWarehouseLocation());
+        item.setReorderLevel(request.getReorderLevel());
+
+        InventoryItem saved = inventoryItemRepository.save(item);
+        publishLowStockEventIfNeeded(saved);
+        return toResponse(saved);
     }
 
     @Transactional

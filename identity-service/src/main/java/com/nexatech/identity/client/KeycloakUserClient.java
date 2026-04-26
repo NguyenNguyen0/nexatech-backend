@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.nexatech.identity.dto.request.Credential;
-import com.nexatech.identity.dto.request.UserCreationParam;
+import com.nexatech.identity.dto.request.KeycloakUserCreationParam;
 import com.nexatech.identity.dto.request.UserUpdateParam;
 
 import feign.Response;
@@ -25,7 +25,7 @@ public interface KeycloakUserClient {
 
     @PostMapping(value = "/admin/realms/{realm}/users", consumes = MediaType.APPLICATION_JSON_VALUE)
     Response createUser(@PathVariable("realm") String realm, @RequestHeader("Authorization") String authorization,
-            @RequestBody UserCreationParam body);
+            @RequestBody KeycloakUserCreationParam body);
 
     @GetMapping("/admin/realms/{realm}/users")
     List<Map<String, Object>> listUsers(@PathVariable("realm") String realm, @RequestHeader("Authorization") String authorization,
