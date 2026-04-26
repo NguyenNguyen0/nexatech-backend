@@ -29,6 +29,7 @@ public class AuthService {
 
     private final KeycloakAuthClient keycloakAuthClient;
     private final UserService userService;
+    private final UserServiceDependencyGuard userServiceDependencyGuard;
     private final KafkaService kafkaService;
     private final UserClientMapper userClientMapper;
 
@@ -42,6 +43,7 @@ public class AuthService {
     private String clientSecret;
 
     public String register(UserCreationParam param) {
+        userServiceDependencyGuard.assertUserServiceReady();
         String createdUserId = userService.createUser(param);
         try {
             UserClientRequest request = userClientMapper.toProvisionRequest(createdUserId, param);

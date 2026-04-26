@@ -3,3 +3,31 @@ spring:
     name: user-service
   config:
     import: "configserver:${CONFIG_SERVER_URI}/"
+  cloud:
+    circuitbreaker:
+      resilience4j:
+        enabled: true
+
+resilience4j:
+  retry:
+    instances:
+      identityService:
+        max-attempts: 3
+        wait-duration: 400ms
+        retry-exceptions:
+          - feign.RetryableException
+          - feign.FeignException$ServiceUnavailable
+          - feign.FeignException$InternalServerError
+          - feign.FeignException$BadGateway
+          - feign.FeignException$GatewayTimeout
+          - java.net.SocketTimeoutException
+          - java.io.IOException
+  circuitbreaker:
+    instances:
+      identityService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3

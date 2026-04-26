@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "812977cf-8aa5-4c72-a2d1-831a6be0afc8",
+    "_postman_id": "0790af14-3bde-450a-83c0-cea331519dec",
     "name": "Identity Service API Check (Nexatech)",
     "description": "Token: gọi **Login** → biến collection `accessToken` được gán.\n\nCác API cần JWT dùng header **Authorization: `Bearer {{accessToken}}`** (xem tab Headers). Không dùng tab Authorization của Postman.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
