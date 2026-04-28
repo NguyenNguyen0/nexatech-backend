@@ -2,7 +2,6 @@ package com.nexatech.order.controller;
 
 import com.nexatech.order.dto.response.ApiResponse;
 import com.nexatech.order.dto.response.PageResponse;
-import com.nexatech.order.enums.OrderStatus;
 import com.nexatech.order.dto.CreateOrderRequest;
 import com.nexatech.order.dto.OrderResponse;
 import com.nexatech.order.service.OrderService;
@@ -39,18 +38,6 @@ public class OrderController {
             @RequestHeader("X-User-Id") UUID customerId,
             Pageable pageable) {
         return ApiResponse.ok(PageResponse.of(orderService.getMyOrders(customerId, pageable)));
-    }
-
-    @GetMapping
-    public ApiResponse<PageResponse<OrderResponse>> getAllOrders(Pageable pageable) {
-        return ApiResponse.ok(PageResponse.of(orderService.getAllOrders(pageable)));
-    }
-
-    @PatchMapping("/{id}/status")
-    public ApiResponse<OrderResponse> updateStatus(
-            @PathVariable UUID id,
-            @RequestParam OrderStatus status) {
-        return ApiResponse.ok(orderService.updateOrderStatus(id, status));
     }
 
     @PostMapping("/{id}/cancel")

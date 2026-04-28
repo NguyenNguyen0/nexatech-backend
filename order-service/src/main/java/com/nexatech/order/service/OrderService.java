@@ -17,6 +17,7 @@ import com.nexatech.order.mapper.OrderMapper;
 import com.nexatech.order.model.Order;
 import com.nexatech.order.model.OrderItem;
 import com.nexatech.order.repository.OrderRepository;
+import com.nexatech.order.util.OrderStateMachine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -116,15 +117,25 @@ public class OrderService {
     }
 
     /**
-     * Lấy toàn bộ đơn hàng trong hệ thống (dành cho admin, phân trang).
+     * Lấy toàn bộ đơn hàng trong hệ thống — dùng bởi admin, delegate sang getAllOrders(status, pageable).
      */
     public Page<OrderResponse> getAllOrders(Pageable pageable) {
-        return orderRepository.findAll(pageable)
-                .map(orderMapper::toResponse);
+        return getAllOrders(null, pageable);
+    }
+
+    /**
+     * Lấy danh sách đơn hàng theo trạng thái (admin, có thể null để lấy tất cả).
+     */
+    public Page<OrderResponse> getAllOrders(OrderStatus status, Pageable pageable) {
+        if (status != null) {
+            return orderRepository.findByStatus(status, pageable).map(orderMapper::toResponse);
+        }
+        return orderRepository.findAll(pageable).map(orderMapper::toResponse);
     }
 
     /**
      * Cập nhật trạng thái đơn hàng (admin thực hiện).
+     * Validate state machine trước khi cập nhật.
      * Tự động gán timestamp vận chuyển khi status chuyển sang SHIPPED / DELIVERED.
      */
     @Transactional
@@ -132,6 +143,7 @@ public class OrderService {
         Order order = findById(orderId);
         OrderStatus oldStatus = order.getStatus();
 
+        OrderStateMachine.validate(oldStatus, newStatus);
         order.setStatus(newStatus);
 
         // Tự động ghi nhận thời điểm gửi hàng và giao hàng thành công
