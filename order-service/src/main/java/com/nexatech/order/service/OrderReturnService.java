@@ -171,6 +171,13 @@ public class OrderReturnService {
                 .map(returnMapper::toResponse);
     }
 
+    public Page<ReturnResponse> getAllReturns(ReturnStatus status, Pageable pageable) {
+        if (status != null) {
+            return returnRepository.findByStatus(status, pageable).map(returnMapper::toResponse);
+        }
+        return returnRepository.findAll(pageable).map(returnMapper::toResponse);
+    }
+
     // ==================== Private helpers ====================
 
     private OrderReturn findById(UUID returnId) {
