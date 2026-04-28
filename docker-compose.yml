@@ -446,6 +446,7 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    restart: on-failure
     networks:
       - nexatech-net
 

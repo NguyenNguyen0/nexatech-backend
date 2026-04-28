@@ -41,8 +41,9 @@ public class PaymentController {
     @GetMapping("/my")
     public ApiResponse<PageResponse<PaymentResponse>> getMyPayments(
             @RequestHeader("X-User-Id") UUID customerId,
+            @RequestParam(required = false) com.nexatech.payment.enums.PaymentStatus status,
             Pageable pageable) {
-        return ApiResponse.ok(PageResponse.of(paymentService.getMyPayments(customerId, pageable)));
+        return ApiResponse.ok(PageResponse.of(paymentService.getMyPayments(customerId, status, pageable)));
     }
 
     @PostMapping("/{id}/refund")
