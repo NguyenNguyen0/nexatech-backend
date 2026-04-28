@@ -4,9 +4,6 @@ import com.nexatech.payment.dto.PaymentResponse;
 import com.nexatech.payment.model.Payment;
 import org.springframework.stereotype.Component;
 
-/**
- * Mapper chuyển đổi Payment entity → PaymentResponse DTO.
- */
 @Component
 public class PaymentMapper {
 
@@ -19,7 +16,9 @@ public class PaymentMapper {
                 .method(payment.getMethod())
                 .status(payment.getStatus())
                 .transactionId(payment.getTransactionId())
+                .failureReason(payment.getFailureReason())
                 .createdAt(payment.getCreatedAt())
+                .completedAt(payment.getCompletedAt())
                 .build();
     }
 }
