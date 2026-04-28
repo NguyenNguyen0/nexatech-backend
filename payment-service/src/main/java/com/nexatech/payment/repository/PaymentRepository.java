@@ -25,6 +25,8 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     Page<Payment> findByCustomerId(UUID customerId, Pageable pageable);
 
+    Page<Payment> findByCustomerIdAndStatus(UUID customerId, PaymentStatus status, Pageable pageable);
+
     Page<Payment> findByStatus(PaymentStatus status, Pageable pageable);
 
     long countByCreatedAtBetween(Instant from, Instant to);

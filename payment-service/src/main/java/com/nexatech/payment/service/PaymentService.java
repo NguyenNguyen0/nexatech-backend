@@ -63,7 +63,11 @@ public class PaymentService {
         );
     }
 
-    public Page<PaymentResponse> getMyPayments(UUID customerId, Pageable pageable) {
+    public Page<PaymentResponse> getMyPayments(UUID customerId, PaymentStatus status, Pageable pageable) {
+        if (status != null) {
+            return paymentRepository.findByCustomerIdAndStatus(customerId, status, pageable)
+                    .map(paymentMapper::toResponse);
+        }
         return paymentRepository.findByCustomerId(customerId, pageable)
                 .map(paymentMapper::toResponse);
     }
