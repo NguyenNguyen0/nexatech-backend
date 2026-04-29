@@ -39,7 +39,7 @@ public class Notification extends BaseEntity {
     private String failureReason;
 
     @Builder.Default
-    @Column(name = "retry_count", nullable = false)
+    @Column(name = "retry_count", nullable = false, columnDefinition = "integer default 0")
     private int retryCount = 0;
 
     @Column(name = "last_retry_at")
