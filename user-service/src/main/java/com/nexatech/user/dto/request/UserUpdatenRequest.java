@@ -30,4 +30,11 @@ public class UserUpdatenRequest {
     LocalDate dob;
     Gender gender;
     Boolean onBoarded;
+    /**
+     * Optional realm role when admin updates user.
+     * - null: keep current role mapping
+     * - blank: remove all current realm roles
+     * - non-blank: replace current realm roles with this role
+     */
+    String role;
 }
