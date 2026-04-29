@@ -43,6 +43,12 @@ public class UserCreationParam {
     String gender;
     Boolean onBoarded;
 
+    /**
+     * Optional realm role name to assign to the created Keycloak user.
+     * If omitted/blank, identity-service defaults to `customer`.
+     */
+    String role;
+
     @NotEmpty(message = "CREDENTIALS_REQUIRED")
     @Valid
     List<Credential> credentials;
