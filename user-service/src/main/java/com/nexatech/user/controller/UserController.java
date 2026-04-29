@@ -2,6 +2,8 @@ package com.nexatech.user.controller;
 
 import jakarta.validation.Valid;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,7 +19,11 @@ import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.AdminUserCreateRequest;
 import com.nexatech.user.dto.request.UserRoleUpdateRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
+import com.nexatech.user.dto.request.VerifyOtpRequest;
+import com.nexatech.user.dto.response.OnboardingStatusResponse;
 import com.nexatech.user.dto.response.UserResponse;
+import com.nexatech.user.exception.AppException;
+import com.nexatech.user.exception.ErrorCode;
 import com.nexatech.user.service.AdminUserService;
 import com.nexatech.user.service.UserService;
 
@@ -44,13 +50,38 @@ public class UserController {
                 .build();
     }
 
+    @GetMapping("/me/onboarding-status")
+    public ApiResponse<OnboardingStatusResponse> getMyOnboardingStatus(@AuthenticationPrincipal Jwt jwt) {
+        return ApiResponse.<OnboardingStatusResponse>builder()
+                .result(userService.getOnboardingStatus(currentUserId(jwt)))
+                .build();
+    }
+
+    @PostMapping("/me/onboarding/request-otp")
+    public ApiResponse<Void> requestMyEmailOtp(@AuthenticationPrincipal Jwt jwt) {
+        userService.requestEmailVerificationOtp(currentUserId(jwt));
+        return ApiResponse.<Void>builder().build();
+    }
+
+    @PostMapping("/me/onboarding/verify-otp")
+    public ApiResponse<Void> verifyMyEmailOtp(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody VerifyOtpRequest request) {
+        userService.verifyEmailVerificationOtp(currentUserId(jwt), request.getOtp());
+        return ApiResponse.<Void>builder().build();
+    }
+
     @GetMapping
     // @RequiresPermission(PermissionsAccept.User.READ) // enable for production
     public ApiResponse<PageResponse<UserResponse>> getAllUsers(
             @RequestParam(name = "page", defaultValue = "1") int page,
-            @RequestParam(name = "size", defaultValue = "10") int size) {
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "email", required = false) String email,
+            @RequestParam(name = "phone", required = false) String phone,
+            @RequestParam(name = "active", required = false) Boolean active,
+            @RequestParam(name = "role", required = false) String role) {
         return ApiResponse.<PageResponse<UserResponse>>builder()
-                .result(userService.getAllUsers(page, size))
+                .result(userService.getAllUsers(page, size, email, phone, active, role))
                 .build();
     }
 
@@ -94,11 +125,24 @@ public class UserController {
                 .build();
     }
 
+    @PutMapping("/{userId}/disable")
+    public ApiResponse<Void> disableUser(@PathVariable String userId) {
+        userService.disableUser(userId);
+        return ApiResponse.<Void>builder().build();
+    }
+
     @PutMapping("/{userId}/enable")
     // @RequiresPermission(PermissionsAccept.User.ENABLE)
     public ApiResponse<Void> enableUser(@PathVariable String userId) {
         userService.enableUser(userId);
         return ApiResponse.<Void>builder()
                 .build();
+    }
+
+    private String currentUserId(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        return jwt.getSubject();
     }
 }

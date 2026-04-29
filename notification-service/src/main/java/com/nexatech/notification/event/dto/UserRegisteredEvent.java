@@ -18,4 +18,6 @@ public class UserRegisteredEvent extends BaseEvent {
     private String userId;
     private String email;
     private String displayName;
+    private String otpCode;
+    private Long expiresInSeconds;
 }

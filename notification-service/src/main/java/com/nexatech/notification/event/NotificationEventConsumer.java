@@ -38,7 +38,7 @@ public class NotificationEventConsumer {
     public void handleUserEvent(String message) {
         if (message == null) return;
         try {
-            // Try to determine event type first
+            // Determine event type first for cross-service compatibility.
             var tree = objectMapper.readTree(message);
             String eventType = tree.has("eventType") ? tree.get("eventType").asText() : null;
 
@@ -48,25 +48,63 @@ public class NotificationEventConsumer {
             }
 
             UserRegisteredEvent event = objectMapper.readValue(message, UserRegisteredEvent.class);
-            if (!"REGISTERED".equals(event.getEventType())) return;
+            String normalizedEventType = event.getEventType();
+            if (normalizedEventType == null) return;
 
             UUID userId = UUID.fromString(event.getUserId());
             String name = event.getDisplayName() != null ? event.getDisplayName() : "there";
 
-            Notification notification = notificationService.createNotification(
-                    userId,
-                    Notification.NotificationType.WELCOME,
-                    "Welcome to NexaTech!",
-                    "Hi " + name + ", your account has been created successfully."
-            );
+            if ("REGISTERED".equals(normalizedEventType)) {
+                Notification notification = notificationService.createNotification(
+                        userId,
+                        Notification.NotificationType.WELCOME,
+                        "Welcome to NexaTech!",
+                        "Hi " + name + ", your account has been created successfully."
+                );
 
-            if (event.getEmail() != null
-                    && preferenceService.isEmailEnabled(userId, Notification.NotificationType.WELCOME)) {
-                sendEmailWithRetrySupport(notification, event.getEmail(),
-                        "welcome", "Welcome to NexaTech!",
-                        Map.of("displayName", name));
+                if (event.getEmail() != null
+                        && preferenceService.isEmailEnabled(userId, Notification.NotificationType.WELCOME)) {
+                    sendEmailWithRetrySupport(
+                            notification,
+                            event.getEmail(),
+                            "welcome",
+                            "Welcome to NexaTech!",
+                            Map.of("displayName", name)
+                    );
+                }
+            } else if ("EMAIL_OTP_REQUIRED".equals(normalizedEventType)) {
+                Notification notification = notificationService.createNotification(
+                        userId,
+                        Notification.NotificationType.GENERAL,
+                        "Email verification required",
+                        "Your email is not verified yet. Please use OTP sent to your email."
+                );
+
+                if (event.getEmail() != null
+                        && event.getOtpCode() != null
+                        && preferenceService.isEmailEnabled(userId, Notification.NotificationType.GENERAL)) {
+                    sendEmailWithRetrySupport(
+                            notification,
+                            event.getEmail(),
+                            "email-otp",
+                            "NexaTech Email Verification OTP",
+                            Map.of(
+                                    "displayName", name,
+                                    "otpCode", event.getOtpCode(),
+                                    "expiresInMinutes", Math.max(1L, (event.getExpiresInSeconds() != null
+                                            ? event.getExpiresInSeconds() : 300L) / 60L)
+                            )
+                    );
+                }
+            } else if ("EMAIL_VERIFIED".equals(normalizedEventType)) {
+                notificationService.createNotification(
+                        userId,
+                        Notification.NotificationType.GENERAL,
+                        "Email verified",
+                        "Your email has been verified successfully."
+                );
             }
-            log.info("Processed REGISTERED event for userId={}", userId);
+            log.info("Processed user event type={} for userId={}", normalizedEventType, userId);
         } catch (Exception e) {
             log.error("Failed to process user event: {}", e.getMessage(), e);
         }
