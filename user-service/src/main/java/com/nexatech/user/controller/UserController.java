@@ -2,6 +2,8 @@ package com.nexatech.user.controller;
 
 import jakarta.validation.Valid;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,7 +19,11 @@ import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.AdminUserCreateRequest;
 import com.nexatech.user.dto.request.UserRoleUpdateRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
+import com.nexatech.user.dto.request.VerifyOtpRequest;
+import com.nexatech.user.dto.response.OnboardingStatusResponse;
 import com.nexatech.user.dto.response.UserResponse;
+import com.nexatech.user.exception.AppException;
+import com.nexatech.user.exception.ErrorCode;
 import com.nexatech.user.service.AdminUserService;
 import com.nexatech.user.service.UserService;
 
@@ -42,6 +48,27 @@ public class UserController {
         return ApiResponse.<UserResponse>builder()
                 .result(adminUserService.createUserWithKeycloakProvision(request))
                 .build();
+    }
+
+    @GetMapping("/me/onboarding-status")
+    public ApiResponse<OnboardingStatusResponse> getMyOnboardingStatus(@AuthenticationPrincipal Jwt jwt) {
+        return ApiResponse.<OnboardingStatusResponse>builder()
+                .result(userService.getOnboardingStatus(currentUserId(jwt)))
+                .build();
+    }
+
+    @PostMapping("/me/onboarding/request-otp")
+    public ApiResponse<Void> requestMyEmailOtp(@AuthenticationPrincipal Jwt jwt) {
+        userService.requestEmailVerificationOtp(currentUserId(jwt));
+        return ApiResponse.<Void>builder().build();
+    }
+
+    @PostMapping("/me/onboarding/verify-otp")
+    public ApiResponse<Void> verifyMyEmailOtp(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody VerifyOtpRequest request) {
+        userService.verifyEmailVerificationOtp(currentUserId(jwt), request.getOtp());
+        return ApiResponse.<Void>builder().build();
     }
 
     @GetMapping
@@ -110,5 +137,12 @@ public class UserController {
         userService.enableUser(userId);
         return ApiResponse.<Void>builder()
                 .build();
+    }
+
+    private String currentUserId(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        return jwt.getSubject();
     }
 }

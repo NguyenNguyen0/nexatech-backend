@@ -33,22 +33,47 @@ public class NotificationEventConsumer {
         if (message == null) return;
         try {
             UserRegisteredEvent event = objectMapper.readValue(message, UserRegisteredEvent.class);
-            if (!"REGISTERED".equals(event.getEventType())) return;
+            String eventType = event.getEventType();
+            if (eventType == null) return;
 
             UUID userId = UUID.fromString(event.getUserId());
             String name = event.getDisplayName() != null ? event.getDisplayName() : "there";
 
-            notificationService.createNotification(
-                    userId,
-                    Notification.NotificationType.WELCOME,
-                    "Welcome to NexaTech!",
-                    "Hi " + name + ", your account has been created successfully."
-            );
+            if ("REGISTERED".equals(eventType)) {
+                notificationService.createNotification(
+                        userId,
+                        Notification.NotificationType.WELCOME,
+                        "Welcome to NexaTech!",
+                        "Hi " + name + ", your account has been created successfully."
+                );
 
-            if (event.getEmail() != null) {
-                emailService.sendWelcomeEmail(event.getEmail(), name);
+                if (event.getEmail() != null) {
+                    emailService.sendWelcomeEmail(event.getEmail(), name);
+                }
+            } else if ("EMAIL_OTP_REQUIRED".equals(eventType)) {
+                notificationService.createNotification(
+                        userId,
+                        Notification.NotificationType.GENERAL,
+                        "Email verification required",
+                        "Your email is not verified yet. Please use OTP sent to your email."
+                );
+                if (event.getEmail() != null && event.getOtpCode() != null) {
+                    emailService.sendEmailVerificationOtp(
+                            event.getEmail(),
+                            name,
+                            event.getOtpCode(),
+                            event.getExpiresInSeconds() != null ? event.getExpiresInSeconds() : 300L
+                    );
+                }
+            } else if ("EMAIL_VERIFIED".equals(eventType)) {
+                notificationService.createNotification(
+                        userId,
+                        Notification.NotificationType.GENERAL,
+                        "Email verified",
+                        "Your email has been verified successfully."
+                );
             }
-            log.info("Processed REGISTERED event for userId={}", userId);
+            log.info("Processed user event type={} for userId={}", eventType, userId);
         } catch (Exception e) {
             log.error("Failed to process user event: {}", e.getMessage(), e);
         }

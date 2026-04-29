@@ -3,6 +3,7 @@ package com.nexatech.user.service;
 import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
+import com.nexatech.user.dto.response.OnboardingStatusResponse;
 import com.nexatech.user.dto.response.UserResponse;
 
 public interface UserService {
@@ -26,4 +27,10 @@ public interface UserService {
     void disableUser(String id);
 
     void enableUser(String id);
+
+    OnboardingStatusResponse getOnboardingStatus(String userId);
+
+    void requestEmailVerificationOtp(String userId);
+
+    void verifyEmailVerificationOtp(String userId, String otp);
 }

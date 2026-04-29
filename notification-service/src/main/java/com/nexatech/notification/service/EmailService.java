@@ -54,6 +54,15 @@ public class EmailService {
         sendEmail(to, "Welcome to NexaTech!", "welcome", variables);
     }
 
+    public void sendEmailVerificationOtp(String to, String displayName, String otpCode, long expiresInSeconds) {
+        Map<String, Object> variables = Map.of(
+                "displayName", displayName,
+                "otpCode", otpCode,
+                "expiresInMinutes", Math.max(1L, expiresInSeconds / 60L)
+        );
+        sendEmail(to, "NexaTech Email Verification OTP", "email-otp", variables);
+    }
+
     public void sendOrderConfirmationEmail(String to, String orderId, BigDecimal total) {
         Map<String, Object> variables = Map.of(
                 "orderId", orderId,

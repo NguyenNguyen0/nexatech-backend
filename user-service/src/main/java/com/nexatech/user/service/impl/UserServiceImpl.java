@@ -5,22 +5,29 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.security.SecureRandom;
+import java.time.Instant;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.nexatech.user.dto.event.EmailVerificationEvent;
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.IdentityUserUpdateRequest;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
+import com.nexatech.user.dto.response.OnboardingStatusResponse;
 import com.nexatech.user.dto.response.UserResponse;
 import com.nexatech.user.exception.AppException;
 import com.nexatech.user.exception.ErrorCode;
@@ -35,6 +42,7 @@ import feign.FeignException;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -46,6 +54,15 @@ public class UserServiceImpl implements UserService {
     UserRepository userRepository;
     UserMapper userMapper;
     IdentityResilienceService identityResilienceService;
+    KafkaTemplate<String, Object> kafkaTemplate;
+
+    @NonFinal
+    @Value("${spring.kafka.topics.user-events:user.events}")
+    String userEventsTopic;
+
+    private static final SecureRandom OTP_RANDOM = new SecureRandom();
+    private static final long OTP_TTL_SECONDS = 300L;
+    private final ConcurrentHashMap<String, OtpEntry> otpStore = new ConcurrentHashMap<>();
 
     @Override
     public UserResponse createUser(UserCreationRequest request) {
@@ -202,6 +219,65 @@ public class UserServiceImpl implements UserService {
         syncUserToIdentity(enabledUser, true);
     }
 
+    @Override
+    public OnboardingStatusResponse getOnboardingStatus(String userId) {
+        User user = userRepository.findByIdAndActiveTrue(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        return OnboardingStatusResponse.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .onBoarded(Boolean.TRUE.equals(user.getOnBoarded()))
+                .build();
+    }
+
+    @Override
+    public void requestEmailVerificationOtp(String userId) {
+        User user = userRepository.findByIdAndActiveTrue(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (Boolean.TRUE.equals(user.getOnBoarded())) {
+            return;
+        }
+
+        String otp = generateOtp();
+        Instant expiresAt = Instant.now().plusSeconds(OTP_TTL_SECONDS);
+        otpStore.put(userId, new OtpEntry(otp, expiresAt));
+
+        publishEmailOtpRequiredEvent(user, otp);
+    }
+
+    @Override
+    @Transactional
+    public void verifyEmailVerificationOtp(String userId, String otp) {
+        if (otp == null || otp.isBlank()) {
+            throw new AppException(ErrorCode.OTP_REQUIRED);
+        }
+        User user = userRepository.findByIdAndActiveTrue(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        OtpEntry entry = otpStore.get(userId);
+        if (entry == null) {
+            throw new AppException(ErrorCode.OTP_INVALID);
+        }
+        if (Instant.now().isAfter(entry.expiresAt())) {
+            otpStore.remove(userId);
+            throw new AppException(ErrorCode.OTP_EXPIRED);
+        }
+        if (!entry.code().equals(otp.trim())) {
+            throw new AppException(ErrorCode.OTP_INVALID);
+        }
+
+        otpStore.remove(userId);
+        user.setOnBoarded(true);
+        userRepository.save(user);
+        // Keep DB state as source of truth, then best-effort sync Keycloak emailVerified flag.
+        try {
+            syncUserToIdentity(user, true);
+        } catch (Exception ex) {
+            log.warn("OTP verified in DB but failed to sync Keycloak emailVerified for userId={}", userId, ex);
+        }
+        publishEmailVerifiedEvent(user);
+    }
+
     // private method: check if the value is changed
     private boolean isChanged(String currentValue, String newValue) {
         return newValue != null && !newValue.isBlank() && !Objects.equals(currentValue, newValue);
@@ -321,6 +397,47 @@ public class UserServiceImpl implements UserService {
             return null;
         }
         return role.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static String generateOtp() {
+        int value = OTP_RANDOM.nextInt(1_000_000);
+        return String.format("%06d", value);
+    }
+
+    private void publishEmailOtpRequiredEvent(User user, String otp) {
+        EmailVerificationEvent event = EmailVerificationEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType("EMAIL_OTP_REQUIRED")
+                .timestamp(Instant.now())
+                .userId(user.getId())
+                .email(user.getEmail())
+                .displayName(buildDisplayName(user))
+                .otpCode(otp)
+                .expiresInSeconds(OTP_TTL_SECONDS)
+                .build();
+        kafkaTemplate.send(userEventsTopic, event);
+    }
+
+    private void publishEmailVerifiedEvent(User user) {
+        EmailVerificationEvent event = EmailVerificationEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType("EMAIL_VERIFIED")
+                .timestamp(Instant.now())
+                .userId(user.getId())
+                .email(user.getEmail())
+                .displayName(buildDisplayName(user))
+                .build();
+        kafkaTemplate.send(userEventsTopic, event);
+    }
+
+    private static String buildDisplayName(User user) {
+        String first = user.getFirstName() != null ? user.getFirstName().trim() : "";
+        String last = user.getLastName() != null ? user.getLastName().trim() : "";
+        String full = (first + " " + last).trim();
+        return full.isEmpty() ? user.getUsername() : full;
+    }
+
+    private record OtpEntry(String code, Instant expiresAt) {
     }
 
     /** Rejects values that are not email-shaped (e.g. UUID accidentally stored as email). */
