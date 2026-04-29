@@ -130,9 +130,21 @@ public class AdminUserServiceImpl implements AdminUserService {
         validateUserExists(userId);
         String normalized = normalizeRole(roleName);
         if (normalized == null) {
-            return;
+            throw new AppException(ErrorCode.ROLE_NAME_REQUIRED);
         }
         try {
+            List<RoleRefRequest> currentRoles = getCurrentRealmRoles(userId);
+            if (currentRoles.isEmpty()) {
+                throw new AppException(ErrorCode.ROLE_NOT_FOUND);
+            }
+            boolean assigned = currentRoles.stream()
+                    .map(RoleRefRequest::getName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .map(name -> name.trim().toUpperCase(Locale.ROOT))
+                    .anyMatch(normalized::equals);
+            if (!assigned) {
+                throw new AppException(ErrorCode.ROLE_NOT_FOUND);
+            }
             RoleRefRequest ref = resolveRoleRef(normalized);
             identityResilienceService.removeRealmRolesFromUser(userId, List.of(ref));
         } catch (FeignException ex) {
