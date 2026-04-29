@@ -108,6 +108,14 @@ public class EmailService {
         sendEmail(to, "Payment Receipt – #" + paymentId, "payment-receipt", variables);
     }
 
+    public void sendEmailVerificationEmail(String to, String displayName, String verificationUrl) {
+        Map<String, Object> variables = Map.of(
+                "displayName", displayName,
+                "verificationUrl", verificationUrl
+        );
+        sendEmail(to, "Verify Your Email — NexaTech", "email-verification", variables);
+    }
+
     // ===== Helper to serialize template variables =====
 
     /**

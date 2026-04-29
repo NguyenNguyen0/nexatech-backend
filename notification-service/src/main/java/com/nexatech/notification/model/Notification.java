@@ -61,6 +61,7 @@ public class Notification extends BaseEntity {
         PAYMENT_CONFIRMATION,
         PAYMENT_FAILED,
         LOW_STOCK_ALERT,
+        EMAIL_VERIFICATION,
         GENERAL
     }
 

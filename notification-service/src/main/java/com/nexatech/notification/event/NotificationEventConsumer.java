@@ -1,6 +1,7 @@
 package com.nexatech.notification.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexatech.notification.event.dto.EmailVerificationEvent;
 import com.nexatech.notification.event.dto.InventoryEvent;
 import com.nexatech.notification.event.dto.OrderEvent;
 import com.nexatech.notification.event.dto.PaymentEvent;
@@ -37,6 +38,15 @@ public class NotificationEventConsumer {
     public void handleUserEvent(String message) {
         if (message == null) return;
         try {
+            // Try to determine event type first
+            var tree = objectMapper.readTree(message);
+            String eventType = tree.has("eventType") ? tree.get("eventType").asText() : null;
+
+            if ("EMAIL_VERIFICATION_REQUESTED".equals(eventType)) {
+                handleEmailVerificationEvent(message);
+                return;
+            }
+
             UserRegisteredEvent event = objectMapper.readValue(message, UserRegisteredEvent.class);
             if (!"REGISTERED".equals(event.getEventType())) return;
 
@@ -59,6 +69,42 @@ public class NotificationEventConsumer {
             log.info("Processed REGISTERED event for userId={}", userId);
         } catch (Exception e) {
             log.error("Failed to process user event: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Handle email verification event from identity-service.
+     * Renders email-verification template and sends verification email.
+     */
+    private void handleEmailVerificationEvent(String message) {
+        try {
+            EmailVerificationEvent event = objectMapper.readValue(message, EmailVerificationEvent.class);
+
+            if (event.getEmail() == null || event.getVerificationUrl() == null) {
+                log.warn("Email verification event missing email or verificationUrl, skipping");
+                return;
+            }
+
+            UUID userId = event.getUserId() != null ? UUID.fromString(event.getUserId()) : adminUserId;
+            String name = event.getDisplayName() != null ? event.getDisplayName() : "there";
+
+            // Create in-app notification
+            Notification notification = notificationService.createNotification(
+                    userId,
+                    Notification.NotificationType.EMAIL_VERIFICATION,
+                    "Verify Your Email",
+                    "Please verify your email address to activate your account."
+            );
+
+            // Send verification email with retry support
+            sendEmailWithRetrySupport(notification, event.getEmail(),
+                    "email-verification", "Verify Your Email — NexaTech",
+                    Map.of("displayName", name, "verificationUrl", event.getVerificationUrl()));
+
+            log.info("Processed EMAIL_VERIFICATION_REQUESTED event for userId={}, email={}",
+                    userId, event.getEmail());
+        } catch (Exception e) {
+            log.error("Failed to process email verification event: {}", e.getMessage(), e);
         }
     }
 

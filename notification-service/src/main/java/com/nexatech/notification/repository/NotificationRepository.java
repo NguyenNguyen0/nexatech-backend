@@ -25,4 +25,6 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
             Notification.NotificationStatus status, int maxRetryCount);
 
     Page<Notification> findByStatus(Notification.NotificationStatus status, Pageable pageable);
+
+    long countByUserIdAndStatusNot(UUID userId, Notification.NotificationStatus status);
 }

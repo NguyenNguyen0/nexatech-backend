@@ -22,6 +22,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final SseEmitterService sseEmitterService;
+    private final WebSocketNotificationService webSocketNotificationService;
 
     public Page<NotificationResponse> getNotifications(UUID userId, Pageable pageable) {
         Pageable sorted = PageRequest.of(
@@ -46,6 +47,15 @@ public class NotificationService {
                 .map(this::toResponse);
     }
 
+    /**
+     * Get unread notification count for a user.
+     * Unread = all notifications whose status is not READ.
+     */
+    public long getUnreadCount(UUID userId) {
+        return notificationRepository.countByUserIdAndStatusNot(
+                userId, Notification.NotificationStatus.READ);
+    }
+
     public Notification createNotification(UUID userId, Notification.NotificationType type,
                                            String title, String message) {
         Notification notification = Notification.builder()
@@ -58,9 +68,20 @@ public class NotificationService {
                 .build();
         notification = notificationRepository.save(notification);
 
-        // Push real-time event via SSE if user has an active connection
+        NotificationResponse response = toResponse(notification);
+
+        // Push real-time event via WebSocket STOMP
         try {
-            sseEmitterService.sendToUser(userId, toResponse(notification));
+            webSocketNotificationService.sendToUser(userId, response);
+            long unreadCount = getUnreadCount(userId);
+            webSocketNotificationService.sendUnreadCount(userId, unreadCount);
+        } catch (Exception e) {
+            log.debug("Failed to push WebSocket event to userId={}: {}", userId, e.getMessage());
+        }
+
+        // Push via SSE as fallback
+        try {
+            sseEmitterService.sendToUser(userId, response);
         } catch (Exception e) {
             log.debug("Failed to push SSE event to userId={}: {}", userId, e.getMessage());
         }
@@ -74,11 +95,26 @@ public class NotificationService {
                 .orElseThrow(() -> new EntityNotFoundException("Notification not found: " + notificationId));
         notification.setStatus(Notification.NotificationStatus.READ);
         notificationRepository.save(notification);
+
+        // Push updated unread count via WebSocket
+        try {
+            long unreadCount = getUnreadCount(notification.getUserId());
+            webSocketNotificationService.sendUnreadCount(notification.getUserId(), unreadCount);
+        } catch (Exception e) {
+            log.debug("Failed to push unread count update: {}", e.getMessage());
+        }
     }
 
     @Transactional
     public void markAllAsRead(UUID userId) {
         notificationRepository.updateStatusByUserId(userId, Notification.NotificationStatus.READ);
+
+        // Push updated unread count via WebSocket
+        try {
+            webSocketNotificationService.sendUnreadCount(userId, 0L);
+        } catch (Exception e) {
+            log.debug("Failed to push unread count update: {}", e.getMessage());
+        }
     }
 
     private NotificationResponse toResponse(Notification notification) {
