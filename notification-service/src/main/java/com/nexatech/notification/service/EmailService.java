@@ -1,10 +1,14 @@
 package com.nexatech.notification.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexatech.notification.model.Notification;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -22,11 +26,15 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
     private final SpringTemplateEngine templateEngine;
+    private final ObjectMapper objectMapper;
 
     @Value("${spring.mail.username}")
     private String fromAddress;
 
-    private void sendEmail(String to, String subject, String templateName, Map<String, Object> variables) {
+    /**
+     * Core email sending method. Throws RuntimeException on failure so callers can handle it.
+     */
+    public void sendEmail(String to, String subject, String templateName, Map<String, Object> variables) {
         try {
             Context context = new Context();
             context.setVariables(variables);
@@ -43,11 +51,41 @@ public class EmailService {
 
             mailSender.send(message);
             log.info("Email sent to {} | subject: '{}'", to, subject);
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage());
             throw new RuntimeException("Failed to send email to " + to, e);
         }
     }
+
+    /**
+     * Re-send an email using the metadata stored on the Notification entity.
+     * Used by the retry scheduler.
+     *
+     * @throws RuntimeException if the email cannot be sent
+     */
+    public void sendEmailForNotification(Notification notification) {
+        if (notification.getRecipientEmail() == null || notification.getEmailTemplateName() == null) {
+            throw new RuntimeException("Cannot retry notification " + notification.getId()
+                    + ": missing recipientEmail or emailTemplateName");
+        }
+
+        Map<String, Object> variables;
+        try {
+            variables = objectMapper.readValue(
+                    notification.getEmailTemplateVariables(),
+                    new TypeReference<>() {});
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot parse template variables for notification "
+                    + notification.getId(), e);
+        }
+
+        sendEmail(notification.getRecipientEmail(),
+                notification.getSubject(),
+                notification.getEmailTemplateName(),
+                variables);
+    }
+
+    // ===== Convenience methods for specific email types =====
 
     public void sendWelcomeEmail(String to, String displayName) {
         Map<String, Object> variables = Map.of("displayName", displayName);
@@ -68,5 +106,27 @@ public class EmailService {
                 "amount", amount
         );
         sendEmail(to, "Payment Receipt – #" + paymentId, "payment-receipt", variables);
+    }
+
+    public void sendEmailVerificationEmail(String to, String displayName, String verificationUrl) {
+        Map<String, Object> variables = Map.of(
+                "displayName", displayName,
+                "verificationUrl", verificationUrl
+        );
+        sendEmail(to, "Verify Your Email — NexaTech", "email-verification", variables);
+    }
+
+    // ===== Helper to serialize template variables =====
+
+    /**
+     * Serialize a Map to JSON for storing in notification entity.
+     */
+    public String serializeVariables(Map<String, Object> variables) {
+        try {
+            return objectMapper.writeValueAsString(variables);
+        } catch (Exception e) {
+            log.error("Failed to serialize template variables: {}", e.getMessage());
+            return "{}";
+        }
     }
 }

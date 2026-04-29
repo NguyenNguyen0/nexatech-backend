@@ -1,15 +1,21 @@
 package com.nexatech.user.service.impl;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nexatech.user.dto.base.ApiResponse;
+import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.IdentityUserUpdateRequest;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
@@ -71,11 +77,18 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<UserResponse> getAllUsers() {
-        return userRepository.findAllByActiveTrue()
-                .stream()
-                .map(userMapper::toResponse)
-                .toList();
+    public PageResponse<UserResponse> getAllUsers(int page, int size) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        Pageable pageable = PageRequest.of(safePage - 1, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        var pageUsers = userRepository.findAllByActiveTrue(pageable);
+        var mappedPage = pageUsers.map(user -> {
+            UserResponse response = userMapper.toResponse(user);
+            response.setRole(resolvePrimaryRole(user.getId()));
+            return response;
+        });
+        return new PageResponse<>(mappedPage);
     }
 
     @Override
@@ -198,6 +211,36 @@ public class UserServiceImpl implements UserService {
     private static boolean hasJwtAuthentication() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null && auth.isAuthenticated() && auth instanceof JwtAuthenticationToken;
+    }
+
+    private String resolvePrimaryRole(String userId) {
+        try {
+            ApiResponse<Map<String, Object>> roleMappings = identityResilienceService.getUserRoleMappings(userId);
+            Map<String, Object> payload = roleMappings != null ? roleMappings.getResult() : null;
+            if (payload == null) {
+                return null;
+            }
+            Object realmMappingsObj = payload.get("realmMappings");
+            if (!(realmMappingsObj instanceof List<?> realmMappings) || realmMappings.isEmpty()) {
+                return null;
+            }
+            for (Object roleItem : realmMappings) {
+                if (!(roleItem instanceof Map<?, ?> roleMap)) {
+                    continue;
+                }
+                Object roleNameObj = roleMap.get("name");
+                if (roleNameObj == null) {
+                    continue;
+                }
+                String roleName = roleNameObj.toString().trim();
+                if (!roleName.isEmpty()) {
+                    return roleName.toUpperCase(Locale.ROOT);
+                }
+            }
+            return null;
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     /** Rejects values that are not email-shaped (e.g. UUID accidentally stored as email). */

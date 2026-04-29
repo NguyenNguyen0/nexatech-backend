@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import org.springframework.security.core.GrantedAuthority;
@@ -19,6 +20,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 public final class EffectiveRealmAuthoritiesResolver {
 
     private static final String DENY_SUFFIX = "_DENY";
+    private static final String DENY_SUFFIX_UPPER = DENY_SUFFIX.toUpperCase(Locale.ROOT);
 
     private EffectiveRealmAuthoritiesResolver() {
     }
@@ -34,8 +36,9 @@ public final class EffectiveRealmAuthoritiesResolver {
             if (auth == null) {
                 continue;
             }
-            if (auth.endsWith(DENY_SUFFIX) && auth.length() > DENY_SUFFIX.length()) {
-                deniedBases.add(auth.substring(0, auth.length() - DENY_SUFFIX.length()));
+            String authUpper = auth.toUpperCase(Locale.ROOT);
+            if (authUpper.endsWith(DENY_SUFFIX_UPPER) && authUpper.length() > DENY_SUFFIX_UPPER.length()) {
+                deniedBases.add(authUpper.substring(0, authUpper.length() - DENY_SUFFIX_UPPER.length()));
             }
         }
 
@@ -45,13 +48,15 @@ public final class EffectiveRealmAuthoritiesResolver {
             if (auth == null) {
                 continue;
             }
-            if (auth.endsWith(DENY_SUFFIX)) {
+            String authUpper = auth.toUpperCase(Locale.ROOT);
+            if (authUpper.endsWith(DENY_SUFFIX_UPPER)) {
                 continue;
             }
-            if (deniedBases.contains(auth)) {
+            if (deniedBases.contains(authUpper)) {
                 continue;
             }
-            result.add(new SimpleGrantedAuthority(auth));
+            // Normalize to CAPLOCK so downstream checks are stable.
+            result.add(new SimpleGrantedAuthority(authUpper));
         }
         return result;
     }

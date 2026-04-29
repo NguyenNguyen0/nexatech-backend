@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 public class CustomAuthoritiesConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
@@ -47,6 +48,10 @@ public class CustomAuthoritiesConverter implements Converter<Jwt, Collection<Gra
     }
 
     private static boolean isKeycloakDefaultRealmRole(String realmRole) {
-        return EXCLUDED_REALM_ROLES.contains(realmRole) || realmRole.startsWith("default-roles-");
+        if (realmRole == null) {
+            return true;
+        }
+        String normalized = realmRole.toLowerCase(Locale.ROOT);
+        return EXCLUDED_REALM_ROLES.contains(normalized) || normalized.startsWith("default-roles-");
     }
 }

@@ -1,12 +1,15 @@
 package com.nexatech.notification.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexatech.notification.event.dto.EmailVerificationEvent;
 import com.nexatech.notification.event.dto.InventoryEvent;
 import com.nexatech.notification.event.dto.OrderEvent;
 import com.nexatech.notification.event.dto.PaymentEvent;
 import com.nexatech.notification.event.dto.UserRegisteredEvent;
 import com.nexatech.notification.model.Notification;
+import com.nexatech.notification.repository.NotificationRepository;
 import com.nexatech.notification.service.EmailService;
+import com.nexatech.notification.service.NotificationPreferenceService;
 import com.nexatech.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -27,30 +31,80 @@ public class NotificationEventConsumer {
     private final ObjectMapper objectMapper;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    private final NotificationPreferenceService preferenceService;
+    private final NotificationRepository notificationRepository;
 
     @KafkaListener(topics = "user.events", groupId = "notification-user-group")
     public void handleUserEvent(String message) {
         if (message == null) return;
         try {
+            // Try to determine event type first
+            var tree = objectMapper.readTree(message);
+            String eventType = tree.has("eventType") ? tree.get("eventType").asText() : null;
+
+            if ("EMAIL_VERIFICATION_REQUESTED".equals(eventType)) {
+                handleEmailVerificationEvent(message);
+                return;
+            }
+
             UserRegisteredEvent event = objectMapper.readValue(message, UserRegisteredEvent.class);
             if (!"REGISTERED".equals(event.getEventType())) return;
 
             UUID userId = UUID.fromString(event.getUserId());
             String name = event.getDisplayName() != null ? event.getDisplayName() : "there";
 
-            notificationService.createNotification(
+            Notification notification = notificationService.createNotification(
                     userId,
                     Notification.NotificationType.WELCOME,
                     "Welcome to NexaTech!",
                     "Hi " + name + ", your account has been created successfully."
             );
 
-            if (event.getEmail() != null) {
-                emailService.sendWelcomeEmail(event.getEmail(), name);
+            if (event.getEmail() != null
+                    && preferenceService.isEmailEnabled(userId, Notification.NotificationType.WELCOME)) {
+                sendEmailWithRetrySupport(notification, event.getEmail(),
+                        "welcome", "Welcome to NexaTech!",
+                        Map.of("displayName", name));
             }
             log.info("Processed REGISTERED event for userId={}", userId);
         } catch (Exception e) {
             log.error("Failed to process user event: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Handle email verification event from identity-service.
+     * Renders email-verification template and sends verification email.
+     */
+    private void handleEmailVerificationEvent(String message) {
+        try {
+            EmailVerificationEvent event = objectMapper.readValue(message, EmailVerificationEvent.class);
+
+            if (event.getEmail() == null || event.getVerificationUrl() == null) {
+                log.warn("Email verification event missing email or verificationUrl, skipping");
+                return;
+            }
+
+            UUID userId = event.getUserId() != null ? UUID.fromString(event.getUserId()) : adminUserId;
+            String name = event.getDisplayName() != null ? event.getDisplayName() : "there";
+
+            // Create in-app notification
+            Notification notification = notificationService.createNotification(
+                    userId,
+                    Notification.NotificationType.EMAIL_VERIFICATION,
+                    "Verify Your Email",
+                    "Please verify your email address to activate your account."
+            );
+
+            // Send verification email with retry support
+            sendEmailWithRetrySupport(notification, event.getEmail(),
+                    "email-verification", "Verify Your Email — NexaTech",
+                    Map.of("displayName", name, "verificationUrl", event.getVerificationUrl()));
+
+            log.info("Processed EMAIL_VERIFICATION_REQUESTED event for userId={}, email={}",
+                    userId, event.getEmail());
+        } catch (Exception e) {
+            log.error("Failed to process email verification event: {}", e.getMessage(), e);
         }
     }
 
@@ -64,15 +118,17 @@ public class NotificationEventConsumer {
 
             switch (event.getStatus()) {
                 case "PENDING", "ORDER_PLACED", "CONFIRMED" -> {
-                    notificationService.createNotification(
+                    Notification notification = notificationService.createNotification(
                             customerId,
                             Notification.NotificationType.ORDER_CONFIRMATION,
                             "Order Confirmed",
                             "Your order #" + orderRef + " has been placed successfully."
                     );
-                    if (event.getCustomerEmail() != null && event.getTotalAmount() != null) {
-                        emailService.sendOrderConfirmationEmail(
-                                event.getCustomerEmail(), orderRef, event.getTotalAmount());
+                    if (event.getCustomerEmail() != null && event.getTotalAmount() != null
+                            && preferenceService.isEmailEnabled(customerId, Notification.NotificationType.ORDER_CONFIRMATION)) {
+                        sendEmailWithRetrySupport(notification, event.getCustomerEmail(),
+                                "order-confirmation", "Order Confirmed – #" + orderRef,
+                                Map.of("orderId", orderRef, "total", event.getTotalAmount()));
                     }
                 }
                 case "CANCELLED" -> notificationService.createNotification(
@@ -104,15 +160,17 @@ public class NotificationEventConsumer {
 
             switch (event.getStatus()) {
                 case "COMPLETED", "PAYMENT_COMPLETED" -> {
-                    notificationService.createNotification(
+                    Notification notification = notificationService.createNotification(
                             customerId,
                             Notification.NotificationType.PAYMENT_CONFIRMATION,
                             "Payment Received",
                             "Your payment of $" + event.getAmount() + " has been processed successfully."
                     );
-                    if (event.getCustomerEmail() != null && event.getPaymentId() != null) {
-                        emailService.sendPaymentReceiptEmail(
-                                event.getCustomerEmail(), event.getPaymentId(), event.getAmount());
+                    if (event.getCustomerEmail() != null && event.getPaymentId() != null
+                            && preferenceService.isEmailEnabled(customerId, Notification.NotificationType.PAYMENT_CONFIRMATION)) {
+                        sendEmailWithRetrySupport(notification, event.getCustomerEmail(),
+                                "payment-receipt", "Payment Receipt – #" + event.getPaymentId(),
+                                Map.of("paymentId", event.getPaymentId(), "amount", event.getAmount()));
                     }
                 }
                 case "REFUNDED" -> notificationService.createNotification(
@@ -163,6 +221,33 @@ public class NotificationEventConsumer {
                     event.getProductId(), event.getQuantity());
         } catch (Exception e) {
             log.error("Failed to process inventory event: {}", e.getMessage(), e);
+        }
+    }
+
+    // ===== Private helper =====
+
+    /**
+     * Attempt to send email. On failure, mark the notification as FAILED with retry metadata
+     * so the NotificationRetryScheduler can pick it up later.
+     */
+    private void sendEmailWithRetrySupport(Notification notification, String recipientEmail,
+                                            String templateName, String subject,
+                                            Map<String, Object> variables) {
+        // Store email metadata on the notification for retry
+        notification.setRecipientEmail(recipientEmail);
+        notification.setEmailTemplateName(templateName);
+        notification.setEmailTemplateVariables(emailService.serializeVariables(variables));
+        notification.setChannel("EMAIL");
+
+        try {
+            emailService.sendEmail(recipientEmail, subject, templateName, variables);
+            notificationRepository.save(notification);
+        } catch (Exception e) {
+            notification.setStatus(Notification.NotificationStatus.FAILED);
+            notification.setFailureReason(e.getMessage());
+            notificationRepository.save(notification);
+            log.warn("Email send failed for notificationId={}, will be retried: {}",
+                    notification.getId(), e.getMessage());
         }
     }
 }

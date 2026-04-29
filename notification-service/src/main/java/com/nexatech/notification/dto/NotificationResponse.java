@@ -17,5 +17,8 @@ public class NotificationResponse {
     private String subject;
     private String content;
     private Notification.NotificationStatus status;
+    private String failureReason;
+    private int retryCount;
+    private Instant lastRetryAt;
     private Instant createdAt;
 }

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Verify Your Email — NexaTech</title>
+    <!--[if mso]>
+    <style type="text/css">
+        table, td { font-family: Arial, sans-serif; }
+    </style>
+    <![endif]-->
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+        .wrapper {
+            width: 100%;
+            background-color: #f0f2f5;
+            padding: 40px 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+        .header {
+            background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+            padding: 40px 32px;
+            text-align: center;
+        }
+        .header h1 {
+            color: #ffffff;
+            font-size: 26px;
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .header p {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 14px;
+            margin: 8px 0 0;
+        }
+        .body-content {
+            padding: 40px 32px;
+        }
+        .body-content p {
+            color: #333333;
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 0 0 16px;
+        }
+        .body-content .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        .cta-wrapper {
+            text-align: center;
+            margin: 32px 0;
+        }
+        .cta-btn {
+            display: inline-block;
+            padding: 16px 48px;
+            background: linear-gradient(135deg, #1a73e8 0%, #1565c0 100%);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+        .link-fallback {
+            color: #666666;
+            font-size: 13px;
+            word-break: break-all;
+            background-color: #f8f9fa;
+            padding: 12px 16px;
+            border-radius: 6px;
+            border: 1px solid #e8eaed;
+        }
+        .link-fallback a {
+            color: #1a73e8;
+            text-decoration: none;
+        }
+        .divider {
+            border: none;
+            border-top: 1px solid #e8eaed;
+            margin: 24px 0;
+        }
+        .note {
+            color: #888888;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 24px 32px;
+            text-align: center;
+            border-top: 1px solid #e8eaed;
+        }
+        .footer p {
+            color: #999999;
+            font-size: 12px;
+            margin: 0 0 4px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Verify Your Email Address</h1>
+            <p>One more step to activate your NexaTech account</p>
+        </div>
+
+        <!-- Body -->
+        <div class="body-content">
+            <p class="greeting">Hi <strong th:text="${displayName}">there</strong>,</p>
+            <p>Thanks for signing up for NexaTech! Please verify your email address by clicking the button below:</p>
+
+            <div class="cta-wrapper">
+                <a class="cta-btn" th:href="${verificationUrl}">Verify My Email</a>
+            </div>
+
+            <div class="link-fallback">
+                <strong>Button not working?</strong> Copy and paste this link into your browser:<br/>
+                <a th:href="${verificationUrl}" th:text="${verificationUrl}">https://nexatech.com/verify?token=xxx</a>
+            </div>
+
+            <hr class="divider"/>
+
+            <p class="note">
+                This verification link will expire in <strong>24 hours</strong>.<br/>
+                If you didn't create a NexaTech account, you can safely ignore this email.
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>&copy; 2026 NexaTech. All rights reserved.</p>
+            <p>This is an automated message — please do not reply to this email.</p>
+        </div>
+    </div>
+</div>
+</body>
+</html>
