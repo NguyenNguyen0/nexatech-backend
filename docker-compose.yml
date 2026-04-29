@@ -159,7 +159,7 @@ services:
       - "2181:2181"
     healthcheck:
       # Dùng bash built-in TCP để kiểm tra ZooKeeper không cần nc/curl
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/2181 && echo ruok >&3 && cat <&3' | grep -q imok"]
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/2181 && echo srvr >&3 && cat <&3' | grep -q 'Zookeeper version'"]
       interval: 10s
       timeout: 10s
       retries: 6
