@@ -8,7 +8,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "notification_preferences",
-        uniqueConstraints = @UniqueConstraint(columns = {"user_id", "notification_type"}))
+    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "notification_type"}))
 @Getter
 @Setter
 @Builder
