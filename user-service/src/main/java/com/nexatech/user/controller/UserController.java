@@ -1,7 +1,5 @@
 package com.nexatech.user.controller;
 
-import java.util.List;
-
 import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,9 +9,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.user.dto.base.ApiResponse;
+import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.AdminUserCreateRequest;
 import com.nexatech.user.dto.request.UserRoleUpdateRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
@@ -46,9 +46,11 @@ public class UserController {
 
     @GetMapping
     // @RequiresPermission(PermissionsAccept.User.READ) // enable for production
-    public ApiResponse<List<UserResponse>> getAllUsers() {
-        return ApiResponse.<List<UserResponse>>builder()
-                .result(userService.getAllUsers())
+    public ApiResponse<PageResponse<UserResponse>> getAllUsers(
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
+        return ApiResponse.<PageResponse<UserResponse>>builder()
+                .result(userService.getAllUsers(page, size))
                 .build();
     }
 

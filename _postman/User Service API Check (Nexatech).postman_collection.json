@@ -53,12 +53,22 @@
               }
             ],
             "url": {
-              "raw": "{{userBaseUrl}}/users",
+              "raw": "{{userBaseUrl}}/users?page={{userPage}}&size={{userSize}}",
               "host": [
                 "{{userBaseUrl}}"
               ],
               "path": [
                 "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{userPage}}"
+                },
+                {
+                  "key": "size",
+                  "value": "{{userSize}}"
+                }
               ]
             }
           },
@@ -1202,6 +1212,14 @@
     {
       "key": "managedEmail",
       "value": "api_user_001@nexatech.local"
+    },
+    {
+      "key": "userPage",
+      "value": "1"
+    },
+    {
+      "key": "userSize",
+      "value": "10"
     },
     {
       "key": "addressId",
