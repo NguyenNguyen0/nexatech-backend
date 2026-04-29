@@ -60,7 +60,7 @@ public class RequiredRolesInitializer implements ApplicationRunner {
         log.warn("Keycloak role missing, creating role={}...", expectedUpper);
         roleService.createRole(RoleCreateParam.builder()
                 .name(expectedUpper)
-                .description("Auto-created by RequiredRolesInitializer")
+                .description("Created by system")
                 .build());
     }
 }
