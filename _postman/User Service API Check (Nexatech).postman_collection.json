@@ -27,7 +27,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"email\": \"nvminh16999@gmail.com\",\n    \"username\": \"nvminh16999\",\n    \"firstName\": \"nvminh16999\",\n    \"lastName\": \"nvminh16999\",\n    \"avatarUrl\": \"nvminh16999\",\n    \"phone\": \"0999999999\",\n    \"dob\": \"2020-10-10\",\n    \"gender\": \"FEMALE\",\n    \"onBoarded\": true,\n    \"password\": \"123456789\",\n    \"temporaryPassword\": false,\n    \"enabled\": true,\n    \"emailVerified\": true\n}"
+              "raw": "{\n    \"email\": \"nvminh16999@gmail.com\",\n    \"username\": \"nvminh16999\",\n    \"firstName\": \"nvminh16999\",\n    \"lastName\": \"nvminh16999\",\n    \"avatarUrl\": \"nvminh16999\",\n    \"phone\": \"0999999999\",\n    \"dob\": \"2020-10-10\",\n    \"gender\": \"FEMALE\",\n    \"onBoarded\": true,\n    \"password\": \"123456789\",\n    \"temporaryPassword\": false,\n    \"enabled\": true,\n    \"emailVerified\": true,\n    \"role\": \"STAFF\"\n}"
             },
             "url": {
               "raw": "{{userBaseUrl}}/users",
@@ -105,7 +105,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{managedEmail}}\",\n  \"firstName\": \"Updated\",\n  \"lastName\": \"User\",\n  \"gender\": \"FEMALE\",\n  \"avatarUrl\": \"cc\"\n}"
+              "raw": "{\n  \"email\": \"{{managedEmail}}\",\n  \"firstName\": \"Updated\",\n  \"lastName\": \"User\",\n  \"gender\": \"FEMALE\",\n  \"avatarUrl\": \"cc\",\n  \"role\": \"MANAGER\"\n}"
             },
             "url": {
               "raw": "{{userBaseUrl}}/users/{{managedUserId}}",
@@ -139,6 +139,65 @@
               "path": [
                 "users",
                 "{{managedUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "updateRoleOnly",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"ACCOUNTANT\"\n}"
+            },
+            "url": {
+              "raw": "{{userBaseUrl}}/users/{{managedUserId}}/role",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{managedUserId}}",
+                "role"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "removeRole",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{userBaseUrl}}/users/{{managedUserId}}/role/{{roleName}}",
+              "host": [
+                "{{userBaseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{managedUserId}}",
+                "role",
+                "{{roleName}}"
               ]
             }
           },

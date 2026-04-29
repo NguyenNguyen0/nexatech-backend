@@ -40,7 +40,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{registerUsername}}\",\n  \"enabled\": true,\n  \"email\": \"{{registerEmail}}\",\n  \"emailVerified\": false,\n  \"firstName\": \"Minh\",\n  \"lastName\": \"Nguyen\",\n  \"phone\": \"0987654321\",\n  \"dob\": \"2000-01-01\",\n  \"gender\": \"MALE\",\n  \"onBoarded\": false,\n  \"credentials\": [\n    { \"type\": \"password\", \"value\": \"{{registerPassword}}\", \"temporary\": false }\n  ]\n}"
+              "raw": "{\n  \"username\": \"{{registerUsername}}\",\n  \"enabled\": true,\n  \"email\": \"{{registerEmail}}\",\n  \"emailVerified\": false,\n  \"firstName\": \"Minh\",\n  \"lastName\": \"Nguyen\",\n  \"phone\": \"0987654321\",\n  \"dob\": \"2000-01-01\",\n  \"gender\": \"MALE\",\n  \"onBoarded\": false,\n  \"role\": \"CUSTOMER\",\n  \"credentials\": [\n    { \"type\": \"password\", \"value\": \"{{registerPassword}}\", \"temporary\": false }\n  ]\n}"
             },
             "url": {
               "raw": "{{identityBaseUrl}}/auth/register",
@@ -225,7 +225,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"username\": \"{{newUsername}}\",\n  \"enabled\": true,\n  \"email\": \"{{newEmail}}\",\n  \"emailVerified\": true,\n  \"firstName\": \"API\",\n  \"lastName\": \"User\",\n  \"credentials\": [\n    { \"type\": \"password\", \"value\": \"123456789\", \"temporary\": false }\n  ]\n}"
+                  "raw": "{\n  \"username\": \"{{newUsername}}\",\n  \"enabled\": true,\n  \"email\": \"{{newEmail}}\",\n  \"emailVerified\": true,\n  \"firstName\": \"API\",\n  \"lastName\": \"User\",\n  \"role\": \"STAFF\",\n  \"credentials\": [\n    { \"type\": \"password\", \"value\": \"123456789\", \"temporary\": false }\n  ]\n}"
                 },
                 "url": {
                   "raw": "{{identityBaseUrl}}/internal/users",
