@@ -5,10 +5,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
@@ -73,29 +75,53 @@ public class UserServiceImpl implements UserService {
             }
         }
 
-        return userMapper.toResponse(userRepository.save(user));
+        return enrichAuditUsernames(userMapper.toResponse(userRepository.save(user)));
     }
 
     @Override
-    public PageResponse<UserResponse> getAllUsers(int page, int size) {
+    public PageResponse<UserResponse> getAllUsers(
+            int page,
+            int size,
+            String email,
+            String phone,
+            Boolean active,
+            String role) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.min(Math.max(size, 1), 100);
-        Pageable pageable = PageRequest.of(safePage - 1, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Sort sort = Sort.by(Sort.Direction.DESC, "createdAt");
+        Specification<User> specification = buildUserFilterSpecification(email, phone, active);
+        String normalizedRole = normalizeRoleFilter(role);
 
-        var pageUsers = userRepository.findAllByActiveTrue(pageable);
-        var mappedPage = pageUsers.map(user -> {
-            UserResponse response = userMapper.toResponse(user);
-            response.setRole(resolvePrimaryRole(user.getId()));
-            return response;
-        });
-        return new PageResponse<>(mappedPage);
+        if (normalizedRole != null) {
+            List<UserResponse> allMatched = userRepository.findAll(specification, sort).stream()
+                    .map(this::mapToUserResponseWithRole)
+                    .filter(u -> normalizedRole.equalsIgnoreCase(u.getRole()))
+                    .collect(Collectors.toList());
+            int fromIndex = Math.min((safePage - 1) * safeSize, allMatched.size());
+            int toIndex = Math.min(fromIndex + safeSize, allMatched.size());
+            List<UserResponse> content = allMatched.subList(fromIndex, toIndex);
+            int totalPages = allMatched.isEmpty() ? 0 : (int) Math.ceil((double) allMatched.size() / safeSize);
+            boolean hasMore = safePage < totalPages;
+            return PageResponse.<UserResponse>builder()
+                    .content(content)
+                    .page(safePage)
+                    .size(safeSize)
+                    .totalElements(allMatched.size())
+                    .totalPages(totalPages)
+                    .hasMore(hasMore)
+                    .build();
+        }
+
+        Pageable pageable = PageRequest.of(safePage - 1, safeSize, sort);
+        var pageUsers = userRepository.findAll(specification, pageable).map(this::mapToUserResponseWithRole);
+        return new PageResponse<>(pageUsers);
     }
 
     @Override
     public UserResponse getUserById(String id) {
         User user = userRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return userMapper.toResponse(user);
+        return enrichAuditUsernames(userMapper.toResponse(user));
     }
 
     @Transactional
@@ -121,7 +147,7 @@ public class UserServiceImpl implements UserService {
             syncUserToIdentity(updatedUser, true);
         }
 
-        return userMapper.toResponse(updatedUser);
+        return enrichAuditUsernames(userMapper.toResponse(updatedUser));
     }
 
     /**
@@ -153,6 +179,12 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @Override
     public void deleteUser(String id) {
+        disableUser(id);
+    }
+
+    @Transactional
+    @Override
+    public void disableUser(String id) {
         User user = userRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         user.setActive(false);
@@ -241,6 +273,54 @@ public class UserServiceImpl implements UserService {
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    private UserResponse mapToUserResponseWithRole(User user) {
+        UserResponse response = userMapper.toResponse(user);
+        response.setRole(resolvePrimaryRole(user.getId()));
+        return enrichAuditUsernames(response);
+    }
+
+    private UserResponse enrichAuditUsernames(UserResponse response) {
+        if (response == null) {
+            return null;
+        }
+        response.setCreatedBy(resolveUsernameByUserId(response.getCreatedBy()));
+        response.setUpdatedBy(resolveUsernameByUserId(response.getUpdatedBy()));
+        return response;
+    }
+
+    private String resolveUsernameByUserId(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return userId;
+        }
+        return userRepository.findById(userId)
+                .map(User::getUsername)
+                .filter(username -> username != null && !username.isBlank())
+                .orElse(userId);
+    }
+
+    private static Specification<User> buildUserFilterSpecification(String email, String phone, Boolean active) {
+        Specification<User> specification = (root, query, cb) -> cb.conjunction();
+        if (email != null && !email.isBlank()) {
+            String normalized = "%" + email.trim().toLowerCase(Locale.ROOT) + "%";
+            specification = specification.and((root, query, cb) -> cb.like(cb.lower(root.get("email")), normalized));
+        }
+        if (phone != null && !phone.isBlank()) {
+            String normalized = "%" + phone.trim().toLowerCase(Locale.ROOT) + "%";
+            specification = specification.and((root, query, cb) -> cb.like(cb.lower(root.get("phone")), normalized));
+        }
+        if (active != null) {
+            specification = specification.and((root, query, cb) -> cb.equal(root.get("active"), active));
+        }
+        return specification;
+    }
+
+    private static String normalizeRoleFilter(String role) {
+        if (role == null || role.isBlank()) {
+            return null;
+        }
+        return role.trim().toUpperCase(Locale.ROOT);
     }
 
     /** Rejects values that are not email-shaped (e.g. UUID accidentally stored as email). */

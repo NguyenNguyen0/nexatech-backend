@@ -9,13 +9,21 @@ public interface UserService {
     
     UserResponse createUser(UserCreationRequest request);
 
-    PageResponse<UserResponse> getAllUsers(int page, int size);
+    PageResponse<UserResponse> getAllUsers(
+            int page,
+            int size,
+            String email,
+            String phone,
+            Boolean active,
+            String role);
 
     UserResponse getUserById(String id);
 
     UserResponse updateUser(String id, UserUpdatenRequest dto);
 
     void deleteUser(String id);
+
+    void disableUser(String id);
 
     void enableUser(String id);
 }

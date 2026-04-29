@@ -48,9 +48,13 @@ public class UserController {
     // @RequiresPermission(PermissionsAccept.User.READ) // enable for production
     public ApiResponse<PageResponse<UserResponse>> getAllUsers(
             @RequestParam(name = "page", defaultValue = "1") int page,
-            @RequestParam(name = "size", defaultValue = "10") int size) {
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "email", required = false) String email,
+            @RequestParam(name = "phone", required = false) String phone,
+            @RequestParam(name = "active", required = false) Boolean active,
+            @RequestParam(name = "role", required = false) String role) {
         return ApiResponse.<PageResponse<UserResponse>>builder()
-                .result(userService.getAllUsers(page, size))
+                .result(userService.getAllUsers(page, size, email, phone, active, role))
                 .build();
     }
 
@@ -92,6 +96,12 @@ public class UserController {
         userService.deleteUser(userId);
         return ApiResponse.<Void>builder()
                 .build();
+    }
+
+    @PutMapping("/{userId}/disable")
+    public ApiResponse<Void> disableUser(@PathVariable String userId) {
+        userService.disableUser(userId);
+        return ApiResponse.<Void>builder().build();
     }
 
     @PutMapping("/{userId}/enable")

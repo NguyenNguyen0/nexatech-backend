@@ -96,7 +96,7 @@ public class AdminUserServiceImpl implements AdminUserService {
             throw new AppException(ErrorCode.KEYCLOAK_ERROR);
         }
 
-        syncUserRoleOnCreate(keycloakUserId, request.getRole());
+        String assignedRole = syncUserRoleOnCreate(keycloakUserId, request.getRole());
 
         UserCreationRequest profile = UserCreationRequest.builder()
                 .id(keycloakUserId)
@@ -114,7 +114,9 @@ public class AdminUserServiceImpl implements AdminUserService {
         User user = userMapper.toUser(profile);
         user.setId(keycloakUserId);
         User saved = userRepository.save(user);
-        return userMapper.toResponse(saved);
+        UserResponse response = userMapper.toResponse(saved);
+        response.setRole(assignedRole);
+        return response;
     }
 
     @Override
@@ -156,14 +158,15 @@ public class AdminUserServiceImpl implements AdminUserService {
         }
     }
 
-    private void syncUserRoleOnCreate(String userId, String roleName) {
+    private String syncUserRoleOnCreate(String userId, String roleName) {
         String normalized = normalizeRole(roleName);
         if (normalized == null) {
-            return;
+            return null;
         }
         try {
             RoleRefRequest ref = resolveRoleRef(normalized);
             identityResilienceService.assignRealmRolesToUser(userId, List.of(ref));
+            return ref.getName() != null ? ref.getName().toUpperCase(Locale.ROOT) : normalized;
         } catch (FeignException ex) {
             throw new AppException(ErrorCode.KEYCLOAK_ERROR);
         } catch (AppException ex) {
