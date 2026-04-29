@@ -49,4 +49,9 @@ public class AdminUserCreateRequest {
     Boolean enabled;
     /** Keycloak emailVerified; null = false. */
     Boolean emailVerified;
+    /**
+     * Optional Keycloak realm role to assign after creating user.
+     * Example: ADMIN, MANAGER, STAFF, WAREHOUSE, ACCOUNTANT, CUSTOMER
+     */
+    String role;
 }

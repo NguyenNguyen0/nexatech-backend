@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.request.AdminUserCreateRequest;
+import com.nexatech.user.dto.request.UserRoleUpdateRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.UserResponse;
 import com.nexatech.user.service.AdminUserService;
@@ -62,9 +63,25 @@ public class UserController {
     @PutMapping("/{userId}")
     // @RequiresPermission(PermissionsAccept.User.UPDATE)
     public ApiResponse<UserResponse> updateUser(@PathVariable String userId, @Valid @RequestBody UserUpdatenRequest request) {
+        UserResponse result = userService.updateUser(userId, request);
+        if (request != null && request.getRole() != null) {
+            adminUserService.updateUserRole(userId, request.getRole());
+        }
         return ApiResponse.<UserResponse>builder()
-                .result(userService.updateUser(userId, request))
+                .result(result)
                 .build();
+    }
+
+    @PutMapping("/{userId}/role")
+    public ApiResponse<Void> updateUserRole(@PathVariable String userId, @Valid @RequestBody UserRoleUpdateRequest request) {
+        adminUserService.updateUserRole(userId, request.getRole());
+        return ApiResponse.<Void>builder().build();
+    }
+
+    @DeleteMapping("/{userId}/role/{roleName}")
+    public ApiResponse<Void> removeUserRole(@PathVariable String userId, @PathVariable String roleName) {
+        adminUserService.removeUserRole(userId, roleName);
+        return ApiResponse.<Void>builder().build();
     }
 
     @DeleteMapping("/{userId}")
