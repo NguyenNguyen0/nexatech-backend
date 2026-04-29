@@ -4,6 +4,7 @@ import com.nexatech.notification.entity.base.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -36,6 +37,22 @@ public class Notification extends BaseEntity {
     private NotificationStatus status;
 
     private String failureReason;
+
+    @Builder.Default
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount = 0;
+
+    @Column(name = "last_retry_at")
+    private Instant lastRetryAt;
+
+    @Column(name = "recipient_email")
+    private String recipientEmail;
+
+    @Column(name = "email_template_name")
+    private String emailTemplateName;
+
+    @Column(name = "email_template_variables", columnDefinition = "TEXT")
+    private String emailTemplateVariables;
 
     public enum NotificationType {
         WELCOME,
