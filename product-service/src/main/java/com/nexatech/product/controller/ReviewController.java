@@ -4,7 +4,6 @@ import com.nexatech.product.dto.request.ReviewRequest;
 import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.PageResponse;
 import com.nexatech.product.dto.response.ReviewResponse;
-import com.nexatech.product.exception.ForbiddenException;
 import com.nexatech.product.service.ReviewService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,43 +30,9 @@ public class ReviewController {
     }
 
     @GetMapping
-    public ApiResponse<PageResponse<ReviewResponse>> getApprovedReviews(
+    public ApiResponse<PageResponse<ReviewResponse>> getReviews(
             @PathVariable String productId,
             Pageable pageable) {
-        return ApiResponse.ok(PageResponse.of(reviewService.getApprovedReviews(productId, pageable)));
-    }
-
-    @GetMapping("/all")
-    public ApiResponse<PageResponse<ReviewResponse>> getAllReviews(
-            @PathVariable String productId,
-            @RequestHeader("X-User-Role") String role,
-            Pageable pageable) {
-        requireAdmin(role);
         return ApiResponse.ok(PageResponse.of(reviewService.getAllReviews(productId, pageable)));
-    }
-
-    @PatchMapping("/{reviewId}/approve")
-    public ApiResponse<ReviewResponse> approveReview(
-            @PathVariable String productId,
-            @PathVariable String reviewId,
-            @RequestHeader("X-User-Role") String role) {
-        requireAdmin(role);
-        return ApiResponse.ok(reviewService.approveReview(productId, reviewId));
-    }
-
-    @DeleteMapping("/{reviewId}")
-    public ApiResponse<Void> deleteReview(
-            @PathVariable String productId,
-            @PathVariable String reviewId,
-            @RequestHeader("X-User-Role") String role) {
-        requireAdmin(role);
-        reviewService.deleteReview(productId, reviewId);
-        return ApiResponse.ok(null);
-    }
-
-    private void requireAdmin(String role) {
-        if (!"ADMIN".equalsIgnoreCase(role)) {
-            throw new ForbiddenException("Admin role required");
-        }
     }
 }

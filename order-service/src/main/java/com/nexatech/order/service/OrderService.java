@@ -27,7 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -35,6 +37,14 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class OrderService {
+
+    private static final Set<OrderStatus> PURCHASED_STATUSES = EnumSet.of(
+            OrderStatus.CONFIRMED,
+            OrderStatus.PROCESSING,
+            OrderStatus.SHIPPED,
+            OrderStatus.DELIVERED,
+            OrderStatus.COMPLETED
+    );
 
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
@@ -114,6 +124,10 @@ public class OrderService {
     public Page<OrderResponse> getMyOrders(UUID customerId, Pageable pageable) {
         return orderRepository.findByCustomerId(customerId, pageable)
                 .map(orderMapper::toResponse);
+    }
+
+    public boolean hasPurchasedProduct(UUID customerId, String productId) {
+        return orderRepository.existsPurchasedProduct(customerId, productId, PURCHASED_STATUSES);
     }
 
     /**

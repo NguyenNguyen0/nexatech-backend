@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Document(collection = "reviews")
@@ -29,10 +30,14 @@ public class Review {
 
     private int rating;
 
-    private String comment;
+    private String title;
+
+    private String content;
+
+    private List<String> images;
 
     @Builder.Default
-    private boolean approved = false;
+    private long helpfulCount = 0L;
 
     @CreatedDate
     private Instant createdAt;
