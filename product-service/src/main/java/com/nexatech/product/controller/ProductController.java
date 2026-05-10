@@ -11,6 +11,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
@@ -37,8 +40,22 @@ public class ProductController {
     }
 
     @GetMapping
-    public ApiResponse<PageResponse<ProductResponse>> getProducts(Pageable pageable) {
-        return ApiResponse.ok(PageResponse.of(productService.getProducts(pageable)));
+    public ApiResponse<PageResponse<ProductResponse>> getProducts(
+            @RequestParam(required = false) String categoryId,
+            @RequestParam(required = false) String brandId,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Double minRating,
+            @RequestParam(required = false) Double maxRating,
+            @RequestParam(required = false) Boolean featured,
+            Pageable pageable) {
+        return ApiResponse.ok(PageResponse.of(
+                productService.getProducts(categoryId, brandId, minPrice, maxPrice, minRating, maxRating, featured, pageable)));
+    }
+
+    @GetMapping("/featured")
+    public ApiResponse<PageResponse<ProductResponse>> getFeaturedProducts(Pageable pageable) {
+        return ApiResponse.ok(PageResponse.of(productService.getFeaturedProducts(pageable)));
     }
 
     @GetMapping("/search")
@@ -53,6 +70,11 @@ public class ProductController {
             @PathVariable String categoryId,
             Pageable pageable) {
         return ApiResponse.ok(PageResponse.of(productService.getProductsByCategory(categoryId, pageable)));
+    }
+
+    @GetMapping("/{id}/related")
+    public ApiResponse<List<ProductResponse>> getRelatedProducts(@PathVariable String id) {
+        return ApiResponse.ok(productService.getRelatedProducts(id));
     }
 
     @DeleteMapping("/{id}")

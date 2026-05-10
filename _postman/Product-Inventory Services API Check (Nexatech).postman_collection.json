@@ -391,6 +391,91 @@
           "response": []
         },
         {
+          "name": "list products (combined filters)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products?categoryId={{categoryId}}&brandId={{brandId}}&minPrice=1000000&maxPrice=50000000&minRating=3.5&page=0&size=10&sort=price,asc",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "categoryId",
+                  "value": "{{categoryId}}"
+                },
+                {
+                  "key": "brandId",
+                  "value": "{{brandId}}"
+                },
+                {
+                  "key": "minPrice",
+                  "value": "1000000"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "50000000"
+                },
+                {
+                  "key": "minRating",
+                  "value": "3.5"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "price,asc"
+                }
+              ]
+            },
+            "description": "Phase 1: Combined filter by category, brand, price range, rating and sort by allowed field."
+          },
+          "response": []
+        },
+        {
+          "name": "get featured products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/featured?page=0&size=10",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "featured"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Phase 2: Dynamic featured ranking by averageRating desc, then createdAt desc."
+          },
+          "response": []
+        },
+        {
           "name": "get product by id",
           "request": {
             "method": "GET",
@@ -407,6 +492,28 @@
                 "{{productId}}"
               ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "get related products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/related",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}",
+                "related"
+              ]
+            },
+            "description": "Phase 2: Return up to 8 related products in same category (excluding current product)."
           },
           "response": []
         },

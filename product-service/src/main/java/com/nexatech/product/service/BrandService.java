@@ -29,6 +29,8 @@ public class BrandService {
             throw new BadRequestException("Brand name already exists: " + normalizedName);
         }
 
+        validateParentBrand(request.getParentBrandId(), null);
+
         Brand brand = brandMapper.toEntity(request);
         brand.setName(normalizedName);
         brand.setSlug(generateUniqueSlug(normalizedName, null));
@@ -44,6 +46,8 @@ public class BrandService {
         if (brandRepository.existsByNameIgnoreCaseAndIdNot(normalizedName, id)) {
             throw new BadRequestException("Brand name already exists: " + normalizedName);
         }
+
+        validateParentBrand(request.getParentBrandId(), id);
 
         String oldName = brand.getName();
         brandMapper.updateEntity(request, brand);
@@ -83,6 +87,16 @@ public class BrandService {
 
     private String normalizeName(String name) {
         return name == null ? "" : name.trim().replaceAll("\\s+", " ");
+    }
+
+    private void validateParentBrand(String parentBrandId, String currentBrandId) {
+        if (!StringUtils.hasText(parentBrandId)) {
+            return;
+        }
+        if (currentBrandId != null && currentBrandId.equals(parentBrandId)) {
+            throw new BadRequestException("Brand cannot be its own parent");
+        }
+        getActiveBrand(parentBrandId);
     }
 
     private String generateUniqueSlug(String name, String currentBrandId) {

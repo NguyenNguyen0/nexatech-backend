@@ -25,6 +25,8 @@ public class Brand {
 
     private String slug;
 
+    private String parentBrandId;
+
     private String logoUrl;
 
     private boolean active;
