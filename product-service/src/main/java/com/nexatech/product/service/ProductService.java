@@ -8,6 +8,7 @@ import com.nexatech.product.exception.BadRequestException;
 import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.ProductMapper;
 import com.nexatech.product.model.Brand;
+import com.nexatech.product.model.Category;
 import com.nexatech.product.model.Product;
 import com.nexatech.product.repository.BrandRepository;
 import com.nexatech.product.repository.CategoryRepository;
@@ -67,7 +68,7 @@ public class ProductService {
 
         Product saved = productRepository.save(product);
         publishEvent(saved, "PRODUCT_CREATED");
-        return enrichWithBrandName(productMapper.toResponse(saved));
+        return enrichProductResponse(productMapper.toResponse(saved));
     }
 
     public ProductResponse updateProduct(String id, ProductRequest request) {
@@ -88,11 +89,11 @@ public class ProductService {
 
         Product saved = productRepository.save(product);
         publishEvent(saved, "PRODUCT_UPDATED");
-        return enrichWithBrandName(productMapper.toResponse(saved));
+        return enrichProductResponse(productMapper.toResponse(saved));
     }
 
     public ProductResponse getProduct(String id) {
-        return enrichWithBrandName(productMapper.toResponse(getActiveProduct(id)));
+        return enrichProductResponse(productMapper.toResponse(getActiveProduct(id)));
     }
 
     public Page<ProductResponse> getProducts(String categoryId,
@@ -140,7 +141,7 @@ public class ProductService {
         if (!hasRatingFilter) {
             Query query = Query.query(finalCriteria).with(safePageable);
             List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
-                    .map(p -> enrichWithBrandName(productMapper.toResponse(p)))
+                    .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                     .toList();
             long total = mongoTemplate.count(Query.query(finalCriteria), Product.class);
             return new PageImpl<>(content, safePageable, total);
@@ -148,7 +149,7 @@ public class ProductService {
 
         Query query = Query.query(finalCriteria).with(safePageable.getSort());
         List<ProductResponse> filtered = mongoTemplate.find(query, Product.class).stream()
-                .map(p -> enrichWithBrandName(productMapper.toResponse(p)))
+            .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                 .filter(response -> matchesRatingRange(response.getAverageRating(), minRating, maxRating))
                 .toList();
 
@@ -171,7 +172,7 @@ public class ProductService {
         query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
 
         List<ProductResponse> all = mongoTemplate.find(query, Product.class).stream()
-                .map(p -> enrichWithBrandName(productMapper.toResponse(p)))
+            .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                 .sorted(featuredComparator())
                 .toList();
 
@@ -198,7 +199,7 @@ public class ProductService {
                     .addCriteria(Criteria.where("active").is(true));
 
             List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
-                    .map(p -> enrichWithBrandName(productMapper.toResponse(p)))
+                    .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                     .toList();
 
             if (!content.isEmpty()) {
@@ -212,7 +213,7 @@ public class ProductService {
         }
 
         return productRepository.findByNameContainingIgnoreCaseAndActiveTrue(normalizedKeyword, pageable)
-                .map(p -> enrichWithBrandName(productMapper.toResponse(p)));
+            .map(p -> enrichProductResponse(productMapper.toResponse(p)));
     }
 
     public Page<ProductResponse> getProductsByCategory(String categoryId, Pageable pageable) {
@@ -224,7 +225,7 @@ public class ProductService {
                 .with(pageable);
 
         List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
-                .map(p -> enrichWithBrandName(productMapper.toResponse(p)))
+            .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                 .toList();
         long total = mongoTemplate.count(
                 Query.query(new Criteria().andOperator(
@@ -250,7 +251,7 @@ public class ProductService {
         query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
 
         return mongoTemplate.find(query, Product.class).stream()
-                .map(p -> enrichWithBrandName(productMapper.toResponse(p)))
+            .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                 .sorted(featuredComparator())
                 .limit(RELATED_PRODUCT_LIMIT)
                 .toList();
@@ -284,13 +285,21 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", brandId));
     }
 
-    private ProductResponse enrichWithBrandName(ProductResponse response) {
-        if (StringUtils.hasText(response.getBrandId())) {
-            response.setBrandName(
-                    brandRepository.findById(response.getBrandId())
-                            .map(Brand::getName)
-                            .orElse(null));
+    private ProductResponse enrichProductResponse(ProductResponse response) {
+        if (StringUtils.hasText(response.getCategoryId())) {
+            categoryRepository.findById(response.getCategoryId()).ifPresent(category -> {
+                response.setCategoryName(category.getName());
+                response.setCategorySlug(category.getSlug());
+            });
         }
+
+        if (StringUtils.hasText(response.getBrandId())) {
+            brandRepository.findById(response.getBrandId()).ifPresent(brand -> {
+                response.setBrandName(brand.getName());
+                response.setBrandSlug(brand.getSlug());
+            });
+        }
+
         Double avg = reviewRepository.getAverageRatingByProductId(response.getId());
         if (avg != null) {
             response.setAverageRating(Math.round(avg * 10.0) / 10.0);
