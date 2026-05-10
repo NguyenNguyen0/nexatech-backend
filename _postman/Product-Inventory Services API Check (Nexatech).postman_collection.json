@@ -915,6 +915,37 @@
           "response": []
         },
         {
+          "name": "import from CSV (Phase 6)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "docs/sample-inventory-import.csv"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{inventoryBaseUrl}}/api/v1/inventory/import",
+              "host": [
+                "{{inventoryBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "inventory",
+                "import"
+              ]
+            },
+            "description": "Phase 6: Import inventory stock from CSV file. Columns: sku, quantity, warehouse. Response includes successCount, failureCount, totalLines, and errorLines with detailed error messages."
+          },
+          "response": []
+        },
+        {
           "name": "update warehouse info",
           "request": {
             "method": "PATCH",

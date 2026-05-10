@@ -1,6 +1,7 @@
 CREATE TABLE inventory_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id VARCHAR(100) NOT NULL UNIQUE,
+    sku VARCHAR(100) NOT NULL UNIQUE,
     quantity INTEGER NOT NULL DEFAULT 0,
     reserved_quantity INTEGER NOT NULL DEFAULT 0,
     reorder_level INTEGER NOT NULL DEFAULT 10,
@@ -22,4 +23,5 @@ CREATE TABLE stock_movements (
 );
 
 CREATE INDEX idx_inventory_product_id ON inventory_items(product_id);
+CREATE INDEX idx_inventory_sku ON inventory_items(sku);
 CREATE INDEX idx_stock_movements_product_id ON stock_movements(product_id);
