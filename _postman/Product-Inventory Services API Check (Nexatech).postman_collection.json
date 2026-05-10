@@ -518,12 +518,12 @@
           "response": []
         },
         {
-          "name": "search products",
+          "name": "search products (advanced)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products/search?keyword={{searchKeyword}}&page=0&size=10",
+              "raw": "{{productBaseUrl}}/api/v1/products/search?keyword={{searchKeyword}}&categoryId=&brandId=&minPrice=&maxPrice=&minRating=&maxRating=&page=0&size=10",
               "host": [
                 "{{productBaseUrl}}"
               ],
@@ -539,6 +539,36 @@
                   "value": "{{searchKeyword}}"
                 },
                 {
+                  "key": "categoryId",
+                  "value": "",
+                  "description": "Optional: filter by category ID"
+                },
+                {
+                  "key": "brandId",
+                  "value": "",
+                  "description": "Optional: filter by brand ID"
+                },
+                {
+                  "key": "minPrice",
+                  "value": "",
+                  "description": "Optional: minimum price"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "",
+                  "description": "Optional: maximum price"
+                },
+                {
+                  "key": "minRating",
+                  "value": "",
+                  "description": "Optional: minimum average rating (0-5)"
+                },
+                {
+                  "key": "maxRating",
+                  "value": "",
+                  "description": "Optional: maximum average rating (0-5)"
+                },
+                {
                   "key": "page",
                   "value": "0"
                 },
@@ -547,7 +577,36 @@
                   "value": "10"
                 }
               ]
-            }
+            },
+            "description": "Phase 5: Advanced search combining full-text keyword with optional filters: categoryId, brandId, minPrice, maxPrice, minRating, maxRating."
+          },
+          "response": []
+        },
+        {
+          "name": "suggest products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/suggest?q=iphone",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "suggest"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "iphone",
+                  "description": "Autocomplete prefix/substring — returns top 5 matching product names"
+                }
+              ]
+            },
+            "description": "Phase 5: Autocomplete/suggest endpoint. Returns up to 5 product name suggestions matching the query string. Optimised for low latency (<200 ms) via regex index on name field."
           },
           "response": []
         },

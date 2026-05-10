@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -184,36 +185,105 @@ public class ProductService {
         return new PageImpl<>(all.subList(from, to), safePageable, all.size());
     }
 
-    public Page<ProductResponse> searchProducts(String keyword, Pageable pageable) {
+    public Page<ProductResponse> searchProducts(String keyword,
+                                                 String categoryId,
+                                                 String brandId,
+                                                 BigDecimal minPrice,
+                                                 BigDecimal maxPrice,
+                                                 Double minRating,
+                                                 Double maxRating,
+                                                 Pageable pageable) {
         if (!StringUtils.hasText(keyword)) {
-            return getProducts(pageable);
+            return getProducts(categoryId, brandId, minPrice, maxPrice, minRating, maxRating, false, pageable);
         }
 
         String normalizedKeyword = keyword.trim();
+        validatePriceRange(minPrice, maxPrice);
+
+        // Build extra Criteria for additional filters
+        List<Criteria> extra = new ArrayList<>();
+        extra.add(Criteria.where("active").is(true));
+        if (StringUtils.hasText(categoryId)) {
+            validateCategory(categoryId);
+            extra.add(idCriteria("categoryId", categoryId));
+        }
+        if (StringUtils.hasText(brandId)) {
+            validateBrand(brandId);
+            extra.add(idCriteria("brandId", brandId));
+        }
+        if (minPrice != null || maxPrice != null) {
+            Criteria priceCriteria = Criteria.where("price");
+            if (minPrice != null) priceCriteria = priceCriteria.gte(minPrice);
+            if (maxPrice != null) priceCriteria = priceCriteria.lte(maxPrice);
+            extra.add(priceCriteria);
+        }
+
+        Criteria combinedCriteria = extra.size() == 1
+                ? extra.getFirst()
+                : new Criteria().andOperator(extra.toArray(new Criteria[0]));
+
+        boolean hasRatingFilter = minRating != null || maxRating != null;
+
         try {
             TextCriteria textCriteria = TextCriteria.forDefaultLanguage().matching(normalizedKeyword);
+            Query query = TextQuery.queryText(textCriteria).sortByScore()
+                    .with(hasRatingFilter ? Pageable.unpaged() : pageable)
+                    .addCriteria(combinedCriteria);
 
-            Query query = TextQuery.queryText(textCriteria)
-                    .sortByScore()
-                    .with(pageable)
-                    .addCriteria(Criteria.where("active").is(true));
-
-            List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
+            List<ProductResponse> hits = mongoTemplate.find(query, Product.class).stream()
                     .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                     .toList();
 
-            if (!content.isEmpty()) {
+            if (!hits.isEmpty()) {
+                if (hasRatingFilter) {
+                    List<ProductResponse> filtered = hits.stream()
+                            .filter(r -> matchesRatingRange(r.getAverageRating(), minRating, maxRating))
+                            .toList();
+                    return pageSlice(filtered, pageable);
+                }
                 long total = mongoTemplate.count(
-                        TextQuery.queryText(textCriteria).addCriteria(Criteria.where("active").is(true)),
-                        Product.class);
-                return new PageImpl<>(content, pageable, total);
+                        TextQuery.queryText(textCriteria).addCriteria(combinedCriteria), Product.class);
+                return new PageImpl<>(hits, pageable, total);
             }
         } catch (UncategorizedMongoDbException ex) {
-            // Fallback to regex search when text index is missing.
+            // fall through to regex fallback
         }
 
-        return productRepository.findByNameContainingIgnoreCaseAndActiveTrue(normalizedKeyword, pageable)
-            .map(p -> enrichProductResponse(productMapper.toResponse(p)));
+        // Regex fallback (no text index)
+        extra.add(Criteria.where("name").regex(normalizedKeyword, "i"));
+        Criteria regexCriteria = new Criteria().andOperator(extra.toArray(new Criteria[0]));
+        Query regexQuery = Query.query(regexCriteria).with(hasRatingFilter ? Pageable.unpaged() : pageable);
+
+        if (hasRatingFilter) {
+            List<ProductResponse> all = mongoTemplate.find(regexQuery, Product.class).stream()
+                    .map(p -> enrichProductResponse(productMapper.toResponse(p)))
+                    .filter(r -> matchesRatingRange(r.getAverageRating(), minRating, maxRating))
+                    .toList();
+            return pageSlice(all, pageable);
+        }
+
+        List<ProductResponse> content = mongoTemplate.find(regexQuery, Product.class).stream()
+                .map(p -> enrichProductResponse(productMapper.toResponse(p)))
+                .toList();
+        long total = mongoTemplate.count(Query.query(regexCriteria), Product.class);
+        return new PageImpl<>(content, pageable, total);
+    }
+
+    public List<String> suggestProducts(String q) {
+        if (!StringUtils.hasText(q) || q.trim().length() < 1) {
+            return List.of();
+        }
+        String escaped = Pattern.quote(q.trim());
+        Pattern regex = Pattern.compile(escaped, Pattern.CASE_INSENSITIVE);
+        Query query = Query.query(new Criteria().andOperator(
+                Criteria.where("active").is(true),
+                Criteria.where("name").regex(regex)
+        ));
+        query.fields().include("name");
+        query.limit(5);
+        return mongoTemplate.find(query, Product.class).stream()
+                .map(Product::getName)
+                .toList();
     }
 
     public Page<ProductResponse> getProductsByCategory(String categoryId, Pageable pageable) {
@@ -392,6 +462,15 @@ public class ProductService {
         }
 
         return PageRequest.of(Math.max(page, 0), Math.max(size, 1), safeSort);
+    }
+
+    private Page<ProductResponse> pageSlice(List<ProductResponse> list, Pageable pageable) {
+        int from = (int) pageable.getOffset();
+        if (from >= list.size()) {
+            return new PageImpl<>(List.of(), pageable, list.size());
+        }
+        int to = Math.min(from + pageable.getPageSize(), list.size());
+        return new PageImpl<>(list.subList(from, to), pageable, list.size());
     }
 
     private void validatePriceRange(BigDecimal minPrice, BigDecimal maxPrice) {

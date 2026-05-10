@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/products")
@@ -61,8 +62,20 @@ public class ProductController {
     @GetMapping("/search")
     public ApiResponse<PageResponse<ProductResponse>> searchProducts(
             @RequestParam String keyword,
+            @RequestParam(required = false) String categoryId,
+            @RequestParam(required = false) String brandId,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Double minRating,
+            @RequestParam(required = false) Double maxRating,
             Pageable pageable) {
-        return ApiResponse.ok(PageResponse.of(productService.searchProducts(keyword, pageable)));
+        return ApiResponse.ok(PageResponse.of(
+                productService.searchProducts(keyword, categoryId, brandId, minPrice, maxPrice, minRating, maxRating, pageable)));
+    }
+
+    @GetMapping("/suggest")
+    public ApiResponse<List<String>> suggestProducts(@RequestParam String q) {
+        return ApiResponse.ok(productService.suggestProducts(q));
     }
 
     @GetMapping("/category/{categoryId}")
