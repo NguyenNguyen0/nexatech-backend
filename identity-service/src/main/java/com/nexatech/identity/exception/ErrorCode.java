@@ -46,6 +46,7 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(2030, "Invalid username or password", HttpStatus.BAD_REQUEST),
     INVALID_JSON_BODY(2031, "Invalid or malformed JSON", HttpStatus.BAD_REQUEST),
     DEPENDENCY_UNAVAILABLE(2032, "Dependent service is temporarily unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    INVALID_PASSWORD(2033, "Invalid password", HttpStatus.BAD_REQUEST),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

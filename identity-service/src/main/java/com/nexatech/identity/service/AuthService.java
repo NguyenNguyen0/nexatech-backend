@@ -26,7 +26,9 @@ import com.nexatech.identity.mapper.UserClientMapper;
 import feign.FeignException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -178,6 +180,42 @@ public class AuthService {
                 .client_id(clientId)
                 .client_secret(clientSecret)
                 .token(request.getToken())
+                .build());
+    }
+
+    public void changePassword(String authorizationHeader, com.nexatech.identity.dto.request.PasswordChangeRequest request) {
+        if (authorizationHeader == null || authorizationHeader.isBlank()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        // 1. Get current user info to get userId (sub) and username
+        Map<String, Object> userInfo = userInfo(authorizationHeader);
+        String userId = (String) userInfo.get("sub");
+        String username = (String) userInfo.get("preferred_username");
+        if (username == null) {
+            username = (String) userInfo.get("email");
+        }
+
+        // 2. Verify old password by trying to login
+        try {
+            keycloakAuthClient.exchangeUserToken(realm, UserTokenExchangeParam.builder()
+                    .grant_type("password")
+                    .client_id(clientId)
+                    .client_secret(clientSecret)
+                    .scope("openid")
+                    .username(username)
+                    .password(request.getOldPassword())
+                    .build());
+        } catch (FeignException ex) {
+            log.error("Old password verification failed for user {}: {} - {}", username, ex.status(), ex.contentUTF8());
+            throw new AppException(ErrorCode.INVALID_PASSWORD);
+        }
+
+        // 3. Reset password using Admin API (which the service has access to)
+        userService.resetPassword(userId, com.nexatech.identity.dto.request.Credential.builder()
+                .type("password")
+                .value(request.getNewPassword())
+                .temporary(false)
                 .build());
     }
 }

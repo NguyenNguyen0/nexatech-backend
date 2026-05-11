@@ -80,4 +80,12 @@ public class AuthController {
                 .result(authService.introspect(request))
                 .build();
     }
+
+    @PostMapping("/change-password")
+    public ApiResponse<Void> changePassword(
+            @RequestHeader(value = "Authorization") String authorization,
+            @Valid @RequestBody com.nexatech.identity.dto.request.PasswordChangeRequest request) {
+        authService.changePassword(authorization, request);
+        return ApiResponse.<Void>builder().build();
+    }
 }

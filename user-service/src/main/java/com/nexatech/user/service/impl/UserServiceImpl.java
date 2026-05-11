@@ -134,11 +134,13 @@ public class UserServiceImpl implements UserService {
         return new PageResponse<>(pageUsers);
     }
 
+    private static final List<String> ROLE_PRIORITY = List.of("ADMIN", "MANAGER", "STAFF", "WAREHOUSE", "ACCOUNTANT", "CUSTOMER");
+
     @Override
     public UserResponse getUserById(String id) {
         User user = userRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return enrichAuditUsernames(userMapper.toResponse(user));
+        return mapToUserResponseWithRole(user);
     }
 
     @Transactional
@@ -164,7 +166,7 @@ public class UserServiceImpl implements UserService {
             syncUserToIdentity(updatedUser, true);
         }
 
-        return enrichAuditUsernames(userMapper.toResponse(updatedUser));
+        return mapToUserResponseWithRole(updatedUser);
     }
 
     /**
@@ -234,9 +236,6 @@ public class UserServiceImpl implements UserService {
     public void requestEmailVerificationOtp(String userId) {
         User user = userRepository.findByIdAndActiveTrue(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        if (Boolean.TRUE.equals(user.getOnBoarded())) {
-            return;
-        }
 
         String otp = generateOtp();
         Instant expiresAt = Instant.now().plusSeconds(OTP_TTL_SECONDS);
@@ -326,28 +325,36 @@ public class UserServiceImpl implements UserService {
             ApiResponse<Map<String, Object>> roleMappings = identityResilienceService.getUserRoleMappings(userId);
             Map<String, Object> payload = roleMappings != null ? roleMappings.getResult() : null;
             if (payload == null) {
-                return null;
+                return "UNASSIGNED";
             }
             Object realmMappingsObj = payload.get("realmMappings");
             if (!(realmMappingsObj instanceof List<?> realmMappings) || realmMappings.isEmpty()) {
-                return null;
+                return "UNASSIGNED";
             }
-            for (Object roleItem : realmMappings) {
-                if (!(roleItem instanceof Map<?, ?> roleMap)) {
-                    continue;
-                }
-                Object roleNameObj = roleMap.get("name");
-                if (roleNameObj == null) {
-                    continue;
-                }
-                String roleName = roleNameObj.toString().trim();
-                if (!roleName.isEmpty()) {
-                    return roleName.toUpperCase(Locale.ROOT);
-                }
+
+            List<String> roles = realmMappings.stream()
+                    .filter(item -> item instanceof Map)
+                    .map(item -> (Map<?, ?>) item)
+                    .map(map -> map.get("name"))
+                    .filter(Objects::nonNull)
+                    .map(Object::toString)
+                    .map(String::trim)
+                    .filter(name -> !name.isEmpty() && !name.startsWith("default-roles-"))
+                    .map(name -> name.toUpperCase(Locale.ROOT))
+                    .collect(Collectors.toList());
+
+            if (roles.isEmpty()) {
+                return "UNASSIGNED";
             }
-            return null;
+
+            // Return first role based on priority, otherwise the first role in the list
+            return ROLE_PRIORITY.stream()
+                    .filter(roles::contains)
+                    .findFirst()
+                    .orElse(roles.get(0));
         } catch (Exception ex) {
-            return null;
+            log.warn("Failed to resolve primary role for userId={}: {}", userId, ex.getMessage());
+            return "UNASSIGNED";
         }
     }
 
