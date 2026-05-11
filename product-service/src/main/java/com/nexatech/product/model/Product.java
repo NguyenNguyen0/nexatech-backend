@@ -33,6 +33,8 @@ public class Product {
     @TextIndexed(weight = 2)
     private String description;
 
+    private String descriptionHtml;
+
     private BigDecimal price;
 
     private BigDecimal compareAtPrice;
@@ -40,13 +42,25 @@ public class Product {
     @TextIndexed(weight = 3)
     private String sku;
 
-    private String categoryId;
+    private String thumbnail;
+
+    private String primaryCategoryId;
+
+    private String primaryCategorySlug;
+
+    private List<String> categoryIds;
+
+    private List<String> categorySlugs;
 
     private String brandId;
 
     private List<String> images;
 
-    private Map<String, String> attributes;
+    private Map<String, String> specs;
+
+    private List<String> tags;
+
+    private Map<String, String> metadata;
 
     private boolean active;
 

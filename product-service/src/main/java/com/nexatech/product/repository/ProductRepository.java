@@ -15,9 +15,9 @@ public interface ProductRepository extends MongoRepository<Product, String> {
 
     Optional<Product> findByIdAndActiveTrue(String id);
 
-    Page<Product> findByCategoryId(String categoryId, Pageable pageable);
+    Page<Product> findByCategoryIdsContaining(String categoryId, Pageable pageable);
 
-    Page<Product> findByCategoryIdAndActiveTrue(String categoryId, Pageable pageable);
+    Page<Product> findByCategoryIdsContainingAndActiveTrue(String categoryId, Pageable pageable);
 
     Page<Product> findByBrandId(String brandId, Pageable pageable);
 
@@ -27,7 +27,9 @@ public interface ProductRepository extends MongoRepository<Product, String> {
 
     Page<Product> findByNameContainingIgnoreCaseAndActiveTrue(String name, Pageable pageable);
 
-    boolean existsByCategoryIdAndActiveTrue(String categoryId);
+    boolean existsByCategoryIdsContainingAndActiveTrue(String categoryId);
+
+    long countByCategoryIdsContainingAndActiveTrue(String categoryId);
 
     boolean existsByBrandIdAndActiveTrue(String brandId);
 }

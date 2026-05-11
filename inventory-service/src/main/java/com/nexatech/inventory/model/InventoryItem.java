@@ -16,6 +16,9 @@ public class InventoryItem extends BaseEntity {
     @Column(nullable = false, unique = true)
     private String productId;
 
+    @Column(nullable = false, unique = true)
+    private String sku;
+
     @Column(nullable = false)
     private int quantity;
 
