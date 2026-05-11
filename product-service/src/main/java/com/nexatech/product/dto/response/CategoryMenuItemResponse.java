@@ -13,7 +13,6 @@ public class CategoryMenuItemResponse {
     private String id;
     private String name;
     private String slug;
-    private String imageUrl;
     private int sortOrder;
     private Map<String, Object> metadata;
     private List<CategoryMenuItemResponse> children;

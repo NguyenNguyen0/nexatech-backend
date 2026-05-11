@@ -807,7 +807,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products/category/slug/{{categorySlug}}?page=0&size=10&sort=createdAt,desc",
+              "raw": "{{productBaseUrl}}/api/v1/products/category/slug/{{categorySlug}}?brandId={{brandId}}&minPrice=1000000&maxPrice=50000000&minRating=3.5&page=0&size=10&sort=price,asc",
               "host": [
                 "{{productBaseUrl}}"
               ],
@@ -817,41 +817,6 @@
                 "products",
                 "category",
                 "slug",
-                "{{categorySlug}}"
-              ],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "0"
-                },
-                {
-                  "key": "size",
-                  "value": "10"
-                },
-                {
-                  "key": "sort",
-                  "value": "createdAt,desc"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "get products by collection slug",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products/collections/{{categorySlug}}?brandId={{brandId}}&minPrice=1000000&maxPrice=50000000&minRating=3.5&page=0&size=10&sort=price,asc",
-              "host": [
-                "{{productBaseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "products",
-                "collections",
                 "{{categorySlug}}"
               ],
               "query": [
@@ -885,7 +850,7 @@
                 }
               ]
             },
-            "description": "Collection route slug-first cho storefront: filter/sort/pagination giong endpoint products."
+            "description": "Category listing by slug with full filter/sort/pagination support."
           },
           "response": []
         },

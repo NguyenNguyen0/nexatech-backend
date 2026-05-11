@@ -119,8 +119,8 @@ public class CategoryService {
                 .name(category.getName())
                 .title(resolveMetadataString(metadata, "seoTitle", category.getName()))
                 .description(resolveMetadataString(metadata, "seoDescription", category.getDescription()))
-                .bannerImage(resolveMetadataString(metadata, "bannerImage", category.getImageUrl()))
-                .productCount(productRepository.countByCategoryIdAndActiveTrue(category.getId()))
+                .bannerImage(resolveMetadataString(metadata, "bannerImage", null))
+                .productCount(productRepository.countByCategoryIdsContainingAndActiveTrue(category.getId()))
                 .subcategoryCount(categoryRepository.findByParentIdAndActiveTrue(category.getId()).size())
                 .metadata(metadata)
                 .build();
@@ -133,7 +133,7 @@ public class CategoryService {
             throw new BadRequestException("Cannot delete category with active subcategories");
         }
 
-        if (productRepository.existsByCategoryIdAndActiveTrue(id)) {
+        if (productRepository.existsByCategoryIdsContainingAndActiveTrue(id)) {
             throw new BadRequestException("Cannot delete category with active products");
         }
 
@@ -200,7 +200,6 @@ public class CategoryService {
                 .id(category.getId())
                 .name(category.getName())
                 .slug(category.getSlug())
-                .imageUrl(category.getImageUrl())
                 .sortOrder(category.getSortOrder())
                 .metadata(sanitizeMetadata(category.getMetadata()))
                 .children(buildCategoryTree(category.getId(), childrenByParent))
