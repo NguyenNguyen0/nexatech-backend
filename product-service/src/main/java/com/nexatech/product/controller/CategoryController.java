@@ -2,6 +2,8 @@ package com.nexatech.product.controller;
 
 import com.nexatech.product.dto.request.CategoryRequest;
 import com.nexatech.product.dto.response.ApiResponse;
+import com.nexatech.product.dto.response.CategoryMenuItemResponse;
+import com.nexatech.product.dto.response.CategoryMetaResponse;
 import com.nexatech.product.dto.response.CategoryResponse;
 import com.nexatech.product.service.CategoryService;
 import jakarta.validation.Valid;
@@ -46,9 +48,24 @@ public class CategoryController {
         return ApiResponse.ok(categoryService.getAllCategories());
     }
 
+    @GetMapping("/menu")
+    public ApiResponse<List<CategoryMenuItemResponse>> getCategoryMenu() {
+        return ApiResponse.ok(categoryService.getCategoryMenu());
+    }
+
     @GetMapping("/{id}/subcategories")
-    public ApiResponse<List<CategoryResponse>> getSubCategories(@PathVariable String id) {
+    public ApiResponse<List<CategoryMenuItemResponse>> getSubCategories(@PathVariable String id) {
         return ApiResponse.ok(categoryService.getSubCategories(id));
+    }
+
+    @GetMapping("/slug/{slug}/subcategories")
+    public ApiResponse<List<CategoryMenuItemResponse>> getSubCategoriesBySlug(@PathVariable String slug) {
+        return ApiResponse.ok(categoryService.getSubCategoriesBySlug(slug));
+    }
+
+    @GetMapping("/slug/{slug}/meta")
+    public ApiResponse<CategoryMetaResponse> getCategoryMetaBySlug(@PathVariable String slug) {
+        return ApiResponse.ok(categoryService.getCategoryMetaBySlug(slug));
     }
 
     @DeleteMapping("/{id}")

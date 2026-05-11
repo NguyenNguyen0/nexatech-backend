@@ -95,7 +95,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Smartphones\",\n  \"description\": \"Danh muc dien thoai\",\n  \"sortOrder\": 1\n}"
+              "raw": "{\n  \"name\": \"Smartphones\",\n  \"description\": \"Danh muc dien thoai\",\n  \"sortOrder\": 1,\n  \"metadata\": {\n    \"seoTitle\": \"Smartphones Collection\",\n    \"seoDescription\": \"Danh muc smartphone chinh hang\",\n    \"bannerImage\": \"https://dummyimage.com/1200x300/smartphones\"\n  }\n}"
             },
             "url": {
               "raw": "{{productBaseUrl}}/api/v1/categories",
@@ -172,6 +172,91 @@
           "response": []
         },
         {
+          "name": "get category subcategories by slug (recursive)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/categories/slug/{{categorySlug}}/subcategories",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "slug",
+                "{{categorySlug}}",
+                "subcategories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get category subcategories by id (recursive)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/categories/{{categoryId}}/subcategories",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "{{categoryId}}",
+                "subcategories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get category menu (recursive tree)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/categories/menu",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "menu"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get category meta by slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/categories/slug/{{categorySlug}}/meta",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "slug",
+                "{{categorySlug}}",
+                "meta"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "update category",
           "request": {
             "method": "PUT",
@@ -183,7 +268,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Smartphones Updated\",\n  \"description\": \"Danh muc dien thoai update\",\n  \"sortOrder\": 2\n}"
+              "raw": "{\n  \"name\": \"Smartphones Updated\",\n  \"description\": \"Danh muc dien thoai update\",\n  \"sortOrder\": 2,\n  \"metadata\": {\n    \"seoTitle\": \"Smartphones Updated Collection\",\n    \"seoDescription\": \"Danh muc smartphone update\",\n    \"bannerImage\": \"https://dummyimage.com/1200x300/smartphones-updated\"\n  }\n}"
             },
             "url": {
               "raw": "{{productBaseUrl}}/api/v1/categories/{{categoryId}}",
@@ -713,6 +798,94 @@
                 }
               ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "get products by category slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/category/slug/{{categorySlug}}?page=0&size=10&sort=createdAt,desc",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "category",
+                "slug",
+                "{{categorySlug}}"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "createdAt,desc"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get products by collection slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/collections/{{categorySlug}}?brandId={{brandId}}&minPrice=1000000&maxPrice=50000000&minRating=3.5&page=0&size=10&sort=price,asc",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "collections",
+                "{{categorySlug}}"
+              ],
+              "query": [
+                {
+                  "key": "brandId",
+                  "value": "{{brandId}}"
+                },
+                {
+                  "key": "minPrice",
+                  "value": "1000000"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "50000000"
+                },
+                {
+                  "key": "minRating",
+                  "value": "3.5"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "price,asc"
+                }
+              ]
+            },
+            "description": "Collection route slug-first cho storefront: filter/sort/pagination giong endpoint products."
           },
           "response": []
         },

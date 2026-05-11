@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/products")
@@ -89,6 +88,35 @@ public class ProductController {
             @PathVariable String categoryId,
             Pageable pageable) {
         return ApiResponse.ok(PageResponse.of(productService.getProductsByCategory(categoryId, pageable)));
+    }
+
+    @GetMapping("/category/slug/{slug}")
+    public ApiResponse<PageResponse<ProductResponse>> getProductsByCategorySlug(
+            @PathVariable String slug,
+            Pageable pageable) {
+        return ApiResponse.ok(PageResponse.of(productService.getProductsByCategorySlug(slug, pageable)));
+    }
+
+    @GetMapping("/collections/{slug}")
+    public ApiResponse<PageResponse<ProductResponse>> getProductsByCollectionSlug(
+            @PathVariable String slug,
+            @RequestParam(required = false) String brandId,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Double minRating,
+            @RequestParam(required = false) Double maxRating,
+            @RequestParam(required = false) Boolean featured,
+            Pageable pageable) {
+        return ApiResponse.ok(PageResponse.of(
+                productService.getProductsByCollectionSlug(
+                        slug,
+                        brandId,
+                        minPrice,
+                        maxPrice,
+                        minRating,
+                        maxRating,
+                        featured,
+                        pageable)));
     }
 
     @GetMapping("/{id}/related")
