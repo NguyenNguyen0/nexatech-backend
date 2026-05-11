@@ -93,13 +93,6 @@ public class ProductController {
     @GetMapping("/category/slug/{slug}")
     public ApiResponse<PageResponse<ProductResponse>> getProductsByCategorySlug(
             @PathVariable String slug,
-            Pageable pageable) {
-        return ApiResponse.ok(PageResponse.of(productService.getProductsByCategorySlug(slug, pageable)));
-    }
-
-    @GetMapping("/collections/{slug}")
-    public ApiResponse<PageResponse<ProductResponse>> getProductsByCollectionSlug(
-            @PathVariable String slug,
             @RequestParam(required = false) String brandId,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
@@ -108,7 +101,7 @@ public class ProductController {
             @RequestParam(required = false) Boolean featured,
             Pageable pageable) {
         return ApiResponse.ok(PageResponse.of(
-                productService.getProductsByCollectionSlug(
+                productService.getProductsByCategorySlug(
                         slug,
                         brandId,
                         minPrice,
