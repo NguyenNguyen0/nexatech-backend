@@ -37,6 +37,12 @@ public class Category {
 
     private boolean active;
 
+    /**
+     * Typed filter config for this category.
+     * Null for root/top-level categories that have no filtering constraints.
+     */
+    private CategoryFilter filter;
+
     @Builder.Default
     private Map<String, Object> metadata = new HashMap<>();
 

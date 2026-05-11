@@ -337,11 +337,37 @@ public class ProductService {
                 .filter(Category::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", slug));
 
+        // Merge category-level filter config with caller-supplied params.
+        // Caller params always win (explicit > inferred).
+        String resolvedBrandId = brandId;
+        BigDecimal resolvedMinPrice = minPrice;
+        BigDecimal resolvedMaxPrice = maxPrice;
+
+        com.nexatech.product.model.CategoryFilter cf = category.getFilter();
+        if (cf != null) {
+            // Inject brandSlug from category filter when caller did not supply brandId
+            if (!StringUtils.hasText(resolvedBrandId) && StringUtils.hasText(cf.getBrandSlug())) {
+                resolvedBrandId = brandRepository.findBySlug(cf.getBrandSlug())
+                        .filter(Brand::isActive)
+                        .map(Brand::getId)
+                        .orElse(null);
+            }
+            // Apply default price range from category filter when caller did not supply limits
+            if (cf.getDefaultPriceRange() != null) {
+                if (resolvedMinPrice == null) {
+                    resolvedMinPrice = cf.getDefaultPriceRange().getMin();
+                }
+                if (resolvedMaxPrice == null) {
+                    resolvedMaxPrice = cf.getDefaultPriceRange().getMax();
+                }
+            }
+        }
+
         return getProducts(
                 category.getId(),
-                brandId,
-                minPrice,
-                maxPrice,
+                resolvedBrandId,
+                resolvedMinPrice,
+                resolvedMaxPrice,
                 minRating,
                 maxRating,
                 featured,

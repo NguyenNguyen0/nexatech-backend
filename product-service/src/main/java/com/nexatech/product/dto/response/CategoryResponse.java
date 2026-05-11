@@ -1,5 +1,6 @@
 package com.nexatech.product.dto.response;
 
+import com.nexatech.product.model.CategoryFilter;
 import lombok.Builder;
 import lombok.Data;
 
@@ -17,5 +18,6 @@ public class CategoryResponse {
     private String imageUrl;
     private int sortOrder;
     private boolean active;
+    private CategoryFilter filter;
     private Map<String, Object> metadata;
 }
