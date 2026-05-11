@@ -40,6 +40,13 @@ public class OrderController {
         return ApiResponse.ok(PageResponse.of(orderService.getMyOrders(customerId, pageable)));
     }
 
+    @GetMapping("/check-purchased")
+    public ApiResponse<Boolean> checkPurchased(
+            @RequestParam UUID userId,
+            @RequestParam String productId) {
+        return ApiResponse.ok(orderService.hasPurchasedProduct(userId, productId));
+    }
+
     @PostMapping("/{id}/cancel")
     public ApiResponse<OrderResponse> cancelOrder(
             @RequestHeader("X-User-Id") UUID customerId,

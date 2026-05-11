@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -28,7 +29,15 @@ public class GatewaySecurityConfig {
     @Order(Ordered.LOWEST_PRECEDENCE)
     public SecurityFilterChain jwtRoutes(HttpSecurity http) throws Exception {
         stateless(http);
-        http.authorizeHttpRequests(a -> a.anyRequest().authenticated())
+        http.authorizeHttpRequests(a -> a
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/products/**",
+                    "/api/v1/categories/**",
+                    "/api/v1/brands/**",
+                    "/api/v1/reviews/**")
+                .permitAll()
+                .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
         return http.build();
     }

@@ -3,6 +3,8 @@ package com.nexatech.product.dto.response;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.Map;
+
 @Data
 @Builder
 public class CategoryResponse {
@@ -15,4 +17,5 @@ public class CategoryResponse {
     private String imageUrl;
     private int sortOrder;
     private boolean active;
+    private Map<String, Object> metadata;
 }
