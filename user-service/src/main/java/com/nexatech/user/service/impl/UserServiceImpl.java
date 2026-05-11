@@ -236,9 +236,6 @@ public class UserServiceImpl implements UserService {
     public void requestEmailVerificationOtp(String userId) {
         User user = userRepository.findByIdAndActiveTrue(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        if (Boolean.TRUE.equals(user.getOnBoarded())) {
-            return;
-        }
 
         String otp = generateOtp();
         Instant expiresAt = Instant.now().plusSeconds(OTP_TTL_SECONDS);
