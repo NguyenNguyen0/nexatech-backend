@@ -10,6 +10,8 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 @Document(collection = "categories")
 @Data
@@ -34,6 +36,9 @@ public class Category {
     private int sortOrder;
 
     private boolean active;
+
+    @Builder.Default
+    private Map<String, Object> metadata = new HashMap<>();
 
     @CreatedDate
     private Instant createdAt;

@@ -29,5 +29,7 @@ public interface ProductRepository extends MongoRepository<Product, String> {
 
     boolean existsByCategoryIdAndActiveTrue(String categoryId);
 
+    long countByCategoryIdAndActiveTrue(String categoryId);
+
     boolean existsByBrandIdAndActiveTrue(String brandId);
 }

@@ -15,6 +15,8 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
     Optional<InventoryItem> findByProductId(String productId);
 
+    Optional<InventoryItem> findBySku(String sku);
+
     List<InventoryItem> findByProductIdIn(List<String> productIds);
 
     List<InventoryItem> findByQuantityLessThanEqual(int threshold);

@@ -40,6 +40,18 @@
       "value": ""
     },
     {
+      "key": "categorySlug",
+      "value": "smartphones"
+    },
+    {
+      "key": "brandSlug",
+      "value": "apple"
+    },
+    {
+      "key": "productSlug",
+      "value": "iphone-15-pro-api"
+    },
+    {
       "key": "reviewId",
       "value": ""
     },
@@ -83,7 +95,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Smartphones\",\n  \"description\": \"Danh muc dien thoai\",\n  \"sortOrder\": 1\n}"
+              "raw": "{\n  \"name\": \"Smartphones\",\n  \"description\": \"Danh muc dien thoai\",\n  \"sortOrder\": 1,\n  \"metadata\": {\n    \"seoTitle\": \"Smartphones Collection\",\n    \"seoDescription\": \"Danh muc smartphone chinh hang\",\n    \"bannerImage\": \"https://dummyimage.com/1200x300/smartphones\"\n  }\n}"
             },
             "url": {
               "raw": "{{productBaseUrl}}/api/v1/categories",
@@ -139,6 +151,112 @@
           "response": []
         },
         {
+          "name": "get category by slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/categories/slug/{{categorySlug}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "slug",
+                "{{categorySlug}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get category subcategories by slug (recursive)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/categories/slug/{{categorySlug}}/subcategories",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "slug",
+                "{{categorySlug}}",
+                "subcategories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get category subcategories by id (recursive)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/categories/{{categoryId}}/subcategories",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "{{categoryId}}",
+                "subcategories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get category menu (recursive tree)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/categories/menu",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "menu"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get category meta by slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/categories/slug/{{categorySlug}}/meta",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "slug",
+                "{{categorySlug}}",
+                "meta"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "update category",
           "request": {
             "method": "PUT",
@@ -150,7 +268,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Smartphones Updated\",\n  \"description\": \"Danh muc dien thoai update\",\n  \"sortOrder\": 2\n}"
+              "raw": "{\n  \"name\": \"Smartphones Updated\",\n  \"description\": \"Danh muc dien thoai update\",\n  \"sortOrder\": 2,\n  \"metadata\": {\n    \"seoTitle\": \"Smartphones Updated Collection\",\n    \"seoDescription\": \"Danh muc smartphone update\",\n    \"bannerImage\": \"https://dummyimage.com/1200x300/smartphones-updated\"\n  }\n}"
             },
             "url": {
               "raw": "{{productBaseUrl}}/api/v1/categories/{{categoryId}}",
@@ -252,6 +370,27 @@
                 "v1",
                 "brands",
                 "{{brandId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get brand by slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands/slug/{{brandSlug}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands",
+                "slug",
+                "{{brandSlug}}"
               ]
             }
           },
@@ -391,6 +530,91 @@
           "response": []
         },
         {
+          "name": "list products (combined filters)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products?categoryId={{categoryId}}&brandId={{brandId}}&minPrice=1000000&maxPrice=50000000&minRating=3.5&page=0&size=10&sort=price,asc",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "categoryId",
+                  "value": "{{categoryId}}"
+                },
+                {
+                  "key": "brandId",
+                  "value": "{{brandId}}"
+                },
+                {
+                  "key": "minPrice",
+                  "value": "1000000"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "50000000"
+                },
+                {
+                  "key": "minRating",
+                  "value": "3.5"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "price,asc"
+                }
+              ]
+            },
+            "description": "Phase 1: Combined filter by category, brand, price range, rating and sort by allowed field."
+          },
+          "response": []
+        },
+        {
+          "name": "get featured products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/featured?page=0&size=10",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "featured"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Phase 2: Dynamic featured ranking by averageRating desc, then createdAt desc."
+          },
+          "response": []
+        },
+        {
           "name": "get product by id",
           "request": {
             "method": "GET",
@@ -411,12 +635,55 @@
           "response": []
         },
         {
-          "name": "search products",
+          "name": "get product by slug",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products/search?keyword={{searchKeyword}}&page=0&size=10",
+              "raw": "{{productBaseUrl}}/api/v1/products/slug/{{productSlug}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "slug",
+                "{{productSlug}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get related products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/related",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "{{productId}}",
+                "related"
+              ]
+            },
+            "description": "Phase 2: Return up to 8 related products in same category (excluding current product)."
+          },
+          "response": []
+        },
+        {
+          "name": "search products (advanced)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/search?keyword={{searchKeyword}}&categoryId=&brandId=&minPrice=&maxPrice=&minRating=&maxRating=&page=0&size=10",
               "host": [
                 "{{productBaseUrl}}"
               ],
@@ -432,6 +699,36 @@
                   "value": "{{searchKeyword}}"
                 },
                 {
+                  "key": "categoryId",
+                  "value": "",
+                  "description": "Optional: filter by category ID"
+                },
+                {
+                  "key": "brandId",
+                  "value": "",
+                  "description": "Optional: filter by brand ID"
+                },
+                {
+                  "key": "minPrice",
+                  "value": "",
+                  "description": "Optional: minimum price"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "",
+                  "description": "Optional: maximum price"
+                },
+                {
+                  "key": "minRating",
+                  "value": "",
+                  "description": "Optional: minimum average rating (0-5)"
+                },
+                {
+                  "key": "maxRating",
+                  "value": "",
+                  "description": "Optional: maximum average rating (0-5)"
+                },
+                {
                   "key": "page",
                   "value": "0"
                 },
@@ -440,7 +737,36 @@
                   "value": "10"
                 }
               ]
-            }
+            },
+            "description": "Phase 5: Advanced search combining full-text keyword with optional filters: categoryId, brandId, minPrice, maxPrice, minRating, maxRating."
+          },
+          "response": []
+        },
+        {
+          "name": "suggest products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/suggest?q=iphone",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "suggest"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "iphone",
+                  "description": "Autocomplete prefix/substring — returns top 5 matching product names"
+                }
+              ]
+            },
+            "description": "Phase 5: Autocomplete/suggest endpoint. Returns up to 5 product name suggestions matching the query string. Optimised for low latency (<200 ms) via regex index on name field."
           },
           "response": []
         },
@@ -472,6 +798,94 @@
                 }
               ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "get products by category slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/category/slug/{{categorySlug}}?page=0&size=10&sort=createdAt,desc",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "category",
+                "slug",
+                "{{categorySlug}}"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "createdAt,desc"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get products by collection slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/collections/{{categorySlug}}?brandId={{brandId}}&minPrice=1000000&maxPrice=50000000&minRating=3.5&page=0&size=10&sort=price,asc",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "collections",
+                "{{categorySlug}}"
+              ],
+              "query": [
+                {
+                  "key": "brandId",
+                  "value": "{{brandId}}"
+                },
+                {
+                  "key": "minPrice",
+                  "value": "1000000"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "50000000"
+                },
+                {
+                  "key": "minRating",
+                  "value": "3.5"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "price,asc"
+                }
+              ]
+            },
+            "description": "Collection route slug-first cho storefront: filter/sort/pagination giong endpoint products."
           },
           "response": []
         },
@@ -749,6 +1163,37 @@
           "response": []
         },
         {
+          "name": "import from CSV (Phase 6)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "docs/sample-inventory-import.csv"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{inventoryBaseUrl}}/api/v1/inventory/import",
+              "host": [
+                "{{inventoryBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "inventory",
+                "import"
+              ]
+            },
+            "description": "Phase 6: Import inventory stock from CSV file. Columns: sku, quantity, warehouse. Response includes successCount, failureCount, totalLines, and errorLines with detailed error messages."
+          },
+          "response": []
+        },
+        {
           "name": "update warehouse info",
           "request": {
             "method": "PATCH",
@@ -1011,84 +1456,72 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Excellent product, highly recommended!\"\n}"
+              "raw": "{\n  \"rating\": 5,\n  \"title\": \"Excellent product\",\n  \"content\": \"Excellent product, highly recommended!\",\n  \"images\": [\"https://dummyimage.com/600x600/review\"]\n}"
             },
             "url": {
               "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews",
               "host": ["{{productBaseUrl}}"],
               "path": ["api", "v1", "products", "{{productId}}", "reviews"]
             },
-            "description": "Create a review for a product. Requires X-User-Id header. One review per user per product."
+            "description": "Create a review for a product. Requires X-User-Id header. Buyer-only and one review per user per product."
           },
           "response": []
         },
         {
-          "name": "get approved reviews",
+          "name": "get reviews (sorted by helpful)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews?page=0&size=10",
+              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews?page=0&size=10&sort=helpfulCount,desc",
               "host": ["{{productBaseUrl}}"],
               "path": ["api", "v1", "products", "{{productId}}", "reviews"],
               "query": [
                 { "key": "page", "value": "0" },
-                { "key": "size", "value": "10" }
+                { "key": "size", "value": "10" },
+                { "key": "sort", "value": "helpfulCount,desc" }
               ]
             },
-            "description": "Get approved reviews for a product (paginated). Public endpoint."
+            "description": "Get reviews for a product (paginated). Sort example: helpfulCount desc."
           },
           "response": []
         },
         {
-          "name": "get all reviews (ADMIN)",
+          "name": "update review",
           "request": {
-            "method": "GET",
+            "method": "PUT",
             "header": [
-              { "key": "X-User-Role", "value": "ADMIN", "description": "Admin role required" }
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{userId}}", "description": "Owner or ADMIN can update" },
+              { "key": "X-User-Role", "value": "ADMIN", "description": "Optional. Needed if updater is not owner." }
             ],
-            "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews/all?page=0&size=10",
-              "host": ["{{productBaseUrl}}"],
-              "path": ["api", "v1", "products", "{{productId}}", "reviews", "all"],
-              "query": [
-                { "key": "page", "value": "0" },
-                { "key": "size", "value": "10" }
-              ]
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 4,\n  \"title\": \"Updated review title\",\n  \"content\": \"Updated review content\",\n  \"images\": [\"https://dummyimage.com/600x600/review-updated\"]\n}"
             },
-            "description": "Get all reviews (including unapproved) for a product. ADMIN only."
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/reviews/{{reviewId}}",
+              "host": ["{{productBaseUrl}}"],
+              "path": ["api", "v1", "reviews", "{{reviewId}}"]
+            },
+            "description": "Update review content/rating. No time limit."
           },
           "response": []
         },
         {
-          "name": "approve review (ADMIN)",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              { "key": "X-User-Role", "value": "ADMIN", "description": "Admin role required" }
-            ],
-            "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews/{{reviewId}}/approve",
-              "host": ["{{productBaseUrl}}"],
-              "path": ["api", "v1", "products", "{{productId}}", "reviews", "{{reviewId}}", "approve"]
-            },
-            "description": "Approve a review. Publishes ReviewApprovedEvent to Kafka topic review.events. ADMIN only."
-          },
-          "response": []
-        },
-        {
-          "name": "delete review (ADMIN)",
+          "name": "delete review",
           "request": {
             "method": "DELETE",
             "header": [
-              { "key": "X-User-Role", "value": "ADMIN", "description": "Admin role required" }
+              { "key": "X-User-Id", "value": "{{userId}}", "description": "Owner or ADMIN can delete" },
+              { "key": "X-User-Role", "value": "ADMIN", "description": "Optional. Needed if deleter is not owner." }
             ],
             "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products/{{productId}}/reviews/{{reviewId}}",
+              "raw": "{{productBaseUrl}}/api/v1/reviews/{{reviewId}}",
               "host": ["{{productBaseUrl}}"],
-              "path": ["api", "v1", "products", "{{productId}}", "reviews", "{{reviewId}}"]
+              "path": ["api", "v1", "reviews", "{{reviewId}}"]
             },
-            "description": "Delete a review. ADMIN only."
+            "description": "Delete a review by id."
           },
           "response": []
         }

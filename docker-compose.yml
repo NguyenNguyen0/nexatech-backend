@@ -264,6 +264,7 @@ services:
       - "8888:8888"
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - MONGO_PRODUCT_URL=${MONGO_PRODUCT_URL:-mongodb://nexatech:nexatech123@mongodb:27017/nexatech_products?authSource=admin}
       - JAVA_TOOL_OPTIONS=-Xmx192m
     depends_on:
       discovery-server:
@@ -346,7 +347,7 @@ services:
     environment:
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
-      - SPRING_DATA_MONGODB_URI=mongodb://${MONGO_USER:-nexatech}:${MONGO_PASSWORD:-nexatech123}@mongodb:27017/nexatech_products?authSource=admin
+      - SPRING_DATA_MONGODB_URI=${MONGO_PRODUCT_URL:-mongodb://nexatech:nexatech123@mongodb:27017/nexatech_products?authSource=admin}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - SPRING_DATA_REDIS_HOST=redis
       - JAVA_TOOL_OPTIONS=-Xmx200m
