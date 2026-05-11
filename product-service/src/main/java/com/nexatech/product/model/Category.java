@@ -31,8 +31,6 @@ public class Category {
 
     private String parentId;
 
-    private String imageUrl;
-
     private int sortOrder;
 
     private boolean active;

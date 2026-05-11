@@ -15,6 +15,6 @@ public class ProductCatalogEvent {
     private Instant timestamp;
     private String productId;
     private String name;
-    private String categoryId;
+    private String primaryCategoryId;
     private boolean active;
 }

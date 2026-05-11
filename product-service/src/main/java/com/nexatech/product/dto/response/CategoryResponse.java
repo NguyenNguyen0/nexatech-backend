@@ -15,7 +15,6 @@ public class CategoryResponse {
     private String slug;
     private String description;
     private String parentId;
-    private String imageUrl;
     private int sortOrder;
     private boolean active;
     private CategoryFilter filter;

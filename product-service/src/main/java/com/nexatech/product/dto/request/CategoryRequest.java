@@ -16,8 +16,6 @@ public class CategoryRequest {
 
     private String parentId;
 
-    private String imageUrl;
-
     private int sortOrder;
 
     private CategoryFilter filter;
