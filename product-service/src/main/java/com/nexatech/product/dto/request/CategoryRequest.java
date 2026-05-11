@@ -3,6 +3,8 @@ package com.nexatech.product.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.Map;
+
 @Data
 public class CategoryRequest {
 
@@ -16,4 +18,6 @@ public class CategoryRequest {
     private String imageUrl;
 
     private int sortOrder;
+
+    private Map<String, Object> metadata;
 }

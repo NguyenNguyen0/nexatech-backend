@@ -1,6 +1,8 @@
 package com.nexatech.inventory.service;
 
 import com.nexatech.inventory.dto.BulkImportResult;
+import com.nexatech.inventory.dto.CSVImportError;
+import com.nexatech.inventory.dto.CSVImportResult;
 import com.nexatech.inventory.dto.InventoryResponse;
 import com.nexatech.inventory.dto.StockCheckRequest;
 import com.nexatech.inventory.dto.StockUpdateRequest;
@@ -19,8 +21,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -273,5 +279,117 @@ public class InventoryService {
                 .build();
 
         inventoryEventProducer.publishInventoryEvent(item.getProductId(), event);
+    }
+
+    @Transactional
+    public CSVImportResult importFromCSV(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("CSV file must not be empty");
+        }
+
+        List<CSVImportError> errorLines = new ArrayList<>();
+        int successCount = 0;
+        int lineNumber = 0;
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+            String line;
+            boolean isHeaderLine = true;
+
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+
+                // Skip header
+                if (isHeaderLine) {
+                    isHeaderLine = false;
+                    continue;
+                }
+
+                String[] parts = line.split(",");
+                if (parts.length < 3) {
+                    errorLines.add(CSVImportError.builder()
+                            .lineNumber(lineNumber)
+                            .sku(parts.length > 0 ? parts[0].trim() : "")
+                            .reason("Invalid CSV format: expected at least 3 columns (sku, quantity, warehouse)")
+                            .build());
+                    continue;
+                }
+
+                String sku = parts[0].trim();
+                String quantityStr = parts[1].trim();
+                String warehouse = parts[2].trim();
+
+                // Validate sku
+                if (!StringUtils.hasText(sku)) {
+                    errorLines.add(CSVImportError.builder()
+                            .lineNumber(lineNumber)
+                            .sku("")
+                            .reason("SKU is required")
+                            .build());
+                    continue;
+                }
+
+                // Validate and parse quantity
+                int quantity;
+                try {
+                    quantity = Integer.parseInt(quantityStr);
+                    if (quantity < 0) {
+                        throw new NumberFormatException("Negative quantity");
+                    }
+                } catch (NumberFormatException e) {
+                    errorLines.add(CSVImportError.builder()
+                            .lineNumber(lineNumber)
+                            .sku(sku)
+                            .reason("Invalid quantity: " + quantityStr)
+                            .build());
+                    continue;
+                }
+
+                try {
+                    // Find by SKU
+                    InventoryItem item = inventoryItemRepository.findBySku(sku)
+                            .orElseThrow(() -> new ResourceNotFoundException("Inventory item", "sku", sku));
+
+                    // Update stock
+                    int oldQuantity = item.getQuantity();
+                    item.setQuantity(quantity);
+                    if (StringUtils.hasText(warehouse)) {
+                        item.setWarehouseLocation(warehouse);
+                    }
+                    InventoryItem saved = inventoryItemRepository.save(item);
+
+                    int delta = quantity - oldQuantity;
+                    if (delta != 0) {
+                        recordMovement(saved.getProductId(), StockMovement.MovementType.ADJUSTMENT, Math.abs(delta),
+                                "CSV_IMPORT", "Imported from CSV line " + lineNumber, null);
+                    }
+
+                    publishLowStockEventIfNeeded(saved);
+                    successCount++;
+
+                } catch (ResourceNotFoundException e) {
+                    errorLines.add(CSVImportError.builder()
+                            .lineNumber(lineNumber)
+                            .sku(sku)
+                            .reason("SKU not found in inventory")
+                            .build());
+                } catch (Exception e) {
+                    errorLines.add(CSVImportError.builder()
+                            .lineNumber(lineNumber)
+                            .sku(sku)
+                            .reason("Failed to process: " + e.getMessage())
+                            .build());
+                }
+            }
+
+        } catch (Exception e) {
+            throw new BadRequestException("Failed to parse CSV file: " + e.getMessage());
+        }
+
+        return CSVImportResult.builder()
+                .successCount(successCount)
+                .failureCount(errorLines.size())
+                .totalLines(lineNumber - 1) // Exclude header
+                .errorLines(errorLines)
+                .build();
     }
 }
