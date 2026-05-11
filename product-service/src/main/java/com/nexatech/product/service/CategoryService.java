@@ -70,6 +70,13 @@ public class CategoryService {
         return categoryMapper.toResponse(getActiveCategory(id));
     }
 
+    public CategoryResponse getCategoryBySlug(String slug) {
+        Category category = categoryRepository.findBySlug(slug)
+                .filter(Category::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", slug));
+        return categoryMapper.toResponse(category);
+    }
+
     public List<CategoryResponse> getAllCategories() {
         return categoryRepository.findByActiveTrue().stream()
                 .sorted((a, b) -> Integer.compare(a.getSortOrder(), b.getSortOrder()))

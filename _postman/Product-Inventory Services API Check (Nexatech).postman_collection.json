@@ -40,6 +40,18 @@
       "value": ""
     },
     {
+      "key": "categorySlug",
+      "value": "smartphones"
+    },
+    {
+      "key": "brandSlug",
+      "value": "apple"
+    },
+    {
+      "key": "productSlug",
+      "value": "iphone-15-pro-api"
+    },
+    {
       "key": "reviewId",
       "value": ""
     },
@@ -133,6 +145,27 @@
                 "v1",
                 "categories",
                 "{{categoryId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get category by slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/categories/slug/{{categorySlug}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "slug",
+                "{{categorySlug}}"
               ]
             }
           },
@@ -252,6 +285,27 @@
                 "v1",
                 "brands",
                 "{{brandId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get brand by slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/brands/slug/{{brandSlug}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "brands",
+                "slug",
+                "{{brandSlug}}"
               ]
             }
           },
@@ -490,6 +544,27 @@
                 "v1",
                 "products",
                 "{{productId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get product by slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/slug/{{productSlug}}",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "slug",
+                "{{productSlug}}"
               ]
             }
           },

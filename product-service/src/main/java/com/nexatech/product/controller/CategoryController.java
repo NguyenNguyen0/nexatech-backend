@@ -36,6 +36,11 @@ public class CategoryController {
         return ApiResponse.ok(categoryService.getCategory(id));
     }
 
+    @GetMapping("/slug/{slug}")
+    public ApiResponse<CategoryResponse> getCategoryBySlug(@PathVariable String slug) {
+        return ApiResponse.ok(categoryService.getCategoryBySlug(slug));
+    }
+
     @GetMapping
     public ApiResponse<List<CategoryResponse>> getAllCategories() {
         return ApiResponse.ok(categoryService.getAllCategories());

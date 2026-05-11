@@ -103,6 +103,13 @@ public class ProductService {
         return enrichProductResponse(productMapper.toResponse(getActiveProduct(id)));
     }
 
+    public ProductResponse getProductBySlug(String slug) {
+        Product product = productRepository.findBySlug(slug)
+                .filter(Product::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "slug", slug));
+        return enrichProductResponse(productMapper.toResponse(product));
+    }
+
     public Page<ProductResponse> getProducts(String categoryId,
                                              String brandId,
                                              BigDecimal minPrice,

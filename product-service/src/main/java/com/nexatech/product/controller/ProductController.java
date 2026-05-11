@@ -41,6 +41,11 @@ public class ProductController {
         return ApiResponse.ok(productService.getProduct(id));
     }
 
+    @GetMapping("/slug/{slug}")
+    public ApiResponse<ProductResponse> getProductBySlug(@PathVariable String slug) {
+        return ApiResponse.ok(productService.getProductBySlug(slug));
+    }
+
     @GetMapping
     public ApiResponse<PageResponse<ProductResponse>> getProducts(
             @RequestParam(required = false) String categoryId,

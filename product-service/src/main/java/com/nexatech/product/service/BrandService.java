@@ -63,6 +63,13 @@ public class BrandService {
         return brandMapper.toResponse(getActiveBrand(id));
     }
 
+    public BrandResponse getBrandBySlug(String slug) {
+        Brand brand = brandRepository.findBySlug(slug)
+                .filter(Brand::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Brand", "slug", slug));
+        return brandMapper.toResponse(brand);
+    }
+
     public List<BrandResponse> getAllBrands() {
         return brandRepository.findByActiveTrue().stream()
                 .map(brandMapper::toResponse)
