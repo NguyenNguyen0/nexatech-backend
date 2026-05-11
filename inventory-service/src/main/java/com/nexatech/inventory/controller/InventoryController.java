@@ -2,6 +2,7 @@ package com.nexatech.inventory.controller;
 
 import com.nexatech.inventory.dto.response.ApiResponse;
 import com.nexatech.inventory.dto.BulkImportResult;
+import com.nexatech.inventory.dto.CSVImportResult;
 import com.nexatech.inventory.dto.InventoryResponse;
 import com.nexatech.inventory.dto.StockCheckRequest;
 import com.nexatech.inventory.dto.StockUpdateRequest;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -64,6 +66,11 @@ public class InventoryController {
     @PostMapping("/bulk-import")
     public ApiResponse<BulkImportResult> bulkImport(@Valid @RequestBody List<StockUpdateRequest> requests) {
         return ApiResponse.ok(inventoryService.bulkImport(requests));
+    }
+
+    @PostMapping("/import")
+    public ApiResponse<CSVImportResult> importFromCSV(@RequestParam("file") MultipartFile file) {
+        return ApiResponse.ok(inventoryService.importFromCSV(file));
     }
 
     @PatchMapping("/{productId}/warehouse")

@@ -59,6 +59,9 @@ public class ProductImageService {
         }
 
         product.setImages(current);
+        if (!StringUtils.hasText(product.getThumbnail()) && !current.isEmpty()) {
+            product.setThumbnail(current.getFirst());
+        }
         return enrichWithBrandName(productMapper.toResponse(productRepository.save(product)));
     }
 
@@ -79,6 +82,9 @@ public class ProductImageService {
         List<String> updated = new ArrayList<>(current);
         updated.remove(imageUrl);
         product.setImages(updated);
+        if (!updated.contains(product.getThumbnail())) {
+            product.setThumbnail(updated.isEmpty() ? null : updated.getFirst());
+        }
         return enrichWithBrandName(productMapper.toResponse(productRepository.save(product)));
     }
 
@@ -98,6 +104,7 @@ public class ProductImageService {
         }
 
         product.setImages(new ArrayList<>(orderedUrls));
+        product.setThumbnail(orderedUrls.isEmpty() ? null : orderedUrls.getFirst());
         return enrichWithBrandName(productMapper.toResponse(productRepository.save(product)));
     }
 

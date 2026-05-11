@@ -9,5 +9,7 @@ public class BrandRequest {
     @NotBlank(message = "Brand name must not be blank")
     private String name;
 
+    private String parentBrandId;
+
     private String logoUrl;
 }

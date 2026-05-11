@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -14,7 +15,9 @@ public class ReviewResponse {
     private String productId;
     private UUID userId;
     private int rating;
-    private String comment;
-    private boolean approved;
+    private String title;
+    private String content;
+    private List<String> images;
+    private long helpfulCount;
     private Instant createdAt;
 }
