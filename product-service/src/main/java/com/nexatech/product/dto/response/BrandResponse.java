@@ -12,7 +12,9 @@ public class BrandResponse {
     private String id;
     private String name;
     private String slug;
+    private String parentBrandId;
     private String logoUrl;
     private boolean active;
     private Instant createdAt;
+    private Instant updatedAt;
 }

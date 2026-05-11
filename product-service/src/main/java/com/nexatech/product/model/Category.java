@@ -10,6 +10,8 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 @Document(collection = "categories")
 @Data
@@ -29,11 +31,18 @@ public class Category {
 
     private String parentId;
 
-    private String imageUrl;
-
     private int sortOrder;
 
     private boolean active;
+
+    /**
+     * Typed filter config for this category.
+     * Null for root/top-level categories that have no filtering constraints.
+     */
+    private CategoryFilter filter;
+
+    @Builder.Default
+    private Map<String, Object> metadata = new HashMap<>();
 
     @CreatedDate
     private Instant createdAt;

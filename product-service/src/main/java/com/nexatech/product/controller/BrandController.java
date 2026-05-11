@@ -36,6 +36,11 @@ public class BrandController {
         return ApiResponse.ok(brandService.getBrand(id));
     }
 
+    @GetMapping("/slug/{slug}")
+    public ApiResponse<BrandResponse> getBrandBySlug(@PathVariable String slug) {
+        return ApiResponse.ok(brandService.getBrandBySlug(slug));
+    }
+
     @GetMapping
     public ApiResponse<List<BrandResponse>> getAllBrands() {
         return ApiResponse.ok(brandService.getAllBrands());
