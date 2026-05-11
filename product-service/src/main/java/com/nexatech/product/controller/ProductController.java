@@ -4,6 +4,7 @@ import com.nexatech.product.dto.request.ProductRequest;
 import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.PageResponse;
 import com.nexatech.product.dto.response.ProductResponse;
+import com.nexatech.product.dto.response.ProductSuggestResponse;
 import com.nexatech.product.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -74,7 +75,7 @@ public class ProductController {
     }
 
     @GetMapping("/suggest")
-    public ApiResponse<List<String>> suggestProducts(@RequestParam String q) {
+    public ApiResponse<List<ProductSuggestResponse>> suggestProducts(@RequestParam String q) {
         return ApiResponse.ok(productService.suggestProducts(q));
     }
 

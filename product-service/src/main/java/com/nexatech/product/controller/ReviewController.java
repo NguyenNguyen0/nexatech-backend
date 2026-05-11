@@ -32,7 +32,8 @@ public class ReviewController {
     @GetMapping
     public ApiResponse<PageResponse<ReviewResponse>> getReviews(
             @PathVariable String productId,
+            @RequestParam(required = false) Integer rating,
             Pageable pageable) {
-        return ApiResponse.ok(PageResponse.of(reviewService.getAllReviews(productId, pageable)));
+        return ApiResponse.ok(PageResponse.of(reviewService.getAllReviews(productId, rating, pageable)));
     }
 }

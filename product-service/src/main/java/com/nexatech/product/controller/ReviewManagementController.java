@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PostMapping;
 
 import java.util.UUID;
 
@@ -39,5 +40,10 @@ public class ReviewManagementController {
             @RequestHeader(value = "X-User-Role", required = false) String role) {
         reviewService.deleteReview(id, userId, role);
         return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/{id}/helpful")
+    public ApiResponse<ReviewResponse> markHelpful(@PathVariable String id) {
+        return ApiResponse.ok(reviewService.markHelpful(id));
     }
 }

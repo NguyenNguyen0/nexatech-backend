@@ -48,11 +48,15 @@ public class ReviewService {
         return reviewMapper.toResponse(reviewRepository.save(review));
     }
 
-    public Page<ReviewResponse> getAllReviews(String productId, Pageable pageable) {
+    public Page<ReviewResponse> getAllReviews(String productId, Integer rating, Pageable pageable) {
         productRepository.findByIdAndActiveTrue(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
-        return reviewRepository.findByProductId(productId, pageable)
+        if (rating != null) {
+            return reviewRepository.findByProductIdAndRating(productId, rating, pageable)
                 .map(reviewMapper::toResponse);
+        }
+        return reviewRepository.findByProductId(productId, pageable)
+            .map(reviewMapper::toResponse);
     }
 
     public ReviewResponse updateReview(String reviewId, UUID userId, String role, ReviewRequest request) {
@@ -72,6 +76,12 @@ public class ReviewService {
         Review review = findReview(reviewId);
         assertOwnerOrAdmin(review, userId, role);
         reviewRepository.delete(review);
+    }
+
+    public ReviewResponse markHelpful(String reviewId) {
+        Review review = findReview(reviewId);
+        review.setHelpfulCount(review.getHelpfulCount() + 1);
+        return reviewMapper.toResponse(reviewRepository.save(review));
     }
 
     private Review findReview(String reviewId) {

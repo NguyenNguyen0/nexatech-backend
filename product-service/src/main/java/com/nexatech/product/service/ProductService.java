@@ -2,6 +2,9 @@ package com.nexatech.product.service;
 
 import com.nexatech.product.dto.request.ProductRequest;
 import com.nexatech.product.dto.response.ProductResponse;
+import com.nexatech.product.client.InventoryClient;
+import com.nexatech.product.client.dto.InventoryStockResponse;
+import com.nexatech.product.dto.response.ProductSuggestResponse;
 import com.nexatech.product.event.ProductCatalogEvent;
 import com.nexatech.product.event.ProductEventProducer;
 import com.nexatech.product.exception.BadRequestException;
@@ -15,6 +18,7 @@ import com.nexatech.product.repository.CategoryRepository;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -42,6 +46,7 @@ import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProductService {
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("price", "name", "createdAt");
@@ -54,6 +59,7 @@ public class ProductService {
     private final ProductMapper productMapper;
     private final ProductEventProducer productEventProducer;
     private final MongoTemplate mongoTemplate;
+    private final InventoryClient inventoryClient;
 
     public ProductResponse createProduct(ProductRequest request) {
         validateCategory(request.getCategoryId());
@@ -269,7 +275,7 @@ public class ProductService {
         return new PageImpl<>(content, pageable, total);
     }
 
-    public List<String> suggestProducts(String q) {
+    public List<ProductSuggestResponse> suggestProducts(String q) {
         if (!StringUtils.hasText(q) || q.trim().length() < 1) {
             return List.of();
         }
@@ -279,11 +285,17 @@ public class ProductService {
                 Criteria.where("active").is(true),
                 Criteria.where("name").regex(regex)
         ));
-        query.fields().include("name");
+        query.fields().include("name").include("slug").include("thumbnail").include("price");
         query.limit(5);
         return mongoTemplate.find(query, Product.class).stream()
-                .map(Product::getName)
-                .toList();
+            .map(p -> ProductSuggestResponse.builder()
+                .id(p.getId())
+                .name(p.getName())
+                .slug(p.getSlug())
+                .thumbnail(p.getThumbnail())
+                .price(p.getPrice())
+                .build())
+            .toList();
     }
 
     public Page<ProductResponse> getProductsByCategory(String categoryId, Pageable pageable) {
@@ -373,6 +385,25 @@ public class ProductService {
         Double avg = reviewRepository.getAverageRatingByProductId(response.getId());
         if (avg != null) {
             response.setAverageRating(Math.round(avg * 10.0) / 10.0);
+
+                try {
+                    InventoryStockResponse inv = inventoryClient.getStock(response.getId());
+                    if (inv != null && inv.getData() != null) {
+                        int available = inv.getData().getAvailableQuantity();
+                        int reorder = inv.getData().getReorderLevel();
+                        response.setStockQuantity(available);
+                        if (available <= 0) {
+                            response.setStockStatus("OUT_OF_STOCK");
+                        } else if (available <= reorder) {
+                            response.setStockStatus("LOW_STOCK");
+                        } else {
+                            response.setStockStatus("IN_STOCK");
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("Could not fetch inventory for product {}: {}", response.getId(), e.getMessage());
+                }
+
         }
         return response;
     }

@@ -34,6 +34,8 @@ public class ProductResponse {
     private Map<String, String> metadata;
     private boolean active;
     private Double averageRating;
+    private Integer stockQuantity;
+    private String stockStatus;
     private Instant createdAt;
     private Instant updatedAt;
 }

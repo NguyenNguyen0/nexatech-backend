@@ -15,6 +15,8 @@ public interface ReviewRepository extends MongoRepository<Review, String> {
 
     Page<Review> findByProductId(String productId, Pageable pageable);
 
+    Page<Review> findByProductIdAndRating(String productId, int rating, Pageable pageable);
+
     @Aggregation(pipeline = {
             "{ $match: { productId: ?0 } }",
             "{ $group: { _id: null, avg: { $avg: '$rating' } } }"
