@@ -325,22 +325,14 @@ public class ProductService {
         return new PageImpl<>(content, pageable, total);
     }
 
-    public Page<ProductResponse> getProductsByCategorySlug(String slug, Pageable pageable) {
-        Category category = categoryRepository.findBySlug(slug)
-                .filter(Category::isActive)
-                .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", slug));
-
-        return getProductsByCategory(category.getId(), pageable);
-    }
-
-    public Page<ProductResponse> getProductsByCollectionSlug(String slug,
-                                                             String brandId,
-                                                             BigDecimal minPrice,
-                                                             BigDecimal maxPrice,
-                                                             Double minRating,
-                                                             Double maxRating,
-                                                             Boolean featured,
-                                                             Pageable pageable) {
+    public Page<ProductResponse> getProductsByCategorySlug(String slug,
+                                                            String brandId,
+                                                            BigDecimal minPrice,
+                                                            BigDecimal maxPrice,
+                                                            Double minRating,
+                                                            Double maxRating,
+                                                            Boolean featured,
+                                                            Pageable pageable) {
         Category category = categoryRepository.findBySlug(slug)
                 .filter(Category::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", slug));
