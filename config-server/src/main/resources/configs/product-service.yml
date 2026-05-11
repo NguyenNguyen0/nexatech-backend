@@ -4,7 +4,7 @@ server:
 spring:
   data:
     mongodb:
-      uri: mongodb://${MONGO_USER:nexatech}:${MONGO_PASSWORD:nexatech123}@localhost:27017/nexatech_products?authSource=admin&authMechanism=SCRAM-SHA-256
+      uri: ${MONGO_PRODUCT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_products?authSource=admin&authMechanism=SCRAM-SHA-256}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
