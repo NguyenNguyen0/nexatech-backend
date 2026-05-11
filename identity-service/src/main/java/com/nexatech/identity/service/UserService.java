@@ -10,6 +10,7 @@ import com.nexatech.identity.client.KeycloakRoleClient;
 import com.nexatech.identity.client.KeycloakUserClient;
 import com.nexatech.identity.dto.request.Credential;
 import com.nexatech.identity.dto.request.KeycloakRoleRef;
+import com.nexatech.identity.dto.request.KeycloakUserCreationParam;
 import com.nexatech.identity.dto.request.UserCreationParam;
 import com.nexatech.identity.dto.request.UserUpdateParam;
 import com.nexatech.identity.exception.AppException;
@@ -36,7 +37,7 @@ public class UserService {
             throw new IllegalArgumentException("credentials is required");
         }
 
-        UserCreationParam body = UserCreationParam.builder()
+        KeycloakUserCreationParam body = KeycloakUserCreationParam.builder()
                 .id(param.getId())
                 .username(param.getUsername())
                 .firstName(param.getFirstName())

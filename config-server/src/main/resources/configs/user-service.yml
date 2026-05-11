@@ -22,7 +22,18 @@ spring:
       group-id: ${KAFKA_GROUP_ID}
     topics:
       user-registration: user-registration
+      user-events: user.events
 
 openfeign:
   identity-service:
     url: ${IDENTITY_SERVICE_URL}
+
+resilience4j:
+  retry:
+    instances:
+      identityService:
+        base-config: default
+  circuitbreaker:
+    instances:
+      identityService:
+        base-config: default

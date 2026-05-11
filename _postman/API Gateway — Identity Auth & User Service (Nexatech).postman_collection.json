@@ -1,9 +1,10 @@
 {
   "info": {
+    "_postman_id": "4048e3d4-a21d-4f69-819c-2d0b8dc3ff7a",
     "name": "API Gateway — Identity Auth & User Service (Nexatech)",
     "description": "Gọi qua **API Gateway** (`api/v1/...`, port mặc định 8080).\n\nToken: **Login** → `accessToken` / `refreshToken` (script test giống collection cũ). Các request cần JWT: header **Authorization: Bearer {{accessToken}}**.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_postman_id": "a1b2c3d4-gateway-nexatech-identity-user"
+    "_exporter_id": "40740215"
   },
   "item": [
     {
@@ -95,35 +96,6 @@
                 "v1",
                 "auth",
                 "login"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "refresh",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{ \"refreshToken\": \"{{refreshToken}}\" }"
-            },
-            "url": {
-              "raw": "{{gatewayBaseUrl}}/api/v1/auth/refresh",
-              "host": [
-                "{{gatewayBaseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "refresh"
               ]
             }
           },
@@ -235,7 +207,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"email\": \"nvminh16999@gmail.com\",\n    \"username\": \"nvminh16999\",\n    \"firstName\": \"nvminh16999\",\n    \"lastName\": \"nvminh16999\",\n    \"avatarUrl\": \"nvminh16999\",\n    \"phone\": \"0999999999\",\n    \"dob\": \"2020-10-10\",\n    \"gender\": \"FEMALE\",\n    \"onBoarded\": true,\n    \"password\": \"123456789\",\n    \"temporaryPassword\": false,\n    \"enabled\": true,\n    \"emailVerified\": true\n}"
+              "raw": "{\n    \"email\": \"nvminh169992@gmail.com\",\n    \"username\": \"nvminh169992\",\n    \"firstName\": \"nvminh16999\",\n    \"lastName\": \"nvminh16999\",\n    \"avatarUrl\": \"nvminh16999\",\n    \"phone\": \"0999999999\",\n    \"dob\": \"2020-10-10\",\n    \"gender\": \"FEMALE\",\n    \"onBoarded\": true,\n    \"password\": \"123456789\",\n    \"temporaryPassword\": false,\n    \"enabled\": true,\n    \"emailVerified\": true\n}"
             },
             "url": {
               "raw": "{{gatewayBaseUrl}}/api/v1/users",

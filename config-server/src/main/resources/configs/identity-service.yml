@@ -23,3 +23,15 @@ openfeign:
     realm: ${KEYCLOAK_REALM:nexatech}
     client-id: ${KEYCLOAK_CLIENT_ID:nexatech-id}
     client-secret: ${KEYCLOAK_CLIENT_SECRET:gUZhl1gcgZgpLbzzvXwnExf8DTnK8YuG}
+  user-service:
+    url: ${OPENFEIGN_USER_SERVICE_URL:http://localhost:8083}
+
+resilience4j:
+  retry:
+    instances:
+      userServiceAvailability:
+        base-config: default
+  circuitbreaker:
+    instances:
+      userServiceAvailability:
+        base-config: default

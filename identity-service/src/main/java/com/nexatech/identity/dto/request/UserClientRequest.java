@@ -20,4 +20,9 @@ public class UserClientRequest {
     String username;
     String firstName;
     String lastName;
+    String avatarUrl;
+    String phone;
+    String dob;
+    String gender;
+    Boolean onBoarded;
 }

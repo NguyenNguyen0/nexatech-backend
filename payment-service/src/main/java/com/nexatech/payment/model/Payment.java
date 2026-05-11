@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -38,4 +39,7 @@ public class Payment extends BaseEntity {
     private String transactionId;
 
     private String failureReason;
+
+    private Instant completedAt;
 }
+

@@ -31,14 +31,18 @@ public class OrderPaymentEventConsumer {
             log.info("Nhận PaymentEvent: type={}, orderId={}, status={}",
                     event.getEventType(), event.getOrderId(), event.getStatus());
 
-            // Khi hoàn tiền thành công → đơn hàng chuyển sang REFUNDED
-            if ("PAYMENT_REFUNDED".equals(event.getEventType()) && event.getOrderId() != null) {
-                orderService.updateOrderStatus(event.getOrderId(), OrderStatus.REFUNDED);
-                log.info("Cập nhật đơn hàng {} sang REFUNDED sau khi hoàn tiền thành công",
-                        event.getOrderId());
+            if (event.getOrderId() == null) return;
+
+            switch (event.getEventType() != null ? event.getEventType() : "") {
+                case "PAYMENT_COMPLETED" ->
+                    orderService.updateOrderStatus(event.getOrderId(), OrderStatus.CONFIRMED);
+
+                case "PAYMENT_REFUNDED" ->
+                    orderService.updateOrderStatus(event.getOrderId(), OrderStatus.REFUNDED);
+
+                default -> log.debug("Bỏ qua PaymentEvent không xử lý: {}", event.getEventType());
             }
         } catch (Exception e) {
-            // Bỏ qua message lỗi để tránh vòng lặp re-consume
             log.error("Lỗi xử lý PaymentEvent: {} | message: {}", e.getMessage(), message);
         }
     }

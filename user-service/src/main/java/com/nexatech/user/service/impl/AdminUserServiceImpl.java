@@ -1,14 +1,18 @@
 package com.nexatech.user.service.impl;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.nexatech.user.client.IdentityClient;
+import com.nexatech.user.client.IdentityIamClient;
 import com.nexatech.user.dto.event.KeycloakCredentialPayload;
 import com.nexatech.user.dto.event.KeycloakUserProvisionPayload;
 import com.nexatech.user.dto.request.AdminUserCreateRequest;
+import com.nexatech.user.dto.request.RoleRefRequest;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.response.UserResponse;
@@ -18,7 +22,10 @@ import com.nexatech.user.mapper.UserMapper;
 import com.nexatech.user.model.User;
 import com.nexatech.user.repository.UserRepository;
 import com.nexatech.user.service.AdminUserService;
+import com.nexatech.user.service.IdentityResilienceService;
+import com.nexatech.user.service.IdentityServiceDependencyGuard;
 
+import feign.FeignException;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -30,11 +37,14 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     UserRepository userRepository;
     UserMapper userMapper;
-    IdentityClient identityClient;
+    IdentityResilienceService identityResilienceService;
+    IdentityServiceDependencyGuard identityServiceDependencyGuard;
+    IdentityIamClient identityIamClient;
 
     @Override
     @Transactional
     public UserResponse createUserWithKeycloakProvision(AdminUserCreateRequest request) {
+        identityServiceDependencyGuard.assertIdentityServiceReady();
         if (request == null || request.getEmail() == null || request.getEmail().isBlank()) {
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }
@@ -74,14 +84,19 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         ApiResponse<String> created;
         try {
-            created = identityClient.createKeycloakUser(provision);
+            created = identityResilienceService.createKeycloakUser(provision);
         } catch (Exception ex) {
+            if (ex instanceof AppException appException && appException.getErrorCode() == ErrorCode.DEPENDENCY_UNAVAILABLE) {
+                throw appException;
+            }
             throw new AppException(ErrorCode.KEYCLOAK_ERROR);
         }
         String keycloakUserId = created != null ? created.getResult() : null;
         if (keycloakUserId == null || keycloakUserId.isBlank()) {
             throw new AppException(ErrorCode.KEYCLOAK_ERROR);
         }
+
+        String assignedRole = syncUserRoleOnCreate(keycloakUserId, request.getRole());
 
         UserCreationRequest profile = UserCreationRequest.builder()
                 .id(keycloakUserId)
@@ -99,6 +114,140 @@ public class AdminUserServiceImpl implements AdminUserService {
         User user = userMapper.toUser(profile);
         user.setId(keycloakUserId);
         User saved = userRepository.save(user);
-        return userMapper.toResponse(saved);
+        UserResponse response = userMapper.toResponse(saved);
+        response.setRole(assignedRole);
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public void updateUserRole(String userId, String roleName) {
+        validateUserExists(userId);
+        replaceAllRealmRoles(userId, roleName);
+    }
+
+    @Override
+    @Transactional
+    public void removeUserRole(String userId, String roleName) {
+        validateUserExists(userId);
+        String normalized = normalizeRole(roleName);
+        if (normalized == null) {
+            throw new AppException(ErrorCode.ROLE_NAME_REQUIRED);
+        }
+        try {
+            List<RoleRefRequest> currentRoles = getCurrentRealmRoles(userId);
+            if (currentRoles.isEmpty()) {
+                throw new AppException(ErrorCode.ROLE_NOT_FOUND);
+            }
+            boolean assigned = currentRoles.stream()
+                    .map(RoleRefRequest::getName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .map(name -> name.trim().toUpperCase(Locale.ROOT))
+                    .anyMatch(normalized::equals);
+            if (!assigned) {
+                throw new AppException(ErrorCode.ROLE_NOT_FOUND);
+            }
+            RoleRefRequest ref = resolveRoleRef(normalized);
+            identityResilienceService.removeRealmRolesFromUser(userId, List.of(ref));
+        } catch (FeignException ex) {
+            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        } catch (AppException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        }
+    }
+
+    private String syncUserRoleOnCreate(String userId, String roleName) {
+        String normalized = normalizeRole(roleName);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            RoleRefRequest ref = resolveRoleRef(normalized);
+            identityResilienceService.assignRealmRolesToUser(userId, List.of(ref));
+            return ref.getName() != null ? ref.getName().toUpperCase(Locale.ROOT) : normalized;
+        } catch (FeignException ex) {
+            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        } catch (AppException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        }
+    }
+
+    private void replaceAllRealmRoles(String userId, String roleName) {
+        try {
+            List<RoleRefRequest> currentRoles = getCurrentRealmRoles(userId);
+            if (!currentRoles.isEmpty()) {
+                identityResilienceService.removeRealmRolesFromUser(userId, currentRoles);
+            }
+
+            String normalized = normalizeRole(roleName);
+            if (normalized == null) {
+                return;
+            }
+            RoleRefRequest ref = resolveRoleRef(normalized);
+            identityResilienceService.assignRealmRolesToUser(userId, List.of(ref));
+        } catch (FeignException ex) {
+            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        } catch (AppException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        }
+    }
+
+    private List<RoleRefRequest> getCurrentRealmRoles(String userId) {
+        ApiResponse<Map<String, Object>> response = identityResilienceService.getUserRoleMappings(userId);
+        Map<String, Object> payload = response != null ? response.getResult() : null;
+        if (payload == null) {
+            return List.of();
+        }
+        Object realmMappingsObj = payload.get("realmMappings");
+        if (!(realmMappingsObj instanceof List<?> realmMappings)) {
+            return List.of();
+        }
+        List<RoleRefRequest> refs = new ArrayList<>();
+        for (Object item : realmMappings) {
+            if (!(item instanceof Map<?, ?> roleMap)) {
+                continue;
+            }
+            Object idObj = roleMap.get("id");
+            Object nameObj = roleMap.get("name");
+            if (nameObj == null) {
+                continue;
+            }
+            refs.add(RoleRefRequest.builder()
+                    .id(idObj != null ? idObj.toString() : null)
+                    .name(nameObj.toString())
+                    .build());
+        }
+        return refs;
+    }
+
+    private RoleRefRequest resolveRoleRef(String roleName) {
+        var roleResponse = identityIamClient.getRoleByName(roleName);
+        Map<String, Object> role = roleResponse != null ? roleResponse.getResult() : null;
+        if (role == null || role.get("name") == null) {
+            throw new AppException(ErrorCode.KEYCLOAK_ERROR);
+        }
+        Object roleIdObj = role.get("id");
+        return RoleRefRequest.builder()
+                .id(roleIdObj != null ? roleIdObj.toString() : null)
+                .name(role.get("name").toString())
+                .build();
+    }
+
+    private void validateUserExists(String userId) {
+        userRepository.findByIdAndActiveTrue(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    private static String normalizeRole(String roleName) {
+        if (roleName == null || roleName.isBlank()) {
+            return null;
+        }
+        return roleName.trim().toUpperCase(Locale.ROOT);
     }
 }

@@ -45,6 +45,10 @@ public enum ErrorCode {
     USERNAME_IS_MISSING(2023, "Username is missing", HttpStatus.BAD_REQUEST),
     INVALID_CREDENTIALS(2030, "Invalid username or password", HttpStatus.BAD_REQUEST),
     INVALID_JSON_BODY(2031, "Invalid or malformed JSON", HttpStatus.BAD_REQUEST),
+    DEPENDENCY_UNAVAILABLE(2032, "Dependent service is temporarily unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    OTP_REQUIRED(2033, "OTP is required", HttpStatus.BAD_REQUEST),
+    OTP_INVALID(2034, "OTP is invalid", HttpStatus.BAD_REQUEST),
+    OTP_EXPIRED(2035, "OTP is expired", HttpStatus.BAD_REQUEST),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

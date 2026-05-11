@@ -1,15 +1,22 @@
 package com.nexatech.user.service;
 
-import java.util.List;
+import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.UserCreationRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
+import com.nexatech.user.dto.response.OnboardingStatusResponse;
 import com.nexatech.user.dto.response.UserResponse;
 
 public interface UserService {
     
     UserResponse createUser(UserCreationRequest request);
 
-    List<UserResponse> getAllUsers();
+    PageResponse<UserResponse> getAllUsers(
+            int page,
+            int size,
+            String email,
+            String phone,
+            Boolean active,
+            String role);
 
     UserResponse getUserById(String id);
 
@@ -17,5 +24,13 @@ public interface UserService {
 
     void deleteUser(String id);
 
+    void disableUser(String id);
+
     void enableUser(String id);
+
+    OnboardingStatusResponse getOnboardingStatus(String userId);
+
+    void requestEmailVerificationOtp(String userId);
+
+    void verifyEmailVerificationOtp(String userId, String otp);
 }

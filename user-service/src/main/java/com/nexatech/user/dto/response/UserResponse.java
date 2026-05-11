@@ -33,6 +33,9 @@ public class UserResponse {
 
     Boolean onBoarded;
     Boolean active;
+    String role;
+    String createdBy;
+    String updatedBy;
     Instant createdAt;
     Instant updatedAt;
 }

@@ -3,9 +3,11 @@ package com.nexatech.identity.service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 
 import com.nexatech.identity.client.KeycloakAuthClient;
+import com.nexatech.identity.dto.request.KeycloakRoleRef;
 import com.nexatech.identity.dto.request.IntrospectParam;
 import com.nexatech.identity.dto.request.IntrospectTokenRequest;
 import com.nexatech.identity.dto.request.LoginRequest;
@@ -21,6 +23,8 @@ import com.nexatech.identity.exception.AppException;
 import com.nexatech.identity.exception.ErrorCode;
 import com.nexatech.identity.mapper.UserClientMapper;
 
+import feign.FeignException;
+
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -29,6 +33,8 @@ public class AuthService {
 
     private final KeycloakAuthClient keycloakAuthClient;
     private final UserService userService;
+    private final RoleService roleService;
+    private final UserServiceDependencyGuard userServiceDependencyGuard;
     private final KafkaService kafkaService;
     private final UserClientMapper userClientMapper;
 
@@ -42,12 +48,62 @@ public class AuthService {
     private String clientSecret;
 
     public String register(UserCreationParam param) {
+        userServiceDependencyGuard.assertUserServiceReady();
         String createdUserId = userService.createUser(param);
         try {
+            // Assign requested realm role to the newly created Keycloak user.
+            // We resolve roleName -> (id, name) using RoleService (Keycloak API).
+            String roleName = (param != null ? param.getRole() : null);
+            if (roleName == null || roleName.isBlank()) {
+                roleName = "CUSTOMER";
+            }
+            String trimmedRoleName = roleName.trim();
+
+            Map<String, Object> role;
+            try {
+                role = roleService.getRoleByName(trimmedRoleName);
+            } catch (FeignException ex) {
+                // Fallback for potential casing mismatch.
+                if (ex.status() == 404) {
+                    String lower = trimmedRoleName.toLowerCase();
+                    String upper = trimmedRoleName.toUpperCase();
+                    Map<String, Object> fallbackRole = null;
+                    try {
+                        fallbackRole = roleService.getRoleByName(lower);
+                    } catch (FeignException ignored) {
+                    }
+                    if (fallbackRole == null) {
+                        try {
+                            fallbackRole = roleService.getRoleByName(upper);
+                        } catch (FeignException ignored) {
+                        }
+                    }
+                    if (fallbackRole == null) {
+                        throw ex;
+                    }
+                    role = fallbackRole;
+                } else {
+                    throw ex;
+                }
+            }
+
+            Object roleIdObj = role != null ? role.get("id") : null;
+            String resolvedRoleName = role != null && role.get("name") != null ? role.get("name").toString() : trimmedRoleName;
+            String roleId = roleIdObj != null ? roleIdObj.toString() : null;
+            if (roleId == null || roleId.isBlank()) {
+                throw new IllegalArgumentException("Keycloak role id is missing for role=" + resolvedRoleName);
+            }
+
+            userService.assignRealmRolesToUser(createdUserId,
+                    List.of(new KeycloakRoleRef(roleId, resolvedRoleName)));
+
             UserClientRequest request = userClientMapper.toProvisionRequest(createdUserId, param);
             kafkaService.sendUserRegistered(request);
             return createdUserId;
         } catch (AppException ex) {
+            userService.deleteUser(createdUserId);
+            throw ex;
+        } catch (FeignException ex) {
             userService.deleteUser(createdUserId);
             throw ex;
         } catch (Exception ex) {

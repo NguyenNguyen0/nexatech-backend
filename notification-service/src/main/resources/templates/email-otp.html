@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Email Verification OTP</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.5;">
+<h2>Email Verification</h2>
+<p>Hi <strong th:text="${displayName}">User</strong>,</p>
+<p>Your OTP code for verifying your email is:</p>
+<p style="font-size: 24px; letter-spacing: 4px; font-weight: bold;" th:text="${otpCode}">123456</p>
+<p>This OTP expires in <strong th:text="${expiresInMinutes}">5</strong> minutes.</p>
+<p>If you did not request this, you can ignore this email.</p>
+</body>
+</html>
