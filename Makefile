@@ -9,7 +9,7 @@ MVN = mvn
 
 .PHONY: help build clean compile dev-up dev-down full-up full-down infra-reset logs-infra logs-full prune \
 	run-discovery run-config run-gateway \
-	run-identity run-user run-product run-inventory run-order run-payment run-notification run-storage
+	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-storage
 
 help:
 	@echo "Available commands:"
@@ -34,6 +34,7 @@ help:
 	@echo "  make run-order          - Run order-service"
 	@echo "  make run-payment        - Run payment-service"
 	@echo "  make run-notification   - Run notification-service"
+	@echo "  make run-chat           - Run chat-service"
 	@echo "  make run-storage        - Run storage-service"
 
 # --- Maven Commands ---
@@ -100,6 +101,9 @@ run-payment:
 
 run-notification:
 	$(MVN) -pl notification-service spring-boot:run
+
+run-chat:
+	$(MVN) -pl chat-service spring-boot:run
 
 run-storage:
 	$(MVN) -pl storage-service spring-boot:run

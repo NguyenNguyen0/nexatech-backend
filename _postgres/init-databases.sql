@@ -30,3 +30,7 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_inventory');
 -- Notification Service
 SELECT 'CREATE DATABASE nexatech_notifications'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_notifications');
+
+-- Chat Service
+SELECT 'CREATE DATABASE nexatech_chats'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_chats');
