@@ -62,7 +62,8 @@ public class ProductService {
     private final InventoryClient inventoryClient;
 
     public ProductResponse createProduct(ProductRequest request) {
-        validateCategory(request.getCategoryId());
+        validateCategory(request.getPrimaryCategoryId());
+        validateCategoryIds(request.getCategoryIds());
         validateBrand(request.getBrandId());
 
         Product product = productMapper.toEntity(request);
@@ -80,7 +81,8 @@ public class ProductService {
 
     public ProductResponse updateProduct(String id, ProductRequest request) {
         Product product = getActiveProduct(id);
-        validateCategory(request.getCategoryId());
+        validateCategory(request.getPrimaryCategoryId());
+        validateCategoryIds(request.getCategoryIds());
         validateBrand(request.getBrandId());
 
         String oldName = product.getName();
@@ -130,7 +132,7 @@ public class ProductService {
 
         if (StringUtils.hasText(categoryId)) {
             validateCategory(categoryId);
-            criteriaList.add(idCriteria("categoryId", categoryId));
+            criteriaList.add(categoryArrayCriteria(categoryId));
         }
         if (StringUtils.hasText(brandId)) {
             validateBrand(brandId);
@@ -218,7 +220,7 @@ public class ProductService {
         extra.add(Criteria.where("active").is(true));
         if (StringUtils.hasText(categoryId)) {
             validateCategory(categoryId);
-            extra.add(idCriteria("categoryId", categoryId));
+            extra.add(categoryArrayCriteria(categoryId));
         }
         if (StringUtils.hasText(brandId)) {
             validateBrand(brandId);
@@ -310,7 +312,7 @@ public class ProductService {
 
         Query query = Query.query(new Criteria().andOperator(
                         Criteria.where("active").is(true),
-                        idCriteria("categoryId", categoryId)))
+                        categoryArrayCriteria(categoryId)))
                 .with(pageable);
 
         List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
@@ -319,37 +321,55 @@ public class ProductService {
         long total = mongoTemplate.count(
                 Query.query(new Criteria().andOperator(
                         Criteria.where("active").is(true),
-                        idCriteria("categoryId", categoryId))),
+                        categoryArrayCriteria(categoryId))),
                 Product.class);
 
         return new PageImpl<>(content, pageable, total);
     }
 
-    public Page<ProductResponse> getProductsByCategorySlug(String slug, Pageable pageable) {
+    public Page<ProductResponse> getProductsByCategorySlug(String slug,
+                                                            String brandId,
+                                                            BigDecimal minPrice,
+                                                            BigDecimal maxPrice,
+                                                            Double minRating,
+                                                            Double maxRating,
+                                                            Boolean featured,
+                                                            Pageable pageable) {
         Category category = categoryRepository.findBySlug(slug)
                 .filter(Category::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", slug));
 
-        return getProductsByCategory(category.getId(), pageable);
-    }
+        // Merge category-level filter config with caller-supplied params.
+        // Caller params always win (explicit > inferred).
+        String resolvedBrandId = brandId;
+        BigDecimal resolvedMinPrice = minPrice;
+        BigDecimal resolvedMaxPrice = maxPrice;
 
-    public Page<ProductResponse> getProductsByCollectionSlug(String slug,
-                                                             String brandId,
-                                                             BigDecimal minPrice,
-                                                             BigDecimal maxPrice,
-                                                             Double minRating,
-                                                             Double maxRating,
-                                                             Boolean featured,
-                                                             Pageable pageable) {
-        Category category = categoryRepository.findBySlug(slug)
-                .filter(Category::isActive)
-                .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", slug));
+        com.nexatech.product.model.CategoryFilter cf = category.getFilter();
+        if (cf != null) {
+            // Inject brandSlug from category filter when caller did not supply brandId
+            if (!StringUtils.hasText(resolvedBrandId) && StringUtils.hasText(cf.getBrandSlug())) {
+                resolvedBrandId = brandRepository.findBySlug(cf.getBrandSlug())
+                        .filter(Brand::isActive)
+                        .map(Brand::getId)
+                        .orElse(null);
+            }
+            // Apply default price range from category filter when caller did not supply limits
+            if (cf.getDefaultPriceRange() != null) {
+                if (resolvedMinPrice == null) {
+                    resolvedMinPrice = cf.getDefaultPriceRange().getMin();
+                }
+                if (resolvedMaxPrice == null) {
+                    resolvedMaxPrice = cf.getDefaultPriceRange().getMax();
+                }
+            }
+        }
 
         return getProducts(
                 category.getId(),
-                brandId,
-                minPrice,
-                maxPrice,
+                resolvedBrandId,
+                resolvedMinPrice,
+                resolvedMaxPrice,
                 minRating,
                 maxRating,
                 featured,
@@ -358,13 +378,13 @@ public class ProductService {
 
     public List<ProductResponse> getRelatedProducts(String productId) {
         Product product = getActiveProduct(productId);
-        if (!StringUtils.hasText(product.getCategoryId())) {
+        if (!StringUtils.hasText(product.getPrimaryCategoryId())) {
             return List.of();
         }
 
         List<Criteria> criteriaList = new ArrayList<>();
         criteriaList.add(Criteria.where("active").is(true));
-        criteriaList.add(idCriteria("categoryId", product.getCategoryId()));
+        criteriaList.add(categoryArrayCriteria(product.getPrimaryCategoryId()));
         criteriaList.add(idNotEqualCriteria("_id", productId));
 
         Query query = Query.query(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
@@ -397,6 +417,17 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "id", categoryId));
     }
 
+    private void validateCategoryIds(List<String> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            return;
+        }
+        for (String id : categoryIds) {
+            if (StringUtils.hasText(id)) {
+                validateCategory(id);
+            }
+        }
+    }
+
     private void validateBrand(String brandId) {
         if (!StringUtils.hasText(brandId)) {
             return;
@@ -406,10 +437,9 @@ public class ProductService {
     }
 
     private ProductResponse enrichProductResponse(ProductResponse response) {
-        if (StringUtils.hasText(response.getCategoryId())) {
-            categoryRepository.findById(response.getCategoryId()).ifPresent(category -> {
-                response.setCategoryName(category.getName());
-                response.setCategorySlug(category.getSlug());
+        if (StringUtils.hasText(response.getPrimaryCategoryId())) {
+            categoryRepository.findById(response.getPrimaryCategoryId()).ifPresent(category -> {
+                response.setPrimaryCategoryName(category.getName());
             });
         }
 
@@ -490,6 +520,17 @@ public class ProductService {
         return Criteria.where(fieldName).is(idValue);
     }
 
+    private Criteria categoryArrayCriteria(String categoryId) {
+        // categoryIds is a List<String>; MongoDB checks if array contains the value
+        if (ObjectId.isValid(categoryId)) {
+            return new Criteria().orOperator(
+                    Criteria.where("categoryIds").is(categoryId),
+                    Criteria.where("categoryIds").is(new ObjectId(categoryId))
+            );
+        }
+        return Criteria.where("categoryIds").is(categoryId);
+    }
+
     private Criteria idNotEqualCriteria(String fieldName, String idValue) {
         if (ObjectId.isValid(idValue)) {
             return Criteria.where(fieldName).nin(idValue, new ObjectId(idValue));
@@ -555,7 +596,7 @@ public class ProductService {
                 .timestamp(Instant.now())
                 .productId(product.getId())
                 .name(product.getName())
-                .categoryId(product.getCategoryId())
+                .primaryCategoryId(product.getPrimaryCategoryId())
                 .active(product.isActive())
                 .build();
         productEventProducer.publishProductEvent(product.getId(), event);

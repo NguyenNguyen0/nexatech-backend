@@ -44,7 +44,13 @@ public class Product {
 
     private String thumbnail;
 
-    private String categoryId;
+    private String primaryCategoryId;
+
+    private String primaryCategorySlug;
+
+    private List<String> categoryIds;
+
+    private List<String> categorySlugs;
 
     private String brandId;
 
@@ -53,8 +59,6 @@ public class Product {
     private Map<String, String> specs;
 
     private List<String> tags;
-
-    private Map<String, String> attributes;
 
     private Map<String, String> metadata;
 
