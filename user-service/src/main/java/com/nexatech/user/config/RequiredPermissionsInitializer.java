@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 
 import com.nexatech.user.client.IdentityIamClient;
 import com.nexatech.user.constant.PermissionsAccept;
-import com.nexatech.user.constant.PermissionsDeny;
 import com.nexatech.user.dto.request.RoleCreateRequest;
 import com.nexatech.user.dto.base.ApiResponse;
 
@@ -47,7 +46,6 @@ public class RequiredPermissionsInitializer implements ApplicationRunner {
 
             List<String> allPermissions = new ArrayList<>();
             allPermissions.addAll(PermissionsAccept.allCodes());
-            allPermissions.addAll(PermissionsDeny.allCodes());
 
             for (String permissionName : allPermissions) {
                 ensurePermissionExists(permissionName, existingRoleNamesUpper);
