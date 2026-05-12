@@ -2,4 +2,4 @@ spring:
   application:
     name: order-service
   config:
-    import: "optional:configserver:"
+    import: "optional:configserver:${CONFIG_SERVER_URI}/"

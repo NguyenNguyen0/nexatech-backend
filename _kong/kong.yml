@@ -18,7 +18,7 @@ services:
         strip_path: false
 
   - name: product-service
-    url: http://product-service:8083
+    url: http://product-service:8090
     routes:
       - name: product-route
         paths:

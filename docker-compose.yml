@@ -362,7 +362,7 @@ services:
     image: nexatech/product-service:latest
     container_name: nexatech-product
     ports:
-      - "8083:8083"
+      - "8090:8090"
     environment:
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
