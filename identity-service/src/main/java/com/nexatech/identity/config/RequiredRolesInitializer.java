@@ -60,8 +60,17 @@ public class RequiredRolesInitializer implements ApplicationRunner {
         log.warn("Keycloak role missing, creating role={}...", expectedUpper);
         roleService.createRole(RoleCreateParam.builder()
                 .name(expectedUpper)
-                .description("Created by system")
+                .description(generateRoleDescription(expectedUpper))
                 .build());
+    }
+
+    private String generateRoleDescription(String roleName) {
+        if (roleName == null) return "System generated role";
+        
+        // Capitalize first letter, lowercase the rest
+        String formatted = roleName.substring(0, 1).toUpperCase(Locale.ROOT) + 
+                           roleName.substring(1).toLowerCase(Locale.ROOT);
+        return formatted + " role";
     }
 }
 
