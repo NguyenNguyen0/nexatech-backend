@@ -113,6 +113,25 @@ services:
     networks:
       - nexatech-net
 
+  postgres-chat:
+    image: postgres:16-alpine
+    container_name: nexatech-postgres-chat
+    environment:
+      POSTGRES_DB: nexatech_chats
+      POSTGRES_USER: ${POSTGRES_USER:-nexatech}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexatech123}
+    ports:
+      - "5439:5432"
+    volumes:
+      - postgres-chat-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexatech} -d nexatech_chats"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nexatech-net
+
   mongodb:
     image: mongo:7
     container_name: nexatech-mongodb
@@ -482,6 +501,36 @@ services:
     networks:
       - nexatech-net
 
+  chat-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: chat-service
+    image: nexatech/chat-service:latest
+    container_name: nexatech-chat
+    ports:
+      - "8089:8089"
+    environment:
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-chat:5432/nexatech_chats
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-nexatech}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-nexatech123}
+      - MONGO_CHAT_URL=${MONGO_CHAT_URL:-mongodb://nexatech:nexatech123@mongodb:27017/nexatech_chats?authSource=admin}
+      - SPRING_DATA_REDIS_HOST=redis
+      - JAVA_TOOL_OPTIONS=-Xmx200m
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres-chat:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexatech-net
+
   storage-service:
     build:
       context: .
@@ -532,6 +581,7 @@ services:
       - inventory-service
       - payment-service
       - notification-service
+      - chat-service
       - storage-service
     networks:
       - nexatech-net
@@ -544,6 +594,7 @@ volumes:
   postgres-inventory-data:
   postgres-payment-data:
   postgres-notification-data:
+  postgres-chat-data:
   mongodb-data:
   redis-data:
   minio-data:

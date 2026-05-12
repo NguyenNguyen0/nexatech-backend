@@ -62,6 +62,18 @@ services:
           - /api/v1/notifications
         strip_path: false
 
+  - name: chat-service
+    url: http://chat-service:8089
+    routes:
+      - name: chat-route
+        paths:
+          - /api/v1/conversations
+        strip_path: false
+      - name: chat-ws-route
+        paths:
+          - /ws/chat
+        strip_path: false
+
   - name: storage-service
     url: http://storage-service:8088
     routes:
