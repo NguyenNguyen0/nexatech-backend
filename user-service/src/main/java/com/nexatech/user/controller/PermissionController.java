@@ -142,15 +142,12 @@ public class PermissionController {
     }
 
     private List<RoleSummaryResponse> filterRealmRolesByDenySuffix(boolean denyOnly) {
+        List<String> validCodes = denyOnly ? PermissionsDeny.allCodes() : PermissionsAccept.allCodes();
         return identityIamClient.listRoles().getResult().stream()
                 .map(this::toRoleSummary)
                 .filter(r -> {
                     String n = r.getName();
-                    if (n == null) {
-                        return false;
-                    }
-                    boolean isDeny = n.endsWith(DENY_SUFFIX);
-                    return denyOnly == isDeny;
+                    return n != null && validCodes.contains(n);
                 })
                 .sorted(Comparator.comparing(RoleSummaryResponse::getName, Comparator.nullsLast(String::compareTo)))
                 .toList();
