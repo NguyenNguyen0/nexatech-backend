@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Nexatech - Order & Payment Service",
-    "description": "Collection để test Order Service (port 8084) và Payment Service (port 8086).\n\nSprint 1: Đặt hàng, CRUD payment, Kafka event flow.\nSprint 2: Admin Stats, Shipping Tracking, VNPay, Return & Refund (COD flow).\nSprint 3: Cart API (Redis), Checkout Flow.\n\nChạy theo thứ tự: tạo đơn hàng → tạo thanh toán → các thao tác khác.",
+    "description": "Collection để test Order Service (port 8084) và Payment Service (port 8086).\n\nSprint 1: Đặt hàng, CRUD payment, Kafka event flow.\nSprint 2: Admin Stats, Shipping Tracking, VNPay, Return & Refund (COD flow).\nSprint 3: Cart API (Redis), Checkout Flow.\nSprint 4: Outbox Pattern, Kafka Deduplication, Idempotency Key (Payment API), Audit Log.\n\nChạy theo thứ tự: tạo đơn hàng → tạo thanh toán → các thao tác khác.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -49,6 +49,11 @@
       "key": "productId2",
       "value": "PRODUCT-002",
       "description": "ID sản phẩm 2 (lấy từ product-service)"
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "",
+      "description": "UUID dùng cho Idempotency-Key header khi tạo thanh toán (auto-generated bởi pre-request script)"
     }
   ],
   "item": [
@@ -340,6 +345,21 @@
           "name": "1. Create Payment",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Tạo UUID v4 mới cho Idempotency-Key (mỗi lần gọi lần đầu)",
+                  "const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {",
+                  "    const r = Math.random() * 16 | 0;",
+                  "    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);",
+                  "});",
+                  "pm.collectionVariables.set('idempotencyKey', uuid);",
+                  "console.log('Idempotency-Key generated:', uuid);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
@@ -364,7 +384,8 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-User-Id", "value": "{{customerId}}", "description": "UUID của customer" }
+              { "key": "X-User-Id", "value": "{{customerId}}", "description": "UUID của customer" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}", "description": "UUID duy nhất cho request này. Auto-generated bởi pre-request script." }
             ],
             "url": {
               "raw": "{{paymentBaseUrl}}/api/v1/payments",
@@ -664,6 +685,19 @@
           "name": "Step 2 — Tạo thanh toán cho đơn hàng",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {",
+                  "    const r = Math.random() * 16 | 0;",
+                  "    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);",
+                  "});",
+                  "pm.collectionVariables.set('idempotencyKey', uuid);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
@@ -686,7 +720,8 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-User-Id", "value": "{{customerId}}" }
+              { "key": "X-User-Id", "value": "{{customerId}}" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}", "description": "UUID duy nhất — auto-generated bởi pre-request script" }
             ],
             "url": {
               "raw": "{{paymentBaseUrl}}/api/v1/payments",
@@ -1262,7 +1297,8 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-User-Id", "value": "{{customerId}}" }
+              { "key": "X-User-Id", "value": "{{customerId}}" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}", "description": "Auto-generated UUID" }
             ],
             "url": {
               "raw": "{{paymentBaseUrl}}/api/v1/payments",
@@ -1633,6 +1669,174 @@
               "mode": "raw",
               "raw": "{\n  \"shippingAddress\": \"456 Lê Lợi, Quận 1, TP.HCM\",\n  \"shippingMethod\": \"EXPRESS\",\n  \"paymentMethod\": \"VNPAY\",\n  \"note\": \"Thanh toán online\"\n}"
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sprint 4 — Reliability (Idempotency, Outbox, Deduplication)",
+      "description": "Kiểm thử các tính năng reliability đã được triển khai:\n\n1. Idempotency Key — Payment API chấp nhận header `Idempotency-Key` (UUID). Nếu gọi lại với cùng key và đơn đã tạo thành công → trả về response đã cache (HTTP 200), không tạo bản ghi mới.\n2. Outbox Pattern — Event được lưu vào outbox_events trong cùng DB transaction, không publish Kafka trực tiếp. Scheduler chạy mỗi 5 giây để relay event lên Kafka.\n3. Kafka Consumer Deduplication — processed_events table ngăn xử lý lại event trùng (UNIQUE eventId + consumerName).\n4. Audit Log — Mọi thao tác quan trọng ghi vào audit_logs (async).",
+      "item": [
+        {
+          "name": "1. Create Payment với Idempotency-Key (lần đầu → 201)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Tạo idempotency key cố định cho test (UUID v4)",
+                  "const fixedKey = 'test-idem-' + Date.now();",
+                  "pm.collectionVariables.set('idempotencyKey', fixedKey);",
+                  "console.log('[Idempotency] Key set:', fixedKey);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.id) {",
+                  "    pm.collectionVariables.set('paymentId', res.data.id);",
+                  "}",
+                  "pm.test('Lần đầu tạo payment → 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Payment ở trạng thái PENDING', () => pm.expect(res.data.status).to.equal('PENDING'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{customerId}}" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}", "description": "UUID duy nhất cho request này" }
+            ],
+            "url": {
+              "raw": "{{paymentBaseUrl}}/api/v1/payments",
+              "host": ["{{paymentBaseUrl}}"],
+              "path": ["api", "v1", "payments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"amount\": 250000,\n  \"method\": \"BANK_TRANSFER\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Lần đầu gửi với Idempotency-Key mới → HTTP 201 Created.\nidempotencyKey được lưu vào collection variable để dùng cho request retry bên dưới."
+          }
+        },
+        {
+          "name": "2. Retry Create Payment (cùng Idempotency-Key) → 200 cached",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Retry với same key → 200 OK (cached)', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('Response là data đã cache', () => {",
+                  "    pm.expect(res.data).to.not.be.null;",
+                  "    pm.expect(res.data.id).to.equal(pm.collectionVariables.get('paymentId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{customerId}}" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}", "description": "Cùng key với request #1 — sẽ trả cached response" }
+            ],
+            "url": {
+              "raw": "{{paymentBaseUrl}}/api/v1/payments",
+              "host": ["{{paymentBaseUrl}}"],
+              "path": ["api", "v1", "payments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"amount\": 250000,\n  \"method\": \"BANK_TRANSFER\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Gửi lại request với CÙNG Idempotency-Key → HTTP 200 với response đã cache.\nKhông tạo thêm bản ghi payment, không publish event mới."
+          }
+        },
+        {
+          "name": "3. Create Payment — không có Idempotency-Key (backward compat)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Không có Idempotency-Key vẫn hoạt động → 400 (trùng orderId)', () => {",
+                  "    // Expect 400 vì orderId này đã có payment (từ request #1)",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Id", "value": "{{customerId}}" }
+            ],
+            "url": {
+              "raw": "{{paymentBaseUrl}}/api/v1/payments",
+              "host": ["{{paymentBaseUrl}}"],
+              "path": ["api", "v1", "payments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"amount\": 250000,\n  \"method\": \"BANK_TRANSFER\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Gửi không có Idempotency-Key header — header là optional (required=false).\nNếu orderId đã có payment → 400. Nếu dùng orderId mới → 201 bình thường."
+          }
+        },
+        {
+          "name": "4. [Note] Outbox Pattern — Cách kiểm tra",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{orderBaseUrl}}/actuator/health",
+              "host": ["{{orderBaseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Outbox Pattern không có API endpoint riêng.\n\nCách kiểm tra:\n1. Sau khi tạo đơn/thanh toán, check DB:\n   SELECT * FROM outbox_events ORDER BY created_at DESC LIMIT 10;\n   → Status ban đầu là PENDING\n2. Sau 5 giây (scheduler chạy), status chuyển PUBLISHED\n3. Nếu Kafka down → retry tối đa 5 lần → FAILED\n\nBảng theo dõi:\n- order-service: DB order_db, bảng outbox_events\n- payment-service: DB payment_db, bảng outbox_events"
+          }
+        },
+        {
+          "name": "5. [Note] Kafka Deduplication — Cách kiểm tra",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{paymentBaseUrl}}/actuator/health",
+              "host": ["{{paymentBaseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Consumer Deduplication không expose API.\n\nCách kiểm tra:\n1. Publish cùng 1 Kafka message 2 lần (cùng eventId)\n2. Lần đầu: xử lý bình thường + lưu processed_events\n3. Lần 2: log 'Duplicate event bị bỏ qua', không xử lý nghiệp vụ\n\nKiểm tra DB:\n  SELECT * FROM processed_events ORDER BY processed_at DESC;\n\nConsumer names:\n- order-service: 'order-service:OrderPaymentEventConsumer'\n- payment-service: 'payment-service:PaymentEventConsumer'"
+          }
+        },
+        {
+          "name": "6. [Note] Audit Log — Cách kiểm tra",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{orderBaseUrl}}/actuator/health",
+              "host": ["{{orderBaseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Audit Log ghi async sau mỗi thao tác business.\n\nCách kiểm tra (query DB):\n  SELECT action, entity_type, entity_id, actor, old_value, new_value, created_at\n  FROM audit_logs\n  ORDER BY created_at DESC\n  LIMIT 20;\n\nActions được log:\n  Order Service:\n    ORDER_CREATED, ORDER_STATUS_CHANGED, ORDER_CANCELLED,\n    RETURN_REQUESTED, RETURN_APPROVED, RETURN_REJECTED,\n    PAYMENT_EVENT_CONFIRMED, PAYMENT_EVENT_COD_CONFIRMED, RETURN_EVENT_REFUNDED\n\n  Payment Service:\n    PAYMENT_CREATED, PAYMENT_REFUNDED, PAYMENT_COD_CONFIRMED, PAYMENT_COMPLETED,\n    VNPAY_IPN_PROCESSED,\n    ORDER_CONFIRMED_RECEIVED, ORDER_DELIVERED_RECEIVED, RETURN_APPROVED_RECEIVED"
           }
         }
       ]

@@ -18,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,7 +44,8 @@ public class OrderReturnService {
     private final OrderReturnRepository returnRepository;
     private final OrderRepository orderRepository;
     private final ReturnMapper returnMapper;
-    private final KafkaTemplate<Object, Object> kafkaTemplate;
+    private final OutboxEventService outboxEventService;
+    private final AuditLogService auditLogService;
 
     /**
      * Tạo yêu cầu trả hàng — chỉ áp dụng cho đơn hàng đã giao (DELIVERED).
@@ -98,8 +98,10 @@ public class OrderReturnService {
         OrderReturn saved = returnRepository.save(orderReturn);
         log.info("Tạo yêu cầu trả hàng: returnId={}, orderId={}", saved.getId(), orderId);
 
-        // Thông báo cho admin (notification-service lắng nghe order.events)
-        publishReturnEvent(saved, "ORDER_RETURN_REQUESTED", order.getTotalAmount());
+        // Lưu event vào outbox thay vì publish Kafka trực tiếp
+        saveReturnEventToOutbox(saved, "ORDER_RETURN_REQUESTED", order.getTotalAmount());
+        auditLogService.log("RETURN_REQUESTED", "OrderReturn", saved.getId().toString(),
+                "orderId=" + orderId, customerId.toString());
 
         return returnMapper.toResponse(saved);
     }
@@ -132,8 +134,10 @@ public class OrderReturnService {
 
         log.info("Duyệt trả hàng: returnId={}, orderId={}", returnId, orderReturn.getOrderId());
 
-        // Trigger hoàn tiền qua payment-service
-        publishReturnEvent(saved, "ORDER_RETURN_APPROVED", savedOrder.getTotalAmount());
+        // Trigger hoàn tiền qua payment-service — lưu vào outbox
+        saveReturnEventToOutbox(saved, "ORDER_RETURN_APPROVED", savedOrder.getTotalAmount());
+        auditLogService.log("RETURN_APPROVED", "OrderReturn", returnId.toString(),
+                "orderId=" + orderReturn.getOrderId(), "admin");
 
         return returnMapper.toResponse(saved);
     }
@@ -157,7 +161,9 @@ public class OrderReturnService {
         OrderReturn saved = returnRepository.save(orderReturn);
 
         log.info("Từ chối trả hàng: returnId={}, adminNote: {}", returnId, adminNote);
-        publishReturnEvent(saved, "ORDER_RETURN_REJECTED", BigDecimal.ZERO);
+        saveReturnEventToOutbox(saved, "ORDER_RETURN_REJECTED", BigDecimal.ZERO);
+        auditLogService.log("RETURN_REJECTED", "OrderReturn", returnId.toString(),
+                "adminNote=" + adminNote, "admin");
 
         return returnMapper.toResponse(saved);
     }
@@ -187,27 +193,21 @@ public class OrderReturnService {
     }
 
     /**
-     * Publish ReturnEvent lên topic "order.events".
-     * payment-service lắng nghe và xử lý khi eventType = ORDER_RETURN_APPROVED.
-     * notification-service có thể lắng nghe ORDER_RETURN_REQUESTED / ORDER_RETURN_REJECTED.
+     * Xây dựng ReturnEvent và lưu vào outbox trong cùng transaction nghiệp vụ.
+     * payment-service lắng nghe ORDER_RETURN_APPROVED để xử lý hoàn tiền.
      */
-    private void publishReturnEvent(OrderReturn orderReturn, String eventType, BigDecimal refundAmount) {
-        try {
-            ReturnEvent event = ReturnEvent.builder()
-                    .eventId(UUID.randomUUID())
-                    .eventType(eventType)
-                    .timestamp(Instant.now())
-                    .returnId(orderReturn.getId())
-                    .orderId(orderReturn.getOrderId())
-                    .customerId(orderReturn.getCustomerId())
-                    .status(orderReturn.getStatus())
-                    .reason(orderReturn.getReason())
-                    .refundAmount(refundAmount)
-                    .build();
-            kafkaTemplate.send("order.events", orderReturn.getOrderId().toString(), event);
-        } catch (Exception e) {
-            log.warn("Không thể publish Kafka event [{}] cho returnId {}: {}",
-                    eventType, orderReturn.getId(), e.getMessage());
-        }
+    private void saveReturnEventToOutbox(OrderReturn orderReturn, String eventType, BigDecimal refundAmount) {
+        ReturnEvent event = ReturnEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventType(eventType)
+                .timestamp(Instant.now())
+                .returnId(orderReturn.getId())
+                .orderId(orderReturn.getOrderId())
+                .customerId(orderReturn.getCustomerId())
+                .status(orderReturn.getStatus())
+                .reason(orderReturn.getReason())
+                .refundAmount(refundAmount)
+                .build();
+        outboxEventService.saveEvent("OrderReturn", orderReturn.getOrderId().toString(), eventType, event);
     }
 }
