@@ -229,7 +229,7 @@ public class OrderService {
 
         saveOrderEventToOutbox(saved, "ORDER_CANCELLED");
         auditLogService.log("ORDER_CANCELLED", "Order", orderId.toString(),
-                "CANCELLED", customerId.toString(), "customer request");
+                null, "CANCELLED", customerId.toString(), "customer request");
         log.info("Huỷ đơn hàng thành công: {} | customer: {}", orderId, customerId);
         return orderMapper.toResponse(saved);
     }
