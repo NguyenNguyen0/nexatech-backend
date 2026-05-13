@@ -7,6 +7,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
@@ -40,8 +41,23 @@ public class KafkaConfig {
     }
 
     @Bean
+    @Primary
     public KafkaTemplate<Object, Object> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
+    }
+
+    /**
+     * KafkaTemplate dùng StringSerializer — cho OutboxEventPublisher.
+     * Tránh double-encoding JSON khi payload đã là String.
+     */
+    @Bean("stringKafkaTemplate")
+    public KafkaTemplate<String, String> stringKafkaTemplate() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        ProducerFactory<String, String> factory = new DefaultKafkaProducerFactory<>(props);
+        return new KafkaTemplate<>(factory);
     }
 
     @Bean

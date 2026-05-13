@@ -4,7 +4,6 @@ import com.nexatech.payment.dto.CreatePaymentRequest;
 import com.nexatech.payment.dto.PaymentResponse;
 import com.nexatech.payment.enums.PaymentStatus;
 import com.nexatech.payment.event.PaymentEvent;
-import com.nexatech.payment.event.PaymentEventProducer;
 import com.nexatech.payment.exception.BadRequestException;
 import com.nexatech.payment.exception.ResourceNotFoundException;
 import com.nexatech.payment.mapper.PaymentMapper;
@@ -27,7 +26,8 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final PaymentMapper paymentMapper;
-    private final PaymentEventProducer paymentEventProducer;
+    private final OutboxEventService outboxEventService;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public PaymentResponse createPayment(UUID customerId, CreatePaymentRequest request) {
@@ -45,7 +45,9 @@ public class PaymentService {
 
         Payment saved = paymentRepository.save(payment);
 
-        publishEvent(saved, "PAYMENT_INITIATED");
+        savePaymentEventToOutbox(saved, "PAYMENT_INITIATED");
+        auditLogService.log("PAYMENT_CREATED", "Payment", saved.getId().toString(),
+                "status=PENDING", customerId.toString());
         log.info("Tạo thanh toán thành công: {} | đơn hàng: {}", saved.getId(), saved.getOrderId());
 
         return paymentMapper.toResponse(saved);
@@ -92,7 +94,9 @@ public class PaymentService {
         payment.setStatus(PaymentStatus.REFUNDED);
         Payment saved = paymentRepository.save(payment);
 
-        publishEvent(saved, "PAYMENT_REFUNDED");
+        savePaymentEventToOutbox(saved, "PAYMENT_REFUNDED");
+        auditLogService.log("PAYMENT_REFUNDED", "Payment", paymentId.toString(),
+                PaymentStatus.COMPLETED.name(), PaymentStatus.REFUNDED.name(), "admin", null);
         log.info("Hoàn tiền thành công: {} | đơn hàng: {}", paymentId, saved.getOrderId());
 
         return paymentMapper.toResponse(saved);
@@ -106,7 +110,9 @@ public class PaymentService {
                 payment.setStatus(PaymentStatus.COMPLETED);
                 payment.setCompletedAt(Instant.now());
                 Payment saved = paymentRepository.save(payment);
-                publishEvent(saved, "PAYMENT_COMPLETED");
+                savePaymentEventToOutbox(saved, "PAYMENT_COMPLETED");
+                auditLogService.log("PAYMENT_CONFIRMED", "Payment", payment.getId().toString(),
+                        "status=COMPLETED", "system");
                 log.info("Xác nhận thanh toán thành công cho đơn hàng: {}", orderId);
             }
         });
@@ -120,7 +126,9 @@ public class PaymentService {
                 payment.setStatus(PaymentStatus.COMPLETED);
                 payment.setCompletedAt(Instant.now());
                 Payment saved = paymentRepository.save(payment);
-                publishEvent(saved, "PAYMENT_COMPLETED");
+                savePaymentEventToOutbox(saved, "PAYMENT_COMPLETED");
+                auditLogService.log("PAYMENT_CONFIRMED_COD", "Payment", payment.getId().toString(),
+                        "status=COMPLETED", "system");
                 log.info("Xác nhận thanh toán COD thành công khi giao hàng, orderId={}", orderId);
             }
         });
@@ -132,7 +140,9 @@ public class PaymentService {
             if (payment.getStatus() == PaymentStatus.COMPLETED) {
                 payment.setStatus(PaymentStatus.REFUNDED);
                 Payment saved = paymentRepository.save(payment);
-                publishEvent(saved, "PAYMENT_REFUNDED");
+                savePaymentEventToOutbox(saved, "PAYMENT_REFUNDED");
+                auditLogService.log("PAYMENT_RETURN_REFUNDED", "Payment", payment.getId().toString(),
+                        "status=REFUNDED", "system");
                 log.info("Hoàn tiền thành công cho đơn trả hàng, orderId={}", orderId);
             } else {
                 log.warn("Không thể hoàn tiền — trạng thái hiện tại: {}, orderId={}",
@@ -146,22 +156,21 @@ public class PaymentService {
                         "Không tìm thấy giao dịch thanh toán: " + paymentId));
     }
 
-    private void publishEvent(Payment payment, String eventType) {
-        try {
-            PaymentEvent event = PaymentEvent.builder()
-                    .eventId(UUID.randomUUID())
-                    .eventType(eventType)
-                    .timestamp(Instant.now())
-                    .paymentId(payment.getId())
-                    .orderId(payment.getOrderId())
-                    .customerId(payment.getCustomerId())
-                    .amount(payment.getAmount())
-                    .status(payment.getStatus())
-                    .build();
-            paymentEventProducer.publishPaymentEvent(event);
-        } catch (Exception e) {
-            log.warn("Không thể publish Kafka event [{}] cho giao dịch {}: {}",
-                    eventType, payment.getId(), e.getMessage());
-        }
+    /**
+     * Xây dựng PaymentEvent và lưu vào outbox trong cùng transaction nghệp vụ.
+     * Scheduler sẽ đọc và publish lên Kafka sau.
+     */
+    private void savePaymentEventToOutbox(Payment payment, String eventType) {
+        PaymentEvent event = PaymentEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventType(eventType)
+                .timestamp(Instant.now())
+                .paymentId(payment.getId())
+                .orderId(payment.getOrderId())
+                .customerId(payment.getCustomerId())
+                .amount(payment.getAmount())
+                .status(payment.getStatus())
+                .build();
+        outboxEventService.saveEvent("Payment", payment.getId().toString(), eventType, event);
     }
 }
