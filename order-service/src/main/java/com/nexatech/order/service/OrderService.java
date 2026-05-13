@@ -9,7 +9,6 @@ import com.nexatech.order.dto.OrderResponse;
 import com.nexatech.order.dto.UpdateShippingRequest;
 import com.nexatech.order.enums.OrderStatus;
 import com.nexatech.order.event.OrderEvent;
-import com.nexatech.order.event.OrderEventProducer;
 import com.nexatech.order.exception.BadRequestException;
 import com.nexatech.order.exception.ForbiddenException;
 import com.nexatech.order.exception.ResourceNotFoundException;
@@ -50,7 +49,8 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final InventoryClient inventoryClient;
     private final ProductClient productClient;
-    private final OrderEventProducer orderEventProducer;
+    private final OutboxEventService outboxEventService;
+    private final AuditLogService auditLogService;
 
     /**
      * Tạo đơn hàng mới.
@@ -104,8 +104,10 @@ public class OrderService {
         //    @Transactional sẽ rollback cả đơn hàng vừa lưu ở trên
         inventoryClient.reserveStock(stockRequest);
 
-        // 5. Publish event sau khi DB và tồn kho đều thành công
-        publishEvent(saved, "ORDER_PLACED");
+        // 5. Lưu event vào outbox — cùng transaction với DB, scheduler publish lên Kafka sau
+        saveOrderEventToOutbox(saved, "ORDER_PLACED");
+        auditLogService.log("ORDER_CREATED", "Order", saved.getId().toString(),
+                "status=" + saved.getStatus(), customerId.toString());
 
         log.info("Tạo đơn hàng thành công: {} | customer: {}", saved.getOrderNumber(), customerId);
         return orderMapper.toResponse(saved);
@@ -168,7 +170,9 @@ public class OrderService {
         }
 
         Order saved = orderRepository.save(order);
-        publishEvent(saved, "ORDER_STATUS_UPDATED");
+        saveOrderEventToOutbox(saved, "ORDER_STATUS_UPDATED");
+        auditLogService.log("ORDER_STATUS_CHANGED", "Order", orderId.toString(),
+                oldStatus.name(), newStatus.name(), "system", null);
         log.info("Cập nhật trạng thái đơn hàng {} : {} → {}", orderId, oldStatus, newStatus);
 
         return orderMapper.toResponse(saved);
@@ -223,7 +227,9 @@ public class OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         Order saved = orderRepository.save(order);
 
-        publishEvent(saved, "ORDER_CANCELLED");
+        saveOrderEventToOutbox(saved, "ORDER_CANCELLED");
+        auditLogService.log("ORDER_CANCELLED", "Order", orderId.toString(),
+                "CANCELLED", customerId.toString(), "customer request");
         log.info("Huỷ đơn hàng thành công: {} | customer: {}", orderId, customerId);
         return orderMapper.toResponse(saved);
     }
@@ -280,33 +286,27 @@ public class OrderService {
     }
 
     /**
-     * Publish OrderEvent lên Kafka.
-     * Catch tất cả exception để tránh rollback DB vì lỗi Kafka.
-     * TODO: thay bằng Outbox Pattern khi cần đảm bảo at-least-once delivery.
+     * Xây dựng OrderEvent và lưu vào outbox trong cùng transaction nghiệp vụ.
+     * Scheduler sẽ đọc và publish lên Kafka sau — đảm bảo at-least-once delivery.
      */
-    private void publishEvent(Order order, String eventType) {
-        try {
-            OrderEvent event = OrderEvent.builder()
-                    .eventId(UUID.randomUUID())
-                    .eventType(eventType)
-                    .timestamp(Instant.now())
-                    .orderId(order.getId())
-                    .orderNumber(order.getOrderNumber())
-                    .customerId(order.getCustomerId())
-                    .status(order.getStatus())
-                    .totalAmount(order.getTotalAmount())
-                    .items(order.getItems().stream()
+    private void saveOrderEventToOutbox(Order order, String eventType) {
+        OrderEvent event = OrderEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventType(eventType)
+                .timestamp(Instant.now())
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .customerId(order.getCustomerId())
+                .status(order.getStatus())
+                .totalAmount(order.getTotalAmount())
+                .items(order.getItems().stream()
                         .map(item -> OrderEvent.OrderItemEvent.builder()
-                            .productId(item.getProductId())
-                            .quantity(item.getQuantity())
-                            .build())
+                                .productId(item.getProductId())
+                                .quantity(item.getQuantity())
+                                .build())
                         .toList())
-                    .build();
-            orderEventProducer.publishOrderEvent(event);
-        } catch (Exception e) {
-            log.warn("Không thể publish Kafka event [{}] cho đơn hàng {}: {}",
-                    eventType, order.getId(), e.getMessage());
-        }
+                .build();
+        outboxEventService.saveEvent("Order", order.getId().toString(), eventType, event);
     }
 
     /**

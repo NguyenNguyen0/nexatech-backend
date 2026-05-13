@@ -3,47 +3,94 @@ package com.nexatech.order.event;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.order.dto.event.PaymentEventDto;
 import com.nexatech.order.enums.OrderStatus;
+import com.nexatech.order.model.ProcessedEvent;
+import com.nexatech.order.repository.ProcessedEventRepository;
+import com.nexatech.order.service.AuditLogService;
 import com.nexatech.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 /**
  * Lắng nghe sự kiện từ payment-service (topic: payment.events).
  *
  * Xử lý:
- *   PAYMENT_REFUNDED → cập nhật đơn hàng sang REFUNDED
- *                       (sau khi admin duyệt trả hàng và payment-service hoàn tiền xong)
+ *   PAYMENT_COMPLETED → cập nhật đơn hàng sang CONFIRMED
+ *   PAYMENT_REFUNDED  → cập nhật đơn hàng sang REFUNDED
+ *
+ * Deduplication: kiểm tra eventId trong processed_events trước khi xử lý.
+ * Nếu Kafka re-deliver message, consumer bỏ qua một cách an toàn.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrderPaymentEventConsumer {
 
+    private static final String CONSUMER_NAME = "order-service:OrderPaymentEventConsumer";
+
     private final OrderService orderService;
     private final ObjectMapper objectMapper;
+    private final ProcessedEventRepository processedEventRepository;
+    private final AuditLogService auditLogService;
 
+    @Transactional
     @KafkaListener(topics = "payment.events", groupId = "order-service-group")
     public void handlePaymentEvent(String message) {
+        PaymentEventDto event;
         try {
-            PaymentEventDto event = objectMapper.readValue(message, PaymentEventDto.class);
-            log.info("Nhận PaymentEvent: type={}, orderId={}, status={}",
-                    event.getEventType(), event.getOrderId(), event.getStatus());
+            event = objectMapper.readValue(message, PaymentEventDto.class);
+        } catch (Exception e) {
+            log.error("Không thể parse PaymentEvent: {} | message: {}", e.getMessage(), message);
+            return;
+        }
 
-            if (event.getOrderId() == null) return;
+        log.info("Nhận PaymentEvent: type={}, orderId={}, status={}",
+                event.getEventType(), event.getOrderId(), event.getStatus());
 
+        // --- Deduplication: bỏ qua nếu đã xử lý ---
+        UUID eventId = event.getEventId();
+        if (eventId == null) {
+            log.warn("PaymentEvent thiếu eventId, bỏ qua deduplication: type={}", event.getEventType());
+        } else if (processedEventRepository.existsByEventIdAndConsumerName(eventId, CONSUMER_NAME)) {
+            log.info("Duplicate PaymentEvent bị bỏ qua: eventId={} type={}", eventId, event.getEventType());
+            return;
+        }
+
+        if (event.getOrderId() == null) return;
+
+        // --- Xử lý nghiệp vụ ---
+        try {
             switch (event.getEventType() != null ? event.getEventType() : "") {
-                case "PAYMENT_COMPLETED" ->
+                case "PAYMENT_COMPLETED" -> {
                     orderService.updateOrderStatus(event.getOrderId(), OrderStatus.CONFIRMED);
-
-                case "PAYMENT_REFUNDED" ->
+                    auditLogService.log("PAYMENT_COMPLETED_RECEIVED", "Order", event.getOrderId().toString(),
+                            "status=CONFIRMED", CONSUMER_NAME);
+                }
+                case "PAYMENT_REFUNDED" -> {
                     orderService.updateOrderStatus(event.getOrderId(), OrderStatus.REFUNDED);
-
+                    auditLogService.log("PAYMENT_REFUNDED_RECEIVED", "Order", event.getOrderId().toString(),
+                            "status=REFUNDED", CONSUMER_NAME);
+                }
                 default -> log.debug("Bỏ qua PaymentEvent không xử lý: {}", event.getEventType());
             }
         } catch (Exception e) {
-            log.error("Lỗi xử lý PaymentEvent: {} | message: {}", e.getMessage(), message);
+            log.error("Lỗi xử lý PaymentEvent type={} orderId={}: {}", event.getEventType(), event.getOrderId(), e.getMessage());
+            // Không re-throw để tránh vòng lặp retry vô hạn từ Kafka
+            return;
+        }
+
+        // --- Lưu processed event (trong cùng transaction) ---
+        if (eventId != null) {
+            processedEventRepository.save(ProcessedEvent.builder()
+                    .eventId(eventId)
+                    .eventType(event.getEventType())
+                    .consumerName(CONSUMER_NAME)
+                    .aggregateId(event.getOrderId().toString())
+                    .build());
         }
     }
 }

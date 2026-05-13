@@ -6,7 +6,6 @@ import com.nexatech.payment.dto.VNPayResponse;
 import com.nexatech.payment.enums.PaymentMethod;
 import com.nexatech.payment.enums.PaymentStatus;
 import com.nexatech.payment.event.PaymentEvent;
-import com.nexatech.payment.event.PaymentEventProducer;
 import com.nexatech.payment.exception.BadRequestException;
 import com.nexatech.payment.model.Payment;
 import com.nexatech.payment.repository.PaymentRepository;
@@ -29,7 +28,8 @@ public class VNPayService {
 
     private final VNPayConfig vnPayConfig;
     private final PaymentRepository paymentRepository;
-    private final PaymentEventProducer paymentEventProducer;
+    private final OutboxEventService outboxEventService;
+    private final AuditLogService auditLogService;
 
     /**
      * Tạo URL thanh toán VNPay và lưu giao dịch với trạng thái PENDING.
@@ -116,14 +116,18 @@ public class VNPayService {
             // Thanh toán thành công
             payment.setStatus(PaymentStatus.COMPLETED);
             paymentRepository.save(payment);
-            publishEvent(payment, "PAYMENT_COMPLETED");
+            savePaymentEventToOutbox(payment, "PAYMENT_COMPLETED");
+            auditLogService.log("VNPAY_PAYMENT_COMPLETED", "Payment", payment.getId().toString(),
+                    "orderId=" + payment.getOrderId(), "vnpay");
             log.info("IPN: thanh toán VNPay thành công — orderId={}", payment.getOrderId());
         } else {
             // Thanh toán thất bại (user hủy / hết hạn / lỗi ngân hàng)
             payment.setStatus(PaymentStatus.FAILED);
             payment.setFailureReason("VNPay response code: " + responseCode);
             paymentRepository.save(payment);
-            publishEvent(payment, "PAYMENT_FAILED");
+            savePaymentEventToOutbox(payment, "PAYMENT_FAILED");
+            auditLogService.log("VNPAY_PAYMENT_FAILED", "Payment", payment.getId().toString(),
+                    "responseCode=" + responseCode, "vnpay");
             log.warn("IPN: thanh toán VNPay thất bại — responseCode={}, orderId={}", responseCode, payment.getOrderId());
         }
 
@@ -187,22 +191,17 @@ public class VNPayService {
         return vnPayConfig.getPaymentUrl() + "?" + VNPayUtil.buildQueryString(params);
     }
 
-    private void publishEvent(Payment payment, String eventType) {
-        try {
-            PaymentEvent event = PaymentEvent.builder()
-                    .eventId(UUID.randomUUID())
-                    .eventType(eventType)
-                    .timestamp(Instant.now())
-                    .paymentId(payment.getId())
-                    .orderId(payment.getOrderId())
-                    .customerId(payment.getCustomerId())
-                    .amount(payment.getAmount())
-                    .status(payment.getStatus())
-                    .build();
-            paymentEventProducer.publishPaymentEvent(event);
-        } catch (Exception e) {
-            log.warn("Không thể publish event [{}] cho paymentId {}: {}",
-                    eventType, payment.getId(), e.getMessage());
-        }
+    private void savePaymentEventToOutbox(Payment payment, String eventType) {
+        PaymentEvent event = PaymentEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventType(eventType)
+                .timestamp(Instant.now())
+                .paymentId(payment.getId())
+                .orderId(payment.getOrderId())
+                .customerId(payment.getCustomerId())
+                .amount(payment.getAmount())
+                .status(payment.getStatus())
+                .build();
+        outboxEventService.saveEvent("Payment", payment.getId().toString(), eventType, event);
     }
 }
