@@ -1,31 +1,66 @@
 package com.nexatech.payment.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.payment.dto.response.ApiResponse;
 import com.nexatech.payment.dto.response.PageResponse;
 import com.nexatech.payment.dto.CreatePaymentRequest;
 import com.nexatech.payment.dto.PaymentResponse;
+import com.nexatech.payment.service.IdempotencyService;
 import com.nexatech.payment.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final IdempotencyService idempotencyService;
+    private final ObjectMapper objectMapper;
 
+    /**
+     * Tạo giao dịch thanh toán mới.
+     * Header Idempotency-Key (tùy chọn): nếu cung cấp, đảm bảo retry an toàn không tạo duplicate.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<PaymentResponse> createPayment(
             @RequestHeader("X-User-Id") UUID customerId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CreatePaymentRequest request) {
-        return ApiResponse.ok(paymentService.createPayment(customerId, request));
+
+        // --- Idempotency check ---
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Optional<String> cached = idempotencyService.checkAndGetCached(idempotencyKey);
+            if (cached.isPresent()) {
+                try {
+                    PaymentResponse cachedResponse = objectMapper.readValue(cached.get(), PaymentResponse.class);
+                    return ApiResponse.ok(cachedResponse);
+                } catch (Exception e) {
+                    log.warn("Không thể deserialize cached idempotency response: key={}", idempotencyKey);
+                }
+            }
+            idempotencyService.markProcessing(idempotencyKey, request.getOrderId());
+        }
+
+        // --- Xử lý nghiệp vụ ---
+        PaymentResponse response = paymentService.createPayment(customerId, request);
+
+        // --- Lưu response vào idempotency cache ---
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotencyService.markCompleted(idempotencyKey, response.getId(), response);
+        }
+
+        return ApiResponse.ok(response);
     }
 
     @GetMapping("/{id}")
@@ -51,3 +86,4 @@ public class PaymentController {
         return ApiResponse.ok(paymentService.refund(id));
     }
 }
+
