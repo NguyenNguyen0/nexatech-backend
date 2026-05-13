@@ -3,7 +3,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/nexatech_payments
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5437/nexatech_payments}
     username: ${DB_USERNAME:nexatech}
     password: ${DB_PASSWORD:nexatech}
     driver-class-name: org.postgresql.Driver
