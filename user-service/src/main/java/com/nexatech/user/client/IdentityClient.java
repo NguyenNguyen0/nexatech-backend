@@ -20,27 +20,27 @@ import com.nexatech.user.dto.request.RoleRefRequest;
 @FeignClient(name = "identity-service", url = "${openfeign.identity-service.url}")
 public interface IdentityClient {
 
-    @PostMapping("/internal/users")
-    ApiResponse<String> createKeycloakUser(@RequestBody KeycloakUserProvisionPayload param);
+        @PostMapping("/internal/users")
+        ApiResponse<String> createKeycloakUser(@RequestBody KeycloakUserProvisionPayload param);
 
-    @GetMapping("/internal/users/availability/email")
-    ApiResponse<Boolean> isKeycloakEmailAvailable(
-            @RequestParam("email") String email, @RequestParam("excludeUserId") String excludeUserId);
+        @GetMapping("/internal/users/availability/email")
+        ApiResponse<Boolean> isKeycloakEmailAvailable(
+                        @RequestParam("email") String email, @RequestParam("excludeUserId") String excludeUserId);
 
-    @PutMapping("/internal/users/{userId}")
-    ApiResponse<Void> updateUser(@PathVariable("userId") String userId,
-            @RequestBody IdentityUserUpdateRequest request);
+        @PutMapping("/internal/users/{userId}")
+        ApiResponse<Void> updateUser(@PathVariable("userId") String userId,
+                        @RequestBody IdentityUserUpdateRequest request);
 
-    @GetMapping("/internal/users/{userId}/role-mappings")
-    ApiResponse<Map<String, Object>> getUserRoleMappings(@PathVariable("userId") String userId);
+        @GetMapping("/internal/users/{userId}/role-mappings")
+        ApiResponse<Map<String, Object>> getUserRoleMappings(@PathVariable("userId") String userId);
 
-    @PostMapping("/internal/users/{userId}/realm-role-mappings")
-    ApiResponse<Void> assignRealmRolesToUser(
-            @PathVariable("userId") String userId,
-            @RequestBody List<RoleRefRequest> roles);
+        @PostMapping("/internal/users/{userId}/realm-role-mappings")
+        ApiResponse<Void> assignRealmRolesToUser(
+                        @PathVariable("userId") String userId,
+                        @RequestBody List<RoleRefRequest> roles);
 
-    @DeleteMapping("/internal/users/{userId}/realm-role-mappings")
-    ApiResponse<Void> removeRealmRolesFromUser(
-            @PathVariable("userId") String userId,
-            @RequestBody List<RoleRefRequest> roles);
+        @DeleteMapping("/internal/users/{userId}/realm-role-mappings")
+        ApiResponse<Void> removeRealmRolesFromUser(
+                        @PathVariable("userId") String userId,
+                        @RequestBody List<RoleRefRequest> roles);
 }

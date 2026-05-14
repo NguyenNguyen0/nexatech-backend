@@ -48,7 +48,8 @@ public class UserService {
                 .credentials(param.getCredentials())
                 .build();
 
-        try (Response response = keycloakUserClient.createUser(realm, adminTokenProvider.adminAuthorizationHeader(), body)) {
+        try (Response response = keycloakUserClient.createUser(realm, adminTokenProvider.adminAuthorizationHeader(),
+                body)) {
             int status = response.status();
             if (status == 409) {
                 throw new AppException(ErrorCode.USER_EXISTED);
@@ -62,7 +63,8 @@ public class UserService {
     }
 
     /**
-     * {@code true} if no other Keycloak user uses this email (excluding {@code excludeUserId}, e.g. current user).
+     * {@code true} if no other Keycloak user uses this email (excluding
+     * {@code excludeUserId}, e.g. current user).
      */
     public boolean isEmailAvailableForUser(String email, String excludeUserId) {
         if (email == null || email.isBlank() || excludeUserId == null || excludeUserId.isBlank()) {
@@ -130,6 +132,7 @@ public class UserService {
         if (roles == null || roles.isEmpty()) {
             throw new IllegalArgumentException("roles body is required");
         }
-        keycloakRoleClient.removeRealmRolesFromUser(realm, userId, adminTokenProvider.adminAuthorizationHeader(), roles);
+        keycloakRoleClient.removeRealmRolesFromUser(realm, userId, adminTokenProvider.adminAuthorizationHeader(),
+                roles);
     }
 }
