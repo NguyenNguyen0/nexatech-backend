@@ -48,7 +48,7 @@ public class PaymentService {
 
         savePaymentEventToOutbox(saved, "PAYMENT_INITIATED");
         auditLogService.log("PAYMENT_CREATED", "Payment", saved.getId().toString(),
-                "status=PENDING", customerId.toString());
+                "status=PENDING", customerId != null ? customerId.toString() : "guest");
         log.info("Tạo thanh toán thành công: {} | đơn hàng: {}", saved.getId(), saved.getOrderId());
 
         return paymentMapper.toResponse(saved);

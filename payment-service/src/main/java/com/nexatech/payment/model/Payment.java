@@ -22,7 +22,7 @@ public class Payment extends BaseEntity {
     @Column(nullable = false)
     private UUID orderId;
 
-    @Column(nullable = false)
+    // null for guest orders
     private UUID customerId;
 
     @Column(nullable = false)

@@ -155,6 +155,17 @@ public class VNPayService {
         return result;
     }
 
+    /**
+     * Tra cứu orderId từ txnRef (payment UUID không dấu gạch ngang).
+     * Dùng khi xử lý redirect về frontend sau thanh toán VNPAY.
+     */
+    public String getOrderIdByTxnRef(String txnRef) {
+        if (txnRef == null || txnRef.isBlank()) return null;
+        return paymentRepository.findByTransactionId(txnRef)
+                .map(p -> p.getOrderId().toString())
+                .orElse(null);
+    }
+
     // ==================== Private helpers ====================
 
     /**
