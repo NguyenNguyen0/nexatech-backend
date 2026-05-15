@@ -18,6 +18,10 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "ship-mock-{{$timestamp}}"
               }
             ],
             "body": {
@@ -60,6 +64,10 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "ship-ghn-{{$timestamp}}"
               }
             ],
             "body": {
