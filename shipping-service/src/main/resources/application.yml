@@ -5,7 +5,7 @@ spring:
   application:
     name: shipping-service
   config:
-    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
+    import: "optional:file:./.env[.properties],optional:file:./shipping-service/.env[.properties],optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/nexatech_shipping}
     username: ${DB_USERNAME:nexatech}
