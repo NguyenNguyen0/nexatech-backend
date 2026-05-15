@@ -16,6 +16,7 @@ import com.nexatech.identity.client.KeycloakSessionClient;
 import com.nexatech.identity.client.KeycloakUserClient;
 import com.nexatech.identity.dto.response.SessionResponse;
 import com.nexatech.identity.service.support.KeycloakAdminTokenProvider;
+import com.nexatech.identity.service.support.SessionRevocationStore;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,12 +29,15 @@ public class SessionService {
     private final KeycloakUserClient keycloakUserClient;
     private final KeycloakSessionClient keycloakSessionClient;
     private final KeycloakAdminTokenProvider adminTokenProvider;
+    private final SessionRevocationStore revocationStore;
 
     @Value("${openfeign.keycloak.realm}")
     private String realm;
 
     private static final DateTimeFormatter ISO_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
+
+    // ── User-facing: list sessions ────────────────────────────────────────────
 
     public List<SessionResponse> getMySessions(String userId, String currentSessionId) {
         String token = adminTokenProvider.adminAuthorizationHeader();
@@ -50,17 +54,51 @@ public class SessionService {
         return keycloakUserClient.getSessions(realm, userId, adminTokenProvider.adminAuthorizationHeader());
     }
 
+    // ── Session deletion (single) ─────────────────────────────────────────────
+
+    /**
+     * Deletes a Keycloak session and immediately adds the session ID to the
+     * Redis revocation list so any in-flight JWT with that sid is rejected.
+     */
     public void deleteSession(String sessionId, Boolean isOffline) {
         keycloakSessionClient.deleteSession(realm, sessionId, adminTokenProvider.adminAuthorizationHeader(), isOffline);
+        // Blacklist the sid so the token bearer gets 401 immediately.
+        revocationStore.revoke(sessionId);
+        log.info("Session deleted and revoked: {}", sessionId);
     }
 
+    // ── User logout (all sessions of one user) ────────────────────────────────
+
+    /**
+     * Logs out all sessions for a user. First snapshots all session IDs,
+     * blacklists them in Redis, then calls Keycloak to terminate them.
+     * Order matters: revoke first so concurrent requests are rejected even
+     * if Keycloak propagation takes a moment.
+     */
     public void logoutUser(String userId) {
+        List<Map<String, Object>> sessions = keycloakUserClient.getSessions(
+                realm, userId, adminTokenProvider.adminAuthorizationHeader());
+
+        if (sessions != null) {
+            List<String> sessionIds = sessions.stream()
+                    .map(s -> s.get("id"))
+                    .filter(java.util.Objects::nonNull)
+                    .map(Object::toString)
+                    .collect(Collectors.toList());
+            revocationStore.revokeAll(sessionIds);
+            log.info("Revoked {} sessions for user {}", sessionIds.size(), userId);
+        }
+
         keycloakUserClient.logoutUser(realm, userId, adminTokenProvider.adminAuthorizationHeader());
     }
+
+    // ── Realm-wide logout (admin) ─────────────────────────────────────────────
 
     public Map<String, Object> logoutAll() {
         return keycloakSessionClient.logoutAll(realm, adminTokenProvider.adminAuthorizationHeader());
     }
+
+    // ── Client / offline session queries (admin) ──────────────────────────────
 
     public List<Map<String, Object>> getClientUserSessions(String clientUuid, Integer first, Integer max) {
         return keycloakSessionClient.getClientUserSessions(realm, clientUuid,
@@ -90,6 +128,8 @@ public class SessionService {
         return keycloakUserClient.getOfflineSessions(realm, userId, clientUuid,
                 adminTokenProvider.adminAuthorizationHeader());
     }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
     private SessionResponse mapToSessionResponse(Map<String, Object> raw, String currentSessionId, String type) {

@@ -7,10 +7,14 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+
+import lombok.RequiredArgsConstructor;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
         private static final String[] PUBLIC_ENDPOINTS = {
@@ -26,6 +30,8 @@ public class SecurityConfig {
                         "/auth/register",
         };
 
+        private final SessionRevocationFilter sessionRevocationFilter;
+
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
                 httpSecurity
@@ -40,6 +46,8 @@ public class SecurityConfig {
                                                 jwtConfigurer -> jwtConfigurer
                                                                 .jwtAuthenticationConverter(jwtAuthenticationConverter()))
                                                 .authenticationEntryPoint(new JwtAuthenticationEntryPoint()))
+                                // Runs after JWT signature/expiry validation; rejects revoked session IDs
+                                .addFilterAfter(sessionRevocationFilter, BearerTokenAuthenticationFilter.class)
                                 .csrf(AbstractHttpConfigurer::disable);
 
                 return httpSecurity.build();

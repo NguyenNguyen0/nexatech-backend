@@ -88,4 +88,15 @@ public class AuthController {
         authService.changePassword(authorization, request);
         return ApiResponse.<Void>builder().build();
     }
+
+    /**
+     * Lightweight session liveness check.
+     * Requires a valid, non-revoked Bearer token (goes through SessionRevocationFilter).
+     * Returns 200 if the session is still active, 401 if revoked.
+     * Used by the frontend heartbeat to detect remote logouts in real time.
+     */
+    @GetMapping("/session/ping")
+    public ApiResponse<Void> sessionPing() {
+        return ApiResponse.<Void>builder().build();
+    }
 }
