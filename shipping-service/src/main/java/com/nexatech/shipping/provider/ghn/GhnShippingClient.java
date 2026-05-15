@@ -5,25 +5,35 @@ import com.nexatech.shipping.entity.Shipment;
 import com.nexatech.shipping.entity.ShipmentTrackingHistory;
 import com.nexatech.shipping.enums.ShipmentStatus;
 import com.nexatech.shipping.enums.ShippingProvider;
+import com.nexatech.shipping.event.ShippingEvent;
 import com.nexatech.shipping.exception.ShippingProviderException;
 import com.nexatech.shipping.mapper.GhnShippingMapper;
 import com.nexatech.shipping.mapper.ShipmentMapper;
 import com.nexatech.shipping.provider.ShippingProviderClient;
 import com.nexatech.shipping.provider.ghn.dto.*;
+import com.nexatech.shipping.provider.mock.MockShippingClient;
 import com.nexatech.shipping.repository.ShipmentRepository;
 import com.nexatech.shipping.repository.ShipmentTrackingHistoryRepository;
+import com.nexatech.shipping.service.AuditLogService;
+import com.nexatech.shipping.service.OutboxEventService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.util.retry.Retry;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class GhnShippingClient implements ShippingProviderClient {
@@ -36,12 +46,30 @@ public class GhnShippingClient implements ShippingProviderClient {
     private final ShipmentRepository shipmentRepository;
     private final ShipmentTrackingHistoryRepository historyRepository;
     private final ShipmentMapper shipmentMapper;
+    private final OutboxEventService outboxEventService;
+    private final AuditLogService auditLogService;
+    private final MockShippingClient mockShippingClient;
 
     @Override
     public ShippingFeeResponse calculateFee(ShippingFeeRequest request) {
         ensureConfigured();
         GhnFeeRequest ghnRequest = ghnShippingMapper.toFeeRequest(request, properties);
-        GhnFeeResponse ghnResponse = post("/v2/shipping-order/fee", ghnRequest, GhnFeeResponse.class);
+        GhnFeeResponse ghnResponse;
+        try {
+            ghnResponse = post("/v2/shipping-order/fee", ghnRequest, GhnFeeResponse.class);
+        } catch (ShippingProviderException ex) {
+            if (isTransientProviderError(ex)) {
+                log.warn("GHN fee failed with transient error, falling back to mock fee: {}", ex.getMessage());
+                ShippingFeeResponse fallback = mockShippingClient.calculateFee(request);
+                fallback.setRawProviderResponse(Map.of(
+                        "fallback", true,
+                        "reason", ex.getMessage(),
+                        "sourceProvider", ShippingProvider.GHN.name()
+                ));
+                return fallback;
+            }
+            throw ex;
+        }
         Integer total = Optional.ofNullable(ghnResponse)
                 .map(GhnFeeResponse::getData)
                 .map(GhnFeeResponse.FeeData::getTotal)
@@ -95,6 +123,9 @@ public class GhnShippingClient implements ShippingProviderClient {
 
         Shipment saved = shipmentRepository.save(shipment);
         addHistory(saved, ShipmentStatus.PENDING_PICKUP, properties.getFromAddress(), null, null, "GHN shipment created");
+        saveShippingEventToOutbox(saved, "SHIPMENT_CREATED");
+        auditLogService.log("SHIPMENT_CREATED", "Shipment", saved.getId().toString(),
+                "status=PENDING_PICKUP", "ghn-provider");
         return shipmentMapper.toCreateResponse(saved);
     }
 
@@ -121,7 +152,10 @@ public class GhnShippingClient implements ShippingProviderClient {
                 shipment.setCurrentAddress(resolveCurrentAddress(data, shipment.getCurrentAddress()));
                 addHistory(shipment, mappedStatus, shipment.getCurrentAddress(), shipment.getCurrentLat(), shipment.getCurrentLng(),
                         "GHN status: " + data.getStatus());
-                shipmentRepository.save(shipment);
+                Shipment saved = shipmentRepository.save(shipment);
+                saveShippingEventToOutbox(saved, "SHIPMENT_STATUS_UPDATED");
+                auditLogService.log("SHIPMENT_STATUS_UPDATED", "Shipment", saved.getId().toString(),
+                        null, "status=" + saved.getStatus(), "ghn-provider", "GHN status: " + data.getStatus());
             }
             return shipmentMapper.toTrackingResponse(shipment);
         }
@@ -156,14 +190,25 @@ public class GhnShippingClient implements ShippingProviderClient {
                             response.bodyToMono(String.class)
                                     .defaultIfEmpty("")
                                     .map(responseBody -> new ShippingProviderException(
-                                            "GHN API error " + response.statusCode().value() + ": " + responseBody)))
+                                            "GHN API error " + response.statusCode().value() + ": " + responseBody,
+                                            response.statusCode().value())))
                     .bodyToMono(responseType)
+                    .retryWhen(Retry.backoff(2, Duration.ofMillis(300))
+                            .filter(this::isTransientProviderError))
                     .block(Duration.ofSeconds(15));
         } catch (ShippingProviderException ex) {
             throw ex;
         } catch (Exception ex) {
             throw new ShippingProviderException("Failed to call GHN API: " + ex.getMessage(), ex);
         }
+    }
+
+    private boolean isTransientProviderError(Throwable ex) {
+        if (ex instanceof ShippingProviderException providerException) {
+            Integer statusCode = providerException.getStatusCode();
+            return statusCode == null || statusCode >= 500;
+        }
+        return true;
     }
 
     private void ensureConfigured() {
@@ -226,5 +271,21 @@ public class GhnShippingClient implements ShippingProviderClient {
                 .note(note)
                 .eventTime(LocalDateTime.now())
                 .build());
+    }
+
+    private void saveShippingEventToOutbox(Shipment shipment, String eventType) {
+        ShippingEvent event = ShippingEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventType(eventType)
+                .timestamp(Instant.now())
+                .shipmentId(shipment.getId())
+                .orderId(shipment.getOrderId())
+                .provider(shipment.getProvider())
+                .trackingCode(shipment.getTrackingCode())
+                .status(shipment.getStatus())
+                .shippingFee(shipment.getShippingFee())
+                .currency(shipment.getCurrency())
+                .build();
+        outboxEventService.saveEvent("Shipment", shipment.getId().toString(), eventType, event);
     }
 }
