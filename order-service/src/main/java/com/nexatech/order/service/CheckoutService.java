@@ -58,20 +58,23 @@ public class CheckoutService {
                             .amount(order.getTotalAmount())
                             .orderInfo("Thanh toan don hang " + order.getOrderNumber())
                             .build());
-            if (vnpay != null) {
-                paymentId = vnpay.getPaymentId();
-                paymentUrl = vnpay.getPaymentUrl();
+            if (vnpay == null || vnpay.getPaymentId() == null || vnpay.getPaymentUrl() == null) {
+                compensateOrderAfterPaymentFailure(customerId, order.getId(), "VNPay payment URL creation failed");
             }
+            paymentId = vnpay.getPaymentId();
+            paymentUrl = vnpay.getPaymentUrl();
         } else {
             ApiResponse<PaymentInfo> paymentResp = paymentClient.createPayment(customerId,
+                    "checkout-payment-" + order.getId(),
                     CreatePaymentDto.builder()
                             .orderId(order.getId())
                             .amount(order.getTotalAmount())
                             .method(request.getPaymentMethod().name())
                             .build());
-            if (paymentResp != null && paymentResp.getData() != null) {
-                paymentId = paymentResp.getData().getId();
+            if (paymentResp == null || !paymentResp.isSuccess() || paymentResp.getData() == null) {
+                compensateOrderAfterPaymentFailure(customerId, order.getId(), "Payment creation failed");
             }
+            paymentId = paymentResp.getData().getId();
         }
 
         // 5. Xóa cart
@@ -109,5 +112,14 @@ public class CheckoutService {
         orderRequest.setPaymentMethod(request.getPaymentMethod());
         orderRequest.setNote(request.getNote());
         return orderRequest;
+    }
+
+    private void compensateOrderAfterPaymentFailure(UUID customerId, UUID orderId, String reason) {
+        try {
+            orderService.cancelOrder(customerId, orderId);
+        } catch (Exception e) {
+            log.error("Unable to compensate checkout after payment failure, orderId={} error={}", orderId, e.getMessage());
+        }
+        throw new BadRequestException(reason);
     }
 }
