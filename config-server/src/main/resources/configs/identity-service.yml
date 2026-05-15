@@ -5,6 +5,11 @@ spring:
   main:
     # OpenFeign + DevTools/context refresh can re-register FeignClientSpecification beans with the same name.
     allow-bean-definition-overriding: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   security:
     oauth2:
       resourceserver:
