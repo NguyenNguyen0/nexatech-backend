@@ -54,6 +54,14 @@ services:
           - /api/v1/payments
         strip_path: false
 
+  - name: shipping-service
+    url: http://shipping-service:8091
+    routes:
+      - name: shipping-route
+        paths:
+          - /api/v1/shipping
+        strip_path: false
+
   - name: notification-service
     url: http://notification-service:8087
     routes:

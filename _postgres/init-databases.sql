@@ -23,6 +23,10 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_orders');
 SELECT 'CREATE DATABASE nexatech_payments'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_payments');
 
+-- Shipping Service
+SELECT 'CREATE DATABASE nexatech_shipping'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_shipping');
+
 -- Inventory Service
 SELECT 'CREATE DATABASE nexatech_inventory'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_inventory');
