@@ -2,6 +2,7 @@ package com.nexatech.payment.service;
 
 import com.nexatech.payment.dto.CreatePaymentRequest;
 import com.nexatech.payment.dto.PaymentResponse;
+import com.nexatech.payment.enums.PaymentMethod;
 import com.nexatech.payment.enums.PaymentStatus;
 import com.nexatech.payment.event.PaymentEvent;
 import com.nexatech.payment.exception.BadRequestException;
@@ -105,6 +106,10 @@ public class PaymentService {
     @Transactional
     public void confirmPayment(UUID orderId) {
         paymentRepository.findByOrderId(orderId).ifPresent(payment -> {
+            if (payment.getMethod() == PaymentMethod.COD) {
+                log.debug("Skip non-COD confirmation for COD payment, orderId={}", orderId);
+                return;
+            }
             if (payment.getStatus() == PaymentStatus.PENDING
                     || payment.getStatus() == PaymentStatus.PROCESSING) {
                 payment.setStatus(PaymentStatus.COMPLETED);
