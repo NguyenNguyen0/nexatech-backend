@@ -63,4 +63,15 @@ public interface KeycloakUserClient {
         List<Map<String, Object>> getSessions(@PathVariable("realm") String realm,
                         @PathVariable("userId") String userId,
                         @RequestHeader("Authorization") String authorization);
+
+        @PostMapping("/admin/realms/{realm}/users/{userId}/logout")
+        void logoutUser(@PathVariable("realm") String realm,
+                        @PathVariable("userId") String userId,
+                        @RequestHeader("Authorization") String authorization);
+
+        @GetMapping("/admin/realms/{realm}/users/{userId}/offline-sessions/{clientUuid}")
+        List<Map<String, Object>> getOfflineSessions(@PathVariable("realm") String realm,
+                        @PathVariable("userId") String userId,
+                        @PathVariable("clientUuid") String clientUuid,
+                        @RequestHeader("Authorization") String authorization);
 }
