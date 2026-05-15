@@ -1,0 +1,21 @@
+services:
+  shipping-postgres:
+    image: postgres:16-alpine
+    container_name: nexatech-shipping-postgres
+    ports:
+      - "${SHIPPING_POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${SHIPPING_DB_NAME:-nexatech_shipping}
+      POSTGRES_USER: ${SHIPPING_DB_USERNAME:-nexatech}
+      POSTGRES_PASSWORD: ${SHIPPING_DB_PASSWORD:-nexatech123}
+    volumes:
+      - shipping-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SHIPPING_DB_USERNAME:-nexatech} -d ${SHIPPING_DB_NAME:-nexatech_shipping}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  shipping-postgres-data:
