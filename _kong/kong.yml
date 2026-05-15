@@ -26,6 +26,7 @@ services:
           - /api/v1/categories
           - /api/v1/brands
           - /api/v1/reviews
+          - /api/v1/admin/products
         strip_path: false
 
   - name: order-service
@@ -36,6 +37,8 @@ services:
           - /api/v1/orders
           - /api/v1/cart
           - /api/v1/checkout
+          - /api/v1/returns
+          - /api/v1/admin/orders
         strip_path: false
 
   - name: inventory-service
@@ -52,6 +55,7 @@ services:
       - name: payment-route
         paths:
           - /api/v1/payments
+          - /api/v1/admin/payments
         strip_path: false
 
   - name: shipping-service

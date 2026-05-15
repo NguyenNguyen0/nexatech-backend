@@ -27,7 +27,7 @@ public class CheckoutController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<CheckoutResponse> checkout(
-            @RequestHeader("X-User-Id") UUID customerId,
+            @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CheckoutRequest request) {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {

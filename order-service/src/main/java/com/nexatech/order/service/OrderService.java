@@ -93,6 +93,9 @@ public class OrderService {
                 .shippingMethod(request.getShippingMethod() != null ? request.getShippingMethod() : "STANDARD")
                 .paymentMethod(request.getPaymentMethod())
                 .note(request.getNote())
+                .guestName(request.getGuestName())
+                .guestEmail(request.getGuestEmail())
+                .guestPhone(request.getGuestPhone())
                 .items(items)
                 .build();
 
@@ -107,7 +110,7 @@ public class OrderService {
         // 5. Lưu event vào outbox — cùng transaction với DB, scheduler publish lên Kafka sau
         saveOrderEventToOutbox(saved, "ORDER_PLACED");
         auditLogService.log("ORDER_CREATED", "Order", saved.getId().toString(),
-                "status=" + saved.getStatus(), customerId.toString());
+                "status=" + saved.getStatus(), customerId != null ? customerId.toString() : "guest");
 
         log.info("Tạo đơn hàng thành công: {} | customer: {}", saved.getOrderNumber(), customerId);
         return orderMapper.toResponse(saved);
@@ -229,7 +232,7 @@ public class OrderService {
 
         saveOrderEventToOutbox(saved, "ORDER_CANCELLED");
         auditLogService.log("ORDER_CANCELLED", "Order", orderId.toString(),
-                null, "CANCELLED", customerId.toString(), "customer request");
+                null, "CANCELLED", customerId != null ? customerId.toString() : "guest", "customer request");
         log.info("Huỷ đơn hàng thành công: {} | customer: {}", orderId, customerId);
         return orderMapper.toResponse(saved);
     }

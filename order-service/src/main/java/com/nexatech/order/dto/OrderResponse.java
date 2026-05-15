@@ -22,6 +22,11 @@ public class OrderResponse {
     private String orderNumber;
     private UUID customerId;
     private OrderStatus status;
+
+    // Guest / buyer contact info
+    private String guestName;
+    private String guestEmail;
+    private String guestPhone;
     private BigDecimal totalAmount;
     private BigDecimal shippingFee;
     private BigDecimal discount;
