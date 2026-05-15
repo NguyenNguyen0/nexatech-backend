@@ -32,9 +32,24 @@ public class InternalUserController {
                 .build();
     }
 
+    @org.springframework.web.bind.annotation.GetMapping("/{userId}")
+    public ApiResponse<?> getUserById(@PathVariable String userId) {
+        return ApiResponse.builder()
+                .result(userService.getUserById(userId))
+                .build();
+    }
+
     @PutMapping("/{userId}/enable")
     public ApiResponse<Void> enableUser(@PathVariable String userId) {
         userService.enableUser(userId);
+        return ApiResponse.<Void>builder().build();
+    }
+
+    @PutMapping("/{userId}/requires-password-change")
+    public ApiResponse<Void> updatePasswordChangeRequired(
+            @PathVariable String userId,
+            @RequestBody Boolean required) {
+        userService.updatePasswordChangeRequired(userId, required);
         return ApiResponse.<Void>builder().build();
     }
 }

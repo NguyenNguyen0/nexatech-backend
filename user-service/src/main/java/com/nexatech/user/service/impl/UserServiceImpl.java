@@ -456,4 +456,12 @@ public class UserServiceImpl implements UserService {
         return at > 0 && at < email.length() - 1;
     }
 
+    @Override
+    @Transactional
+    public void updatePasswordChangeRequired(String userId, boolean required) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        user.setRequiresPasswordChange(required);
+        userRepository.save(user);
+    }
 }

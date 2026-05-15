@@ -32,5 +32,6 @@ public class UserTokenExchangeResponse {
 
     String sessionState;
     String scope;
+    Boolean requiresPasswordChange;
 }
 

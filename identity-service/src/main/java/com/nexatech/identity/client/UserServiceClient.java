@@ -12,4 +12,12 @@ public interface UserServiceClient {
 
     @GetMapping("/internal/system/ping")
     ApiResponse<Map<String, String>> ping();
+
+    @GetMapping("/internal/users/{userId}")
+    ApiResponse<Map<String, Object>> getUserById(@org.springframework.web.bind.annotation.PathVariable("userId") String userId);
+
+    @org.springframework.web.bind.annotation.PutMapping("/internal/users/{userId}/requires-password-change")
+    ApiResponse<Void> updatePasswordChangeRequired(
+            @org.springframework.web.bind.annotation.PathVariable("userId") String userId,
+            @org.springframework.web.bind.annotation.RequestBody Boolean required);
 }

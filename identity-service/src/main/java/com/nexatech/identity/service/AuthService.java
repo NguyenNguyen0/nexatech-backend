@@ -12,6 +12,7 @@ import com.nexatech.identity.dto.request.IntrospectParam;
 import com.nexatech.identity.dto.request.IntrospectTokenRequest;
 import com.nexatech.identity.dto.request.LoginRequest;
 import com.nexatech.identity.dto.request.ForgotPasswordRequest;
+import com.nexatech.identity.dto.base.ApiResponse;
 import com.nexatech.identity.dto.event.ForgotPasswordEvent;
 import com.nexatech.identity.dto.request.LogoutParam;
 import com.nexatech.identity.dto.request.LogoutRequest;
@@ -41,6 +42,7 @@ public class AuthService {
     private final UserServiceDependencyGuard userServiceDependencyGuard;
     private final KafkaService kafkaService;
     private final UserClientMapper userClientMapper;
+    private final com.nexatech.identity.client.UserServiceClient userServiceClient;
 
     @Value("${openfeign.keycloak.realm}")
     private String realm;
@@ -92,7 +94,8 @@ public class AuthService {
             }
 
             Object roleIdObj = role != null ? role.get("id") : null;
-            String resolvedRoleName = role != null && role.get("name") != null ? role.get("name").toString() : trimmedRoleName;
+            String resolvedRoleName = role != null && role.get("name") != null ? role.get("name").toString()
+                    : trimmedRoleName;
             String roleId = roleIdObj != null ? roleIdObj.toString() : null;
             if (roleId == null || roleId.isBlank()) {
                 throw new IllegalArgumentException("Keycloak role id is missing for role=" + resolvedRoleName);
@@ -124,7 +127,7 @@ public class AuthService {
             throw new IllegalArgumentException("Password is required");
         }
 
-        return keycloakAuthClient.exchangeUserToken(realm, UserTokenExchangeParam.builder()
+        UserTokenExchangeResponse response = keycloakAuthClient.exchangeUserToken(realm, UserTokenExchangeParam.builder()
                 .grant_type("password")
                 .client_id(clientId)
                 .client_secret(clientSecret)
@@ -132,6 +135,30 @@ public class AuthService {
                 .username(request.getUsername())
                 .password(request.getPassword())
                 .build());
+
+        // Decode token to get userId and check requiresPasswordChange
+        try {
+            String accessToken = response.getAccessToken();
+            String[] parts = accessToken.split("\\.");
+            if (parts.length == 3) {
+                String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(payload);
+                String userId = node.get("sub").asText();
+                
+                ApiResponse<Map<String, Object>> userResponse = userServiceClient.getUserById(userId);
+                if (userResponse != null && userResponse.getResult() != null) {
+                    Object req = userResponse.getResult().get("requiresPasswordChange");
+                    if (req instanceof Boolean) {
+                        response.setRequiresPasswordChange((Boolean) req);
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to check requiresPasswordChange during login: {}", ex.getMessage());
+        }
+
+        return response;
     }
 
     public UserTokenExchangeResponse refreshToken(RefreshTokenRequest request) {
@@ -171,7 +198,25 @@ public class AuthService {
         if (!authorizationHeader.regionMatches(true, 0, "Bearer ", 0, 7)) {
             throw new IllegalArgumentException("Authorization must be a Bearer token");
         }
-        return keycloakAuthClient.userInfo(realm, authorizationHeader);
+        Map<String, Object> kcUserInfo = keycloakAuthClient.userInfo(realm, authorizationHeader);
+
+        // Enrich with requiresPasswordChange from user-service
+        try {
+            String userId = (String) kcUserInfo.get("sub");
+            if (userId != null) {
+                ApiResponse<Map<String, Object>> userResponse = userServiceClient.getUserById(userId);
+                if (userResponse != null && userResponse.getResult() != null) {
+                    Object req = userResponse.getResult().get("requiresPasswordChange");
+                    if (req != null) {
+                        kcUserInfo.put("requiresPasswordChange", req);
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to enrich user info with requiresPasswordChange: {}", ex.getMessage());
+        }
+
+        return kcUserInfo;
     }
 
     public Map<String, Object> introspect(IntrospectTokenRequest request) {
@@ -185,7 +230,8 @@ public class AuthService {
                 .build());
     }
 
-    public void changePassword(String authorizationHeader, com.nexatech.identity.dto.request.PasswordChangeRequest request) {
+    public void changePassword(String authorizationHeader,
+            com.nexatech.identity.dto.request.PasswordChangeRequest request) {
         if (authorizationHeader == null || authorizationHeader.isBlank()) {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
@@ -219,6 +265,13 @@ public class AuthService {
                 .value(request.getNewPassword())
                 .temporary(false)
                 .build());
+
+        // 4. Clear requiresPasswordChange flag
+        try {
+            userServiceClient.updatePasswordChangeRequired(userId, false);
+        } catch (Exception ex) {
+            log.warn("Failed to clear requiresPasswordChange for user {}: {}", userId, ex.getMessage());
+        }
     }
 
     public void forgotPassword(ForgotPasswordRequest request) {
@@ -227,8 +280,9 @@ public class AuthService {
         }
         String identifier = request.getIdentifier().trim();
         List<Map<String, Object>> users = userService.listUsers(identifier);
-        
-        // Filter exactly matching username or email since Keycloak's search might be fuzzy
+
+        // Filter exactly matching username or email since Keycloak's search might be
+        // fuzzy
         Map<String, Object> targetUser = null;
         if (users != null) {
             for (Map<String, Object> user : users) {
@@ -252,7 +306,7 @@ public class AuthService {
         String email = (String) targetUser.get("email");
         String firstName = (String) targetUser.get("firstName");
         String lastName = (String) targetUser.get("lastName");
-        
+
         if (email == null || email.isBlank()) {
             log.warn("Forgot password requested for user without email: {}", identifier);
             return;
@@ -269,7 +323,8 @@ public class AuthService {
                 .build());
 
         // Publish event
-        String displayName = (firstName != null && lastName != null) ? firstName.trim() + " " + lastName.trim() : username;
+        String displayName = (firstName != null && lastName != null) ? firstName.trim() + " " + lastName.trim()
+                : username;
         ForgotPasswordEvent event = ForgotPasswordEvent.builder()
                 .eventId(java.util.UUID.randomUUID().toString())
                 .eventType("FORGOT_PASSWORD")
@@ -279,8 +334,16 @@ public class AuthService {
                 .displayName(displayName)
                 .newPassword(newPassword)
                 .build();
-        
+
         kafkaService.sendForgotPasswordEvent(event);
+
+        // Set requiresPasswordChange flag
+        try {
+            userServiceClient.updatePasswordChangeRequired(userId, true);
+        } catch (Exception ex) {
+            log.warn("Failed to set requiresPasswordChange for user {}: {}", userId, ex.getMessage());
+        }
+
         log.info("Reset password and sent forgot password event for user: {}", identifier);
     }
 
