@@ -2,6 +2,7 @@ package com.nexatech.notification.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.notification.event.dto.EmailVerificationEvent;
+import com.nexatech.notification.event.dto.ForgotPasswordEvent;
 import com.nexatech.notification.event.dto.InventoryEvent;
 import com.nexatech.notification.event.dto.OrderEvent;
 import com.nexatech.notification.event.dto.PaymentEvent;
@@ -44,6 +45,9 @@ public class NotificationEventConsumer {
 
             if ("EMAIL_VERIFICATION_REQUESTED".equals(eventType)) {
                 handleEmailVerificationEvent(message);
+                return;
+            } else if ("FORGOT_PASSWORD".equals(eventType)) {
+                handleForgotPasswordEvent(message);
                 return;
             }
 
@@ -143,6 +147,42 @@ public class NotificationEventConsumer {
                     userId, event.getEmail());
         } catch (Exception e) {
             log.error("Failed to process email verification event: {}", e.getMessage(), e);
+        }
+    }
+
+    private void handleForgotPasswordEvent(String message) {
+        try {
+            ForgotPasswordEvent event = objectMapper.readValue(message, ForgotPasswordEvent.class);
+
+            if (event.getEmail() == null || event.getNewPassword() == null) {
+                log.warn("Forgot password event missing email or newPassword, skipping");
+                return;
+            }
+
+            UUID userId = event.getUserId() != null ? UUID.fromString(event.getUserId()) : adminUserId;
+            String name = event.getDisplayName() != null ? event.getDisplayName() : "there";
+
+            // Create in-app notification
+            Notification notification = notificationService.createNotification(
+                    userId,
+                    Notification.NotificationType.GENERAL,
+                    "Mật khẩu của bạn đã được đặt lại",
+                    "Hệ thống đã tạo mật khẩu mới cho bạn. Vui lòng kiểm tra email."
+            );
+
+            // Send email
+            sendEmailWithRetrySupport(notification, event.getEmail(),
+                    "forgot-password", "NexaTech — Mật khẩu mới của bạn",
+                    Map.of(
+                        "displayName", name, 
+                        "newPassword", event.getNewPassword(),
+                        "loginUrl", "http://localhost:3000/auth/login" // Using default frontend URL
+                    ));
+
+            log.info("Processed FORGOT_PASSWORD event for userId={}, email={}",
+                    userId, event.getEmail());
+        } catch (Exception e) {
+            log.error("Failed to process forgot password event: {}", e.getMessage(), e);
         }
     }
 

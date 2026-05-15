@@ -28,6 +28,7 @@ public class SecurityConfig {
                         "/auth/refresh",
                         "/auth/login",
                         "/auth/register",
+                        "/auth/forgot-password",
         };
 
         private final SessionRevocationFilter sessionRevocationFilter;

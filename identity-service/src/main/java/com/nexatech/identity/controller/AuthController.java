@@ -14,6 +14,7 @@ import java.util.Map;
 import com.nexatech.identity.dto.base.ApiResponse;
 import com.nexatech.identity.dto.request.IntrospectTokenRequest;
 import com.nexatech.identity.dto.request.LoginRequest;
+import com.nexatech.identity.dto.request.ForgotPasswordRequest;
 import com.nexatech.identity.dto.request.LogoutRequest;
 import com.nexatech.identity.dto.request.RefreshTokenRequest;
 import com.nexatech.identity.dto.request.UserCreationParam;
@@ -97,6 +98,12 @@ public class AuthController {
      */
     @GetMapping("/session/ping")
     public ApiResponse<Void> sessionPing() {
+        return ApiResponse.<Void>builder().build();
+    }
+
+    @PostMapping("/forgot-password")
+    public ApiResponse<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
         return ApiResponse.<Void>builder().build();
     }
 }

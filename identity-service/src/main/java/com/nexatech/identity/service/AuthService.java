@@ -11,6 +11,8 @@ import com.nexatech.identity.dto.request.KeycloakRoleRef;
 import com.nexatech.identity.dto.request.IntrospectParam;
 import com.nexatech.identity.dto.request.IntrospectTokenRequest;
 import com.nexatech.identity.dto.request.LoginRequest;
+import com.nexatech.identity.dto.request.ForgotPasswordRequest;
+import com.nexatech.identity.dto.event.ForgotPasswordEvent;
 import com.nexatech.identity.dto.request.LogoutParam;
 import com.nexatech.identity.dto.request.LogoutRequest;
 import com.nexatech.identity.dto.request.RefreshTokenParam;
@@ -217,5 +219,79 @@ public class AuthService {
                 .value(request.getNewPassword())
                 .temporary(false)
                 .build());
+    }
+
+    public void forgotPassword(ForgotPasswordRequest request) {
+        if (request == null || request.getIdentifier() == null || request.getIdentifier().isBlank()) {
+            throw new IllegalArgumentException("Username or Email is required");
+        }
+        String identifier = request.getIdentifier().trim();
+        List<Map<String, Object>> users = userService.listUsers(identifier);
+        
+        // Filter exactly matching username or email since Keycloak's search might be fuzzy
+        Map<String, Object> targetUser = null;
+        if (users != null) {
+            for (Map<String, Object> user : users) {
+                String uName = (String) user.get("username");
+                String uEmail = (String) user.get("email");
+                if (identifier.equalsIgnoreCase(uName) || identifier.equalsIgnoreCase(uEmail)) {
+                    targetUser = user;
+                    break;
+                }
+            }
+        }
+
+        if (targetUser == null) {
+            log.warn("Forgot password requested for non-existent user: {}", identifier);
+            // Return normally to prevent user enumeration attacks
+            return;
+        }
+
+        String userId = (String) targetUser.get("id");
+        String username = (String) targetUser.get("username");
+        String email = (String) targetUser.get("email");
+        String firstName = (String) targetUser.get("firstName");
+        String lastName = (String) targetUser.get("lastName");
+        
+        if (email == null || email.isBlank()) {
+            log.warn("Forgot password requested for user without email: {}", identifier);
+            return;
+        }
+
+        // Generate a random 8-character password
+        String newPassword = generateRandomPassword();
+
+        // Reset password
+        userService.resetPassword(userId, com.nexatech.identity.dto.request.Credential.builder()
+                .type("password")
+                .value(newPassword)
+                .temporary(false)
+                .build());
+
+        // Publish event
+        String displayName = (firstName != null && lastName != null) ? firstName.trim() + " " + lastName.trim() : username;
+        ForgotPasswordEvent event = ForgotPasswordEvent.builder()
+                .eventId(java.util.UUID.randomUUID().toString())
+                .eventType("FORGOT_PASSWORD")
+                .timestamp(java.time.Instant.now())
+                .userId(userId)
+                .email(email)
+                .displayName(displayName)
+                .newPassword(newPassword)
+                .build();
+        
+        kafkaService.sendForgotPasswordEvent(event);
+        log.info("Reset password and sent forgot password event for user: {}", identifier);
+    }
+
+    private String generateRandomPassword() {
+        int length = 8;
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < length; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 }

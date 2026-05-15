@@ -201,6 +201,33 @@
           "response": []
         },
         {
+          "name": "forgot-password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{loginUsername}}\"\n}"
+            },
+            "url": {
+              "raw": "{{identityBaseUrl}}/auth/forgot-password",
+              "host": [
+                "{{identityBaseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "sessions — list my sessions",
           "event": [
             {

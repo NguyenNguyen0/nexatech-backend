@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.identity.dto.request.UserClientRequest;
+import com.nexatech.identity.dto.event.ForgotPasswordEvent;
 import com.nexatech.identity.exception.AppException;
 import com.nexatech.identity.exception.ErrorCode;
 
@@ -25,6 +26,9 @@ public class KafkaService {
     @Value("${spring.kafka.topics.user-registration}")
     private String userRegistrationTopic;
 
+    @Value("${spring.kafka.topics.user-events:user.events}")
+    private String userEventsTopic;
+
     public void sendUserRegistered(UserClientRequest payload) {
         try {
             String json = objectMapper.writeValueAsString(payload);
@@ -38,6 +42,23 @@ public class KafkaService {
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         } catch (Exception ex) {
             log.error("Failed to publish user registration event", ex);
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+        }
+    }
+
+    public void sendForgotPasswordEvent(ForgotPasswordEvent payload) {
+        try {
+            String json = objectMapper.writeValueAsString(payload);
+            SendResult<String, String> result = kafkaTemplate.send(userEventsTopic, payload.getUserId(), json).get();
+            log.info("Published forgot password event topic={} partition={} offset={}",
+                    userEventsTopic,
+                    result.getRecordMetadata().partition(),
+                    result.getRecordMetadata().offset());
+        } catch (JsonProcessingException ex) {
+            log.error("Failed to serialize forgot password event", ex);
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+        } catch (Exception ex) {
+            log.error("Failed to publish forgot password event", ex);
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }
     }
