@@ -1,0 +1,34 @@
+server:
+  port: 8091
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/nexatech_shipping}
+    username: ${DB_USERNAME:nexatech}
+    password: ${DB_PASSWORD:nexatech123}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: false
+
+shipping:
+  provider: ${SHIPPING_PROVIDER:mock} # mock | ghn
+  ghn:
+    base-url: ${GHN_BASE_URL:https://dev-online-gateway.ghn.vn/shiip/public-api}
+    token: ${GHN_TOKEN:}
+    shop-id: ${GHN_SHOP_ID:}
+    from-district-id: ${GHN_FROM_DISTRICT_ID:}
+    from-ward-code: ${GHN_FROM_WARD_CODE:}
+    from-name: ${GHN_FROM_NAME:NexaTech Warehouse}
+    from-phone: ${GHN_FROM_PHONE:0987654321}
+    from-address: ${GHN_FROM_ADDRESS:Thu Duc, Ho Chi Minh City}
+    from-province-name: ${GHN_FROM_PROVINCE_NAME:TP. Hồ Chí Minh}
+    from-district-name: ${GHN_FROM_DISTRICT_NAME:Thành phố Thủ Đức}
+    from-ward-name: ${GHN_FROM_WARD_NAME:Linh Trung}
