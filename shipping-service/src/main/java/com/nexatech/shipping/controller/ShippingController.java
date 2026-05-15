@@ -1,6 +1,8 @@
 package com.nexatech.shipping.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.shipping.dto.*;
+import com.nexatech.shipping.service.IdempotencyService;
 import com.nexatech.shipping.service.ShippingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 public class ShippingController {
 
     private final ShippingService shippingService;
+    private final IdempotencyService idempotencyService;
+    private final ObjectMapper objectMapper;
 
     @PostMapping("/fee")
     public ApiResponse<ShippingFeeResponse> calculateFee(@Valid @RequestBody ShippingFeeRequest request) {
@@ -23,7 +27,14 @@ public class ShippingController {
 
     @PostMapping("/shipments")
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<CreateShipmentResponse> createShipment(@Valid @RequestBody CreateShipmentRequest request) {
+    public ApiResponse<CreateShipmentResponse> createShipment(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody CreateShipmentRequest request) {
+
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            return handleIdempotentCreateShipment(idempotencyKey, request);
+        }
+
         return ApiResponse.ok("Shipment created successfully", shippingService.createShipment(request));
     }
 
@@ -47,5 +58,31 @@ public class ShippingController {
             @PathVariable String trackingCode,
             @Valid @RequestBody MockUpdateStatusRequest request) {
         return ApiResponse.ok("Mock shipment status updated successfully", shippingService.updateMockStatus(trackingCode, request));
+    }
+
+    private ApiResponse<CreateShipmentResponse> handleIdempotentCreateShipment(
+            String idempotencyKey,
+            CreateShipmentRequest request) {
+        return idempotencyService.checkAndGetCached(idempotencyKey)
+                .map(payload -> ApiResponse.ok("Shipment created successfully", readCachedShipmentResponse(payload)))
+                .orElseGet(() -> {
+                    idempotencyService.markProcessing(idempotencyKey, request.getOrderId());
+                    try {
+                        CreateShipmentResponse response = shippingService.createShipment(request);
+                        idempotencyService.markCompleted(idempotencyKey, response.getShipmentId(), response);
+                        return ApiResponse.ok("Shipment created successfully", response);
+                    } catch (RuntimeException ex) {
+                        idempotencyService.markFailed(idempotencyKey);
+                        throw ex;
+                    }
+                });
+    }
+
+    private CreateShipmentResponse readCachedShipmentResponse(String payload) {
+        try {
+            return objectMapper.readValue(payload, CreateShipmentResponse.class);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Unable to read cached idempotency response");
+        }
     }
 }

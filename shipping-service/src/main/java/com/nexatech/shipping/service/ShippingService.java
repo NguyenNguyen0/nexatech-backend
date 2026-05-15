@@ -2,21 +2,28 @@ package com.nexatech.shipping.service;
 
 import com.nexatech.shipping.dto.*;
 import com.nexatech.shipping.entity.Shipment;
+import com.nexatech.shipping.enums.ShipmentStatus;
+import com.nexatech.shipping.enums.ShippingProvider;
 import com.nexatech.shipping.exception.ResourceNotFoundException;
 import com.nexatech.shipping.mapper.ShipmentMapper;
+import com.nexatech.shipping.provider.ghn.GhnShippingClient;
 import com.nexatech.shipping.provider.mock.MockShippingClient;
 import com.nexatech.shipping.repository.ShipmentRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ShippingService {
 
     private final ShippingProviderFactory providerFactory;
     private final MockShippingClient mockShippingClient;
+    private final GhnShippingClient ghnShippingClient;
     private final ShipmentRepository shipmentRepository;
     private final ShipmentMapper shipmentMapper;
+    private final AuditLogService auditLogService;
 
     public ShippingFeeResponse calculateFee(ShippingFeeRequest request) {
         return providerFactory.getCurrentProviderClient().calculateFee(request);
@@ -42,5 +49,29 @@ public class ShippingService {
 
     public TrackingResponse updateMockStatus(String trackingCode, MockUpdateStatusRequest request) {
         return mockShippingClient.updateStatus(trackingCode, request);
+    }
+
+    public void cancelShipmentByOrderIdIfPresent(String orderId, String actor) {
+        shipmentRepository.findByOrderId(orderId).ifPresentOrElse(shipment -> {
+            if (isTerminal(shipment.getStatus())) {
+                log.info("Skip cancelling terminal shipment: orderId={} trackingCode={} status={}",
+                        orderId, shipment.getTrackingCode(), shipment.getStatus());
+                return;
+            }
+
+            if (shipment.getProvider() == ShippingProvider.MOCK) {
+                mockShippingClient.cancelShipment(shipment.getTrackingCode());
+            } else if (shipment.getProvider() == ShippingProvider.GHN) {
+                ghnShippingClient.cancelShipment(shipment.getTrackingCode());
+            }
+        }, () -> auditLogService.log("ORDER_CANCELLED_NO_SHIPMENT", "Shipment", orderId,
+                "No shipment found for cancelled order", actor));
+    }
+
+    private boolean isTerminal(ShipmentStatus status) {
+        return status == ShipmentStatus.DELIVERED
+                || status == ShipmentStatus.FAILED
+                || status == ShipmentStatus.RETURNED
+                || status == ShipmentStatus.CANCELLED;
     }
 }
