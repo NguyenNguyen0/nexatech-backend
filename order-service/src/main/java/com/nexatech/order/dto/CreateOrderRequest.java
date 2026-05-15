@@ -23,6 +23,11 @@ public class CreateOrderRequest {
 
     private String note;
 
+    // Guest contact info — passed through from CheckoutRequest
+    private String guestName;
+    private String guestEmail;
+    private String guestPhone;
+
     @Data
     public static class OrderItemRequest {
 
