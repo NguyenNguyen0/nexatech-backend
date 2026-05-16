@@ -30,4 +30,8 @@ public interface UserServiceClient {
     @GetMapping("/internal/users/resolve-login")
     ApiResponse<java.util.Map<String, Object>> resolveLoginIdentifier(
             @org.springframework.web.bind.annotation.RequestParam("identifier") String identifier);
+
+    @org.springframework.web.bind.annotation.PostMapping("/internal/users/{userId}/assert-login-allowed")
+    ApiResponse<Void> assertLoginAllowed(
+            @org.springframework.web.bind.annotation.PathVariable("userId") String userId);
 }

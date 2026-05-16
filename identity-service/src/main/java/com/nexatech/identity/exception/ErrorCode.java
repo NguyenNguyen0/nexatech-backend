@@ -49,6 +49,7 @@ public enum ErrorCode {
     INVALID_PASSWORD(2033, "Invalid password", HttpStatus.BAD_REQUEST),
     UNSUPPORTED_SOCIAL_PROVIDER(2034, "Unsupported social login provider", HttpStatus.BAD_REQUEST),
     SOCIAL_LOGIN_FAILED(2035, "Social login failed", HttpStatus.BAD_REQUEST),
+    USER_ACCOUNT_DISABLED(2036, "This account has been disabled", HttpStatus.FORBIDDEN),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

@@ -71,4 +71,10 @@ public class InternalUserController {
                 .result(userService.resolveLoginIdentifier(identifier))
                 .build();
     }
+
+    @org.springframework.web.bind.annotation.PostMapping("/{userId}/assert-login-allowed")
+    public ApiResponse<Void> assertLoginAllowed(@PathVariable String userId) {
+        userService.assertAccountActiveForLogin(userId);
+        return ApiResponse.<Void>builder().build();
+    }
 }
