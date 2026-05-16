@@ -28,9 +28,10 @@ spring:
         reconnect.backoff.max.ms: 10000
 
 # ==================== VNPay Configuration ====================
+# All VNPay credentials MUST be set via environment variables - no defaults intentionally
 vnpay:
-  tmn-code: ${VNPAY_TMN_CODE:EMCFMDKQ}
-  hash-secret: ${VNPAY_HASH_SECRET:RAOEXHYVSDDIIENYWSLDIIZTANXUXZFJ}
-  payment-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-  return-url: http://localhost:8086/api/v1/payments/vnpay/return
-  ipn-url: http://localhost:8086/api/v1/payments/vnpay/ipn
+  tmn-code: ${VNPAY_TMN_CODE}
+  hash-secret: ${VNPAY_HASH_SECRET}
+  payment-url: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  return-url: ${VNPAY_RETURN_URL}
+  ipn-url: ${VNPAY_IPN_URL}
