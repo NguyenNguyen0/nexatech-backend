@@ -78,8 +78,10 @@ public class VNPayService {
     public Map<String, String> processIpn(Map<String, String> params) {
         Map<String, String> result = new LinkedHashMap<>();
 
-        // Tách vnp_SecureHash ra để xác thực — KHÔNG đưa vào tính hash
+        // Tách vnp_SecureHash và vnp_SecureHashType ra trước khi tính hash
+        // VNPay v2.1.0 có thể gửi thêm vnp_SecureHashType (vd: SHA512) trong callback
         String receivedHash = params.remove("vnp_SecureHash");
+        params.remove("vnp_SecureHashType");
 
         // Tính lại chữ ký từ params còn lại
         String hashData = VNPayUtil.buildHashData(params);
@@ -145,6 +147,7 @@ public class VNPayService {
         Map<String, String> result = new LinkedHashMap<>(params);
 
         String receivedHash = params.remove("vnp_SecureHash");
+        params.remove("vnp_SecureHashType");
         String hashData = VNPayUtil.buildHashData(params);
         String expectedHash = VNPayUtil.hmacSha512(vnPayConfig.getHashSecret(), hashData);
 

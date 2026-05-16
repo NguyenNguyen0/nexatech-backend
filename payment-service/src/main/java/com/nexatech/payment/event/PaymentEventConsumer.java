@@ -75,10 +75,16 @@ public class PaymentEventConsumer {
                 paymentService.processReturnRefund(event.getOrderId());
                 auditLogService.log("RETURN_APPROVED_RECEIVED", "Payment", event.getOrderId().toString(),
                         "status=REFUNDED", CONSUMER_NAME);
+            } else if ("ORDER_CANCELLED".equals(event.getEventType())) {
+                // Hoàn tiền nếu đơn hàng bị hủy sau khi đã thanh toán (không áp dụng cho COD)
+                paymentService.refundOnOrderCancellation(event.getOrderId());
+                auditLogService.log("ORDER_CANCELLED_RECEIVED", "Payment", event.getOrderId().toString(),
+                        "refund_if_paid", CONSUMER_NAME);
             }
         } catch (Exception e) {
             log.error("Lỗi xử lý OrderEvent type={} orderId={}: {}", event.getEventType(), event.getOrderId(), e.getMessage());
-            return;
+            throw new RuntimeException("Lỗi xử lý OrderEvent type=" + event.getEventType()
+                    + " orderId=" + event.getOrderId(), e);
         }
 
         // --- Lưu processed event (trong cùng transaction) ---

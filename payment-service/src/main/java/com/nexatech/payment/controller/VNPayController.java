@@ -73,11 +73,11 @@ public class VNPayController {
 
         String redirectUrl;
         if (success && orderId != null) {
-            redirectUrl = frontendUrl + "/order/success?orderId=" + orderId
+            redirectUrl = frontendUrl + "/cart/checkout/success?orderId=" + orderId
                     + "&orderNumber=" + result.getOrDefault("vnp_OrderInfo", "")
                     + "&paymentMethod=VNPAY";
         } else {
-            redirectUrl = frontendUrl + "/order/failed?reason=payment_cancelled";
+            redirectUrl = frontendUrl + "/cart?paymentFailed=true";
         }
 
         HttpHeaders headers = new HttpHeaders();

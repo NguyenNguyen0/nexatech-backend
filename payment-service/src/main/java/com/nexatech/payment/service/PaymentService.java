@@ -139,6 +139,31 @@ public class PaymentService {
         });
     }
 
+    /**
+     * Hoàn tiền khi đơn hàng bị huỷ (ORDER_CANCELLED event).
+     * Chỉ hoàn tiền nếu phương thức thanh toán không phải COD và đã thanh toán thành công.
+     */
+    @Transactional
+    public void refundOnOrderCancellation(UUID orderId) {
+        paymentRepository.findByOrderId(orderId).ifPresent(payment -> {
+            if (payment.getMethod() == PaymentMethod.COD) {
+                log.debug("COD payment không cần hoàn tiền khi hủy đơn, orderId={}", orderId);
+                return;
+            }
+            if (payment.getStatus() == PaymentStatus.COMPLETED) {
+                payment.setStatus(PaymentStatus.REFUNDED);
+                Payment saved = paymentRepository.save(payment);
+                savePaymentEventToOutbox(saved, "PAYMENT_REFUNDED");
+                auditLogService.log("PAYMENT_REFUNDED_ON_CANCEL", "Payment", payment.getId().toString(),
+                        PaymentStatus.COMPLETED.name(), PaymentStatus.REFUNDED.name(), "system", "order_cancelled");
+                log.info("Hoàn tiền do hủy đơn: orderId={}, paymentId={}", orderId, payment.getId());
+            } else {
+                log.debug("Payment không ở trạng thái COMPLETED, bỏ qua hoàn tiền: status={}, orderId={}",
+                        payment.getStatus(), orderId);
+            }
+        });
+    }
+
     @Transactional
     public void processReturnRefund(UUID orderId) {
         paymentRepository.findByOrderId(orderId).ifPresent(payment -> {

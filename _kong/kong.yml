@@ -116,8 +116,11 @@ plugins:
         - X-User-Id
         - X-User-Role
         - X-User-Email
+        - Idempotency-Key
+        - X-Requested-With
       exposed_headers:
         - X-Total-Count
+      credentials: true
       max_age: 3600
 
   - name: rate-limiting

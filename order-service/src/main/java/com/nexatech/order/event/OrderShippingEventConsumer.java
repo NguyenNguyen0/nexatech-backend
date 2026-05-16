@@ -46,7 +46,7 @@ public class OrderShippingEventConsumer {
             event = objectMapper.readValue(message, ShippingEventDto.class);
         } catch (Exception e) {
             log.error("Không thể parse ShippingEvent: {} | message: {}", e.getMessage(), message);
-            return;
+            throw new RuntimeException("Không thể parse ShippingEvent: " + e.getMessage(), e);
         }
 
         log.info("Nhận ShippingEvent: type={}, orderId={}, trackingCode={}",
@@ -83,7 +83,8 @@ public class OrderShippingEventConsumer {
             }
         } catch (Exception e) {
             log.error("Lỗi xử lý ShippingEvent type={} orderId={}: {}", event.getEventType(), orderId, e.getMessage());
-            return;
+            throw new RuntimeException("Lỗi xử lý ShippingEvent type=" + event.getEventType()
+                    + " orderId=" + orderId, e);
         }
 
         // --- Lưu processed event (trong cùng transaction) ---
