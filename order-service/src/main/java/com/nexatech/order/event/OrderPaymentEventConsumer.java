@@ -45,7 +45,7 @@ public class OrderPaymentEventConsumer {
             event = objectMapper.readValue(message, PaymentEventDto.class);
         } catch (Exception e) {
             log.error("Không thể parse PaymentEvent: {} | message: {}", e.getMessage(), message);
-            return;
+            throw new RuntimeException("Không thể parse PaymentEvent: " + e.getMessage(), e);
         }
 
         log.info("Nhận PaymentEvent: type={}, orderId={}, status={}",
@@ -79,8 +79,8 @@ public class OrderPaymentEventConsumer {
             }
         } catch (Exception e) {
             log.error("Lỗi xử lý PaymentEvent type={} orderId={}: {}", event.getEventType(), event.getOrderId(), e.getMessage());
-            // Không re-throw để tránh vòng lặp retry vô hạn từ Kafka
-            return;
+            throw new RuntimeException("Lỗi xử lý PaymentEvent type=" + event.getEventType()
+                    + " orderId=" + event.getOrderId(), e);
         }
 
         // --- Lưu processed event (trong cùng transaction) ---

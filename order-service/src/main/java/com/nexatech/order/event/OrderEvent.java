@@ -23,7 +23,11 @@ public class OrderEvent extends BaseEvent {
     private String orderNumber;
     private UUID customerId;
     private OrderStatus status;
+    private String paymentMethod;
     private BigDecimal totalAmount;
+    private String shippingAddress;
+    private String guestName;
+    private String guestPhone;
     private List<OrderItemEvent> items;
 
     @Data

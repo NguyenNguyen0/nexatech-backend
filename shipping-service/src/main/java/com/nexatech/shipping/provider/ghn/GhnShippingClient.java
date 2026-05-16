@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
 import java.math.BigDecimal;
@@ -85,7 +86,7 @@ public class GhnShippingClient implements ShippingProviderClient {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public CreateShipmentResponse createShipment(CreateShipmentRequest request) {
         ensureConfigured();
         GhnCreateOrderRequest ghnRequest = ghnShippingMapper.toCreateOrderRequest(request, properties);
@@ -237,9 +238,9 @@ public class GhnShippingClient implements ShippingProviderClient {
                     .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(), response ->
                             response.bodyToMono(String.class)
                                     .defaultIfEmpty("")
-                                    .map(responseBody -> new ShippingProviderException(
+                                    .flatMap(responseBody -> Mono.error(new ShippingProviderException(
                                             "GHN API error " + response.statusCode().value() + ": " + responseBody,
-                                            response.statusCode().value())))
+                                            response.statusCode().value()))))
                     .bodyToMono(responseType)
                     .retryWhen(Retry.backoff(2, Duration.ofMillis(300))
                             .filter(this::isTransientProviderError))
@@ -252,6 +253,7 @@ public class GhnShippingClient implements ShippingProviderClient {
     }
 
     private boolean isTransientProviderError(Throwable ex) {
+        log.warn("GHN retry check: exceptionType={} message={}", ex.getClass().getSimpleName(), ex.getMessage());
         if (ex instanceof ShippingProviderException providerException) {
             Integer statusCode = providerException.getStatusCode();
             return statusCode == null || statusCode >= 500;
@@ -291,7 +293,7 @@ public class GhnShippingClient implements ShippingProviderClient {
     }
 
     private BigDecimal resolveCreateFee(GhnCreateOrderResponse.CreateOrderData data) {
-        Integer fee = data.getTotalFee() != null ? data.getTotalFee() : data.getFee();
+        Integer fee = data.getTotalFee();
         return fee == null ? BigDecimal.ZERO : BigDecimal.valueOf(fee);
     }
 
