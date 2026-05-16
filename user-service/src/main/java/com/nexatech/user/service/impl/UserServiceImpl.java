@@ -209,7 +209,18 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         user.setActive(false);
         User deletedUser = userRepository.save(user);
+        revokeAllUserSessionsQuietly(id);
         syncUserToIdentity(deletedUser, false);
+    }
+
+    /** {@link com.nexatech.identity.service.SessionService#logoutUser} — đá mọi thiết bị đang đăng nhập. */
+    private void revokeAllUserSessionsQuietly(String userId) {
+        try {
+            identityResilienceService.logoutAllUserSessions(userId);
+            log.info("Revoked all login sessions for disabled user {}", userId);
+        } catch (Exception ex) {
+            log.warn("User {} disabled but session revoke failed: {}", userId, ex.getMessage());
+        }
     }
 
     @Transactional

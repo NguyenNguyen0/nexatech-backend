@@ -43,4 +43,8 @@ public interface IdentityClient {
         ApiResponse<Void> removeRealmRolesFromUser(
                         @PathVariable("userId") String userId,
                         @RequestBody List<RoleRefRequest> roles);
+
+        /** Same as user POST /auth/sessions/logout-all — revoke Redis + Keycloak sessions. */
+        @PostMapping("/internal/sessions/users/{userId}/logout")
+        ApiResponse<Void> logoutUserSessions(@PathVariable("userId") String userId);
 }
