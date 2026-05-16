@@ -172,8 +172,56 @@ public class GhnShippingClient implements ShippingProviderClient {
     }
 
     @Override
+    @Transactional
     public CancelShipmentResponse cancelShipment(String trackingCode) {
-        throw new UnsupportedOperationException("GHN cancel shipment is not implemented yet");
+        ensureConfigured();
+
+        GhnCancelOrderRequest ghnRequest = GhnCancelOrderRequest.builder()
+                .orderCodes(List.of(trackingCode))
+                .build();
+
+        GhnCancelOrderResponse ghnResponse = post(
+                "/v2/switch-status/cancel",
+                ghnRequest,
+                GhnCancelOrderResponse.class
+        );
+
+        // Validate GHN response
+        boolean cancelled = Optional.ofNullable(ghnResponse)
+                .map(GhnCancelOrderResponse::getData)
+                .filter(data -> !data.isEmpty())
+                .map(data -> data.get(0))
+                .map(result -> Boolean.TRUE.equals(result.getResult()))
+                .orElse(false);
+
+        if (!cancelled) {
+            String reason = Optional.ofNullable(ghnResponse)
+                    .map(GhnCancelOrderResponse::getData)
+                    .filter(data -> !data.isEmpty())
+                    .map(data -> data.get(0).getMessage())
+                    .orElse("GHN did not confirm cancellation");
+            throw new ShippingProviderException("GHN cancel failed for order " + trackingCode + ": " + reason);
+        }
+
+        // Update local state
+        Shipment shipment = shipmentRepository.findByTrackingCode(trackingCode)
+                .orElse(null);
+
+        if (shipment != null) {
+            ShipmentStatus previousStatus = shipment.getStatus();
+            shipment.setStatus(ShipmentStatus.CANCELLED);
+            addHistory(shipment, ShipmentStatus.CANCELLED, shipment.getCurrentAddress(), null, null, "Cancelled via GHN API");
+            shipmentRepository.save(shipment);
+            saveShippingEventToOutbox(shipment, "SHIPMENT_CANCELLED");
+            auditLogService.log("SHIPMENT_CANCELLED", "Shipment", shipment.getId().toString(),
+                    previousStatus.name(), "status=CANCELLED", "ghn-provider", "GHN cancel requested");
+        }
+
+        return CancelShipmentResponse.builder()
+                .trackingCode(trackingCode)
+                .status(ShipmentStatus.CANCELLED)
+                .message("Shipment cancelled successfully via GHN")
+                .build();
     }
 
     public void validateConfiguration() {

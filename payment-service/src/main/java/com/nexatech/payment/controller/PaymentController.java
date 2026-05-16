@@ -34,7 +34,7 @@ public class PaymentController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<PaymentResponse> createPayment(
-            @RequestHeader("X-User-Id") UUID customerId,
+            @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CreatePaymentRequest request) {
 
