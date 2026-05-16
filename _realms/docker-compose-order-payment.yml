@@ -278,8 +278,8 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-nexatech123}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - JAVA_TOOL_OPTIONS=-Xmx200m -XX:+UseSerialGC -XX:TieredStopAtLevel=4
-      - VNPAY_TMN_CODE=${VNPAY_TMN_CODE:-E0N2B1W3}
-      - VNPAY_HASH_SECRET=${VNPAY_HASH_SECRET:-G0U4942C75J1TARXV9C5KMH4OGR6ESTL}
+      - VNPAY_TMN_CODE=${VNPAY_TMN_CODE:-}
+      - VNPAY_HASH_SECRET=${VNPAY_HASH_SECRET:-}
       - VNPAY_PAYMENT_URL=${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
       - VNPAY_RETURN_URL=${VNPAY_RETURN_URL:-http://localhost:8086/api/v1/payments/vnpay/return}
       - VNPAY_IPN_URL=${VNPAY_IPN_URL:-https://965t8z7w-8086.asse.devtunnels.ms/api/v1/payments/vnpay/ipn}
@@ -316,7 +316,7 @@ services:
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - JAVA_TOOL_OPTIONS=-Xmx200m -XX:+UseSerialGC -XX:TieredStopAtLevel=4
       - SHIPPING_PROVIDER=${SHIPPING_PROVIDER:-ghn}
-      - GHN_TOKEN=${GHN_TOKEN:-0cde2f2d-5016-11f1-a973-aee5264794df}
+      - GHN_TOKEN=${GHN_TOKEN:-}
       - GHN_SHOP_ID=${GHN_SHOP_ID:-200306}
       - GHN_FROM_DISTRICT_ID=${GHN_FROM_DISTRICT_ID:-3695}
       - GHN_FROM_WARD_CODE=${GHN_FROM_WARD_CODE:-90768}
