@@ -3,6 +3,8 @@ package com.nexatech.user.dto.response;
 import java.time.Instant;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.nexatech.user.model.constant.AddressType;
 
 import lombok.AccessLevel;
@@ -21,7 +23,7 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AddressResponse {
     UUID id;
-    UUID userId;
+    String userId;
     String receiverName;
     String phone;
     String province;
@@ -30,9 +32,23 @@ public class AddressResponse {
     Double latitude;
     Double longitude;
     AddressType addressType;
-    boolean isDefault;
+
+    @JsonIgnore
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    boolean defaultAddress;
+
+    @JsonProperty("isDefault")
+    public boolean getIsDefault() {
+        return defaultAddress;
+    }
+
+    @JsonProperty("isDefault")
+    public void setIsDefault(boolean value) {
+        this.defaultAddress = value;
+    }
+
     Boolean active;
     Instant createdAt;
     Instant updatedAt;
 }
-
