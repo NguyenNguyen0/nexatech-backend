@@ -1,11 +1,20 @@
 services:
+  # ─── Databases ────────────────────────────────────────────────────────────────
   postgres-order:
     image: postgres:16-alpine
-    container_name: nexatech-postgres-order
+    container_name: nexatech-order-postgres
     environment:
       POSTGRES_DB: nexatech_orders
       POSTGRES_USER: ${POSTGRES_USER:-nexatech}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexatech123}
+    # Giảm shared_buffers (32 MB thay vì 128 MB mặc định) và giới hạn kết nối
+    command: >
+      postgres
+      -c shared_buffers=32MB
+      -c max_connections=30
+      -c work_mem=2MB
+      -c maintenance_work_mem=16MB
+      -c wal_buffers=4MB
     ports:
       - "5435:5432"
     volumes:
@@ -15,16 +24,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
     networks:
       - nexatech-net
 
   postgres-payment:
     image: postgres:16-alpine
-    container_name: nexatech-postgres-payment
+    container_name: nexatech-payment-postgres
     environment:
       POSTGRES_DB: nexatech_payments
       POSTGRES_USER: ${POSTGRES_USER:-nexatech}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexatech123}
+    command: >
+      postgres
+      -c shared_buffers=32MB
+      -c max_connections=30
+      -c work_mem=2MB
+      -c maintenance_work_mem=16MB
+      -c wal_buffers=4MB
     ports:
       - "5437:5432"
     volumes:
@@ -34,12 +55,51 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
     networks:
       - nexatech-net
 
+  postgres-shipping:
+    image: postgres:16-alpine
+    container_name: nexatech-shipping-postgres
+    environment:
+      POSTGRES_DB: nexatech_shipping
+      POSTGRES_USER: ${POSTGRES_USER:-nexatech}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexatech123}
+    command: >
+      postgres
+      -c shared_buffers=32MB
+      -c max_connections=30
+      -c work_mem=2MB
+      -c maintenance_work_mem=16MB
+      -c wal_buffers=4MB
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-shipping-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexatech} -d nexatech_shipping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+      - nexatech-net
+
+  # ─── Cache ────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: nexatech-redis
+    # Giới hạn 64 MB, tắt RDB persistence để tiết kiệm I/O
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru --save ""
     ports:
       - "6379:6379"
     volumes:
@@ -49,15 +109,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 96M
     networks:
       - nexatech-net
 
+  # ─── Messaging ────────────────────────────────────────────────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
     container_name: nexatech-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_HEAP_OPTS: "-Xmx128m -Xms64m"
     ports:
       - "2181:2181"
     healthcheck:
@@ -66,6 +133,11 @@ services:
       timeout: 10s
       retries: 6
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 192M
     networks:
       - nexatech-net
 
@@ -84,7 +156,11 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_HEAP_OPTS: "-Xmx512m -Xms256m"
+      # Giảm heap cho môi trường dev (512m → 384m)
+      KAFKA_HEAP_OPTS: "-Xmx384m -Xms128m"
+      # Giảm số partition mặc định để tránh tốn tài nguyên
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_LOG_RETENTION_HOURS: 12
     ports:
       - "9092:9092"
     healthcheck:
@@ -93,22 +169,34 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     networks:
       - nexatech-net
 
+  # ─── Infrastructure Services ──────────────────────────────────────────────────
   discovery-server:
     image: nexatech/discovery-server:latest
     container_name: nexatech-discovery
     ports:
       - "8761:8761"
     environment:
-      - JAVA_TOOL_OPTIONS=-Xmx192m
+      # SerialGC phù hợp container nhỏ, tắt JIT tầng dưới để giảm CPU lúc khởi động
+      - JAVA_TOOL_OPTIONS=-Xmx192m -XX:+UseSerialGC -XX:TieredStopAtLevel=4
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 8
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     networks:
       - nexatech-net
 
@@ -119,7 +207,7 @@ services:
       - "8888:8888"
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
-      - JAVA_TOOL_OPTIONS=-Xmx192m
+      - JAVA_TOOL_OPTIONS=-Xmx192m -XX:+UseSerialGC -XX:TieredStopAtLevel=4
     depends_on:
       discovery-server:
         condition: service_healthy
@@ -129,12 +217,18 @@ services:
       timeout: 10s
       retries: 8
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     networks:
       - nexatech-net
 
+  # ─── Application Services ─────────────────────────────────────────────────────
   order-service:
     build:
-      context: .
+      context: ..
       args:
         SERVICE_NAME: order-service
     image: nexatech/order-service:latest
@@ -142,14 +236,14 @@ services:
     ports:
       - "8084:8084"
     environment:
-      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - CONFIG_SERVER_URI=http://config-server:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-order:5432/nexatech_orders
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-nexatech}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-nexatech123}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - SPRING_DATA_REDIS_HOST=redis
-      - JAVA_TOOL_OPTIONS=-Xmx200m
+      - JAVA_TOOL_OPTIONS=-Xmx200m -XX:+UseSerialGC -XX:TieredStopAtLevel=4
     depends_on:
       config-server:
         condition: service_healthy
@@ -159,12 +253,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 280M
     networks:
       - nexatech-net
 
   payment-service:
     build:
-      context: .
+      context: ..
       args:
         SERVICE_NAME: payment-service
     image: nexatech/payment-service:latest
@@ -172,13 +271,18 @@ services:
     ports:
       - "8086:8086"
     environment:
-      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - CONFIG_SERVER_URI=http://config-server:8888
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-payment:5432/nexatech_payments
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-nexatech}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-nexatech123}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - JAVA_TOOL_OPTIONS=-Xmx200m
+      - JAVA_TOOL_OPTIONS=-Xmx200m -XX:+UseSerialGC -XX:TieredStopAtLevel=4
+      - VNPAY_TMN_CODE=${VNPAY_TMN_CODE:-E0N2B1W3}
+      - VNPAY_HASH_SECRET=${VNPAY_HASH_SECRET:-G0U4942C75J1TARXV9C5KMH4OGR6ESTL}
+      - VNPAY_PAYMENT_URL=${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      - VNPAY_RETURN_URL=${VNPAY_RETURN_URL:-http://localhost:8086/api/v1/payments/vnpay/return}
+      - VNPAY_IPN_URL=${VNPAY_IPN_URL:-https://965t8z7w-8086.asse.devtunnels.ms/api/v1/payments/vnpay/ipn}
     depends_on:
       config-server:
         condition: service_healthy
@@ -186,12 +290,81 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 280M
+    networks:
+      - nexatech-net
+
+  shipping-service:
+    build:
+      context: ..
+      args:
+        SERVICE_NAME: shipping-service
+    image: nexatech/shipping-service:latest
+    container_name: nexatech-shipping
+    ports:
+      - "8091:8091"
+    environment:
+      - CONFIG_SERVER_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-shipping:5432/nexatech_shipping
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-nexatech}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-nexatech123}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JAVA_TOOL_OPTIONS=-Xmx200m -XX:+UseSerialGC -XX:TieredStopAtLevel=4
+      - SHIPPING_PROVIDER=${SHIPPING_PROVIDER:-ghn}
+      - GHN_TOKEN=${GHN_TOKEN:-0cde2f2d-5016-11f1-a973-aee5264794df}
+      - GHN_SHOP_ID=${GHN_SHOP_ID:-200306}
+      - GHN_FROM_DISTRICT_ID=${GHN_FROM_DISTRICT_ID:-3695}
+      - GHN_FROM_WARD_CODE=${GHN_FROM_WARD_CODE:-90768}
+      - GHN_FROM_DISTRICT_NAME=${GHN_FROM_DISTRICT_NAME:-Thành phố Thủ Đức}
+      - GHN_FROM_WARD_NAME=${GHN_FROM_WARD_NAME:-Linh Trung}
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres-shipping:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 280M
+    networks:
+      - nexatech-net
+
+  # ─── API Gateway (Kong) ───────────────────────────────────────────────────────
+  kong:
+    image: kong:3.6
+    container_name: nexatech-kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    volumes:
+      - ../_kong:/kong
+    ports:
+      - "8080:8000"
+      - "8001:8001"
+    depends_on:
+      - order-service
+      - payment-service
+      - shipping-service
     networks:
       - nexatech-net
 
 volumes:
   postgres-order-data:
   postgres-payment-data:
+  postgres-shipping-data:
   redis-data:
 
 networks:

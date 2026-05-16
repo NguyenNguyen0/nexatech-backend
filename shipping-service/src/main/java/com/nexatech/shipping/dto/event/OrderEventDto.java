@@ -18,5 +18,9 @@ public class OrderEventDto {
     private String orderNumber;
     private UUID customerId;
     private String status;
+    private String paymentMethod;
     private BigDecimal totalAmount;
+    private String shippingAddress;
+    private String guestName;
+    private String guestPhone;
 }
