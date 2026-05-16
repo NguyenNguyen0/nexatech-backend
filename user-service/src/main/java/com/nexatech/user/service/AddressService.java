@@ -14,7 +14,8 @@ public interface AddressService {
 
     AddressResponse updateMyAddress(String userId, String id, AddressRequest request);
 
-    AddressResponse setDefaultMyAddress(String userId, String id);
+    /** Đặt mặc định và trả về toàn bộ địa chỉ (đã đồng bộ is_default). */
+    List<AddressResponse> setDefaultMyAddress(String userId, String id);
 
     void deleteMyAddress(String userId, String id);
 }

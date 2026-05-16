@@ -71,9 +71,10 @@ public class AddressController {
     }
 
     @PutMapping("/{id}/default")
-    public ApiResponse<AddressResponse> setDefaultMyAddress(@AuthenticationPrincipal Jwt jwt,
+    public ApiResponse<List<AddressResponse>> setDefaultMyAddress(
+            @AuthenticationPrincipal Jwt jwt,
             @PathVariable String id) {
-        return ApiResponse.<AddressResponse>builder()
+        return ApiResponse.<List<AddressResponse>>builder()
                 .result(addressService.setDefaultMyAddress(currentUserId(jwt), id))
                 .build();
     }

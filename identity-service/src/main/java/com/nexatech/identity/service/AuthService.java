@@ -190,6 +190,7 @@ public class AuthService {
         }
 
         assertCustomerRole(userId);
+        assertUserAccountActive(userId);
         ensureSocialUserReady(userId, firstName, lastName);
         syncSocialUserProfile(userId, loginUsername, email, firstName, lastName, avatarUrl);
 
@@ -341,6 +342,91 @@ public class AuthService {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private void assertUserAccountActive(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+        try {
+            userServiceClient.assertLoginAllowed(userId);
+        } catch (FeignException ex) {
+            if (isUserAccountDisabledFeignError(ex)) {
+                throw new AppException(ErrorCode.USER_ACCOUNT_DISABLED);
+            }
+            throw ex;
+        }
+    }
+
+    private boolean isUserAccountDisabledFeignError(FeignException ex) {
+        if (ex.status() == ErrorCode.USER_ACCOUNT_DISABLED.getStatusCode().value()) {
+            return true;
+        }
+        try {
+            String content = ex.contentUTF8();
+            if (content == null || content.isBlank()) {
+                return false;
+            }
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readTree(content);
+            return node.has("code")
+                    && node.get("code").asInt() == ErrorCode.USER_ACCOUNT_DISABLED.getCode();
+        } catch (Exception parseEx) {
+            log.trace("Could not parse user-service error body: {}", parseEx.getMessage());
+            return false;
+        }
+    }
+
+    private String resolveUserIdForLogin(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            return null;
+        }
+        String trimmed = identifier.trim();
+        if (trimmed.contains("@")) {
+            Map<String, Object> keycloakUser = findUserByEmail(trimmed.toLowerCase());
+            if (keycloakUser != null && keycloakUser.get("id") != null) {
+                return keycloakUser.get("id").toString();
+            }
+        }
+        try {
+            ApiResponse<Map<String, Object>> response = userServiceClient.resolveLoginIdentifier(trimmed);
+            if (response != null && response.getResult() != null) {
+                Object userId = response.getResult().get("userId");
+                if (userId != null && !userId.toString().isBlank()) {
+                    return userId.toString();
+                }
+            }
+        } catch (FeignException ex) {
+            if (ex.status() == 404) {
+                return null;
+            }
+            throw ex;
+        }
+        return null;
+    }
+
+    private String extractUserIdFromAccessToken(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        try {
+            String[] parts = accessToken.split("\\.");
+            if (parts.length != 3) {
+                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            }
+            String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(payload);
+            String sub = node.path("sub").asText(null);
+            if (sub == null || sub.isBlank()) {
+                throw new AppException(ErrorCode.UNAUTHENTICATED);
+            }
+            return sub;
+        } catch (AppException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
     }
 
     private Map<String, Object> findUserByEmail(String email) {
@@ -560,7 +646,13 @@ public class AuthService {
             throw new IllegalArgumentException("Password is required");
         }
 
-        String keycloakUsername = resolveKeycloakUsername(request.getUsername().trim());
+        String identifier = request.getUsername().trim();
+        String userId = resolveUserIdForLogin(identifier);
+        if (userId != null) {
+            assertUserAccountActive(userId);
+        }
+
+        String keycloakUsername = resolveKeycloakUsername(identifier);
 
         UserTokenExchangeResponse response = keycloakAuthClient.exchangeUserToken(realm, UserTokenExchangeParam.builder()
                 .grant_type("password")
@@ -571,6 +663,11 @@ public class AuthService {
                 .password(request.getPassword())
                 .build());
 
+        if (userId == null) {
+            userId = extractUserIdFromAccessToken(response.getAccessToken());
+        }
+        assertUserAccountActive(userId);
+
         enrichRequiresPasswordChange(response);
         return response;
     }
@@ -580,13 +677,16 @@ public class AuthService {
             throw new IllegalArgumentException("Refresh token is required");
         }
 
-        return keycloakAuthClient.refreshToken(realm, RefreshTokenParam.builder()
+        UserTokenExchangeResponse response = keycloakAuthClient.refreshToken(realm, RefreshTokenParam.builder()
                 .grant_type("refresh_token")
                 .client_id(clientId)
                 .client_secret(clientSecret)
                 .scope("openid")
                 .refresh_token(request.getRefreshToken())
                 .build());
+
+        assertUserAccountActive(extractUserIdFromAccessToken(response.getAccessToken()));
+        return response;
     }
 
     public void logout(LogoutRequest request) {

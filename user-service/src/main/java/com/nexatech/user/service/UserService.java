@@ -41,4 +41,7 @@ public interface UserService {
 
     /** Resolve login identifier (username / email / phone) to Keycloak username. */
     java.util.Map<String, String> resolveLoginIdentifier(String identifier);
+
+    /** Throws if user does not exist or {@code active} is false (login gate). */
+    void assertAccountActiveForLogin(String userId);
 }

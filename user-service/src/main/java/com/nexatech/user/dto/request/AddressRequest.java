@@ -1,5 +1,6 @@
 package com.nexatech.user.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.nexatech.user.model.constant.AddressType;
 
 import jakarta.validation.constraints.NotBlank;
@@ -41,6 +42,7 @@ public class AddressRequest {
     @NotNull(message = "ADDRESS_TYPE_REQUIRED")
     AddressType addressType;
 
+    @JsonProperty("isDefault")
     Boolean isDefault;
 }
 

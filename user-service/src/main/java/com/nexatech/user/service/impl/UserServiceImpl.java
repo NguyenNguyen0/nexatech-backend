@@ -209,7 +209,18 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         user.setActive(false);
         User deletedUser = userRepository.save(user);
+        revokeAllUserSessionsQuietly(id);
         syncUserToIdentity(deletedUser, false);
+    }
+
+    /** {@link com.nexatech.identity.service.SessionService#logoutUser} — đá mọi thiết bị đang đăng nhập. */
+    private void revokeAllUserSessionsQuietly(String userId) {
+        try {
+            identityResilienceService.logoutAllUserSessions(userId);
+            log.info("Revoked all login sessions for disabled user {}", userId);
+        } catch (Exception ex) {
+            log.warn("User {} disabled but session revoke failed: {}", userId, ex.getMessage());
+        }
     }
 
     @Transactional
@@ -526,6 +537,19 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
+    public void assertAccountActiveForLogin(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new AppException(ErrorCode.USER_NOT_FOUND);
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (!Boolean.TRUE.equals(user.getActive())) {
+            throw new AppException(ErrorCode.USER_ACCOUNT_DISABLED);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public java.util.Map<String, String> resolveLoginIdentifier(String identifier) {
         if (identifier == null || identifier.isBlank()) {
             throw new AppException(ErrorCode.INVALID_CREDENTIALS);
@@ -535,17 +559,17 @@ public class UserServiceImpl implements UserService {
         if (trimmed.contains("@")) {
             User user = userRepository.findByEmail(trimmed.toLowerCase(java.util.Locale.ROOT))
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-            return java.util.Map.of("username", user.getUsername());
+            return java.util.Map.of("username", user.getUsername(), "userId", user.getId());
         }
 
         if (isLikelyPhone(trimmed)) {
             User user = findUserByPhone(trimmed)
                     .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-            return java.util.Map.of("username", user.getUsername());
+            return java.util.Map.of("username", user.getUsername(), "userId", user.getId());
         }
 
         return userRepository.findByUsername(trimmed)
-                .map(user -> java.util.Map.of("username", user.getUsername()))
+                .map(user -> java.util.Map.of("username", user.getUsername(), "userId", user.getId()))
                 .orElse(java.util.Map.of("username", trimmed));
     }
 

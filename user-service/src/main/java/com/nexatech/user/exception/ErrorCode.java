@@ -49,6 +49,7 @@ public enum ErrorCode {
     OTP_REQUIRED(2033, "OTP is required", HttpStatus.BAD_REQUEST),
     OTP_INVALID(2034, "OTP is invalid", HttpStatus.BAD_REQUEST),
     OTP_EXPIRED(2035, "OTP is expired", HttpStatus.BAD_REQUEST),
+    USER_ACCOUNT_DISABLED(2036, "This account has been disabled", HttpStatus.FORBIDDEN),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {
