@@ -27,6 +27,7 @@ public class SecurityConfig {
                         "/auth/logout",
                         "/auth/refresh",
                         "/auth/login",
+                        "/auth/social-media",
                         "/auth/register",
                         "/auth/forgot-password",
         };

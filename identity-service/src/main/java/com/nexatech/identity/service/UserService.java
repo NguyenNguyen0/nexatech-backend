@@ -62,6 +62,14 @@ public class UserService {
         return keycloakUserClient.listUsers(realm, adminTokenProvider.adminAuthorizationHeader(), username, null, null);
     }
 
+    public List<Map<String, Object>> listUsersByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return List.of();
+        }
+        return keycloakUserClient.listUsers(
+                realm, adminTokenProvider.adminAuthorizationHeader(), null, email.trim(), Boolean.TRUE);
+    }
+
     /**
      * {@code true} if no other Keycloak user uses this email (excluding
      * {@code excludeUserId}, e.g. current user).

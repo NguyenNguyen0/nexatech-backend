@@ -26,6 +26,7 @@ import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.IdentityUserUpdateRequest;
 import com.nexatech.user.dto.request.UserCreationRequest;
+import com.nexatech.user.dto.request.UserProfileSyncRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.OnboardingStatusResponse;
 import com.nexatech.user.dto.response.UserResponse;
@@ -463,5 +464,123 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         user.setRequiresPasswordChange(required);
         userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse syncProfileFromSocialLogin(String userId, UserProfileSyncRequest request) {
+        if (userId == null || userId.isBlank()) {
+            throw new AppException(ErrorCode.USER_NOT_FOUND);
+        }
+        if (request == null) {
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+        }
+
+        java.util.Optional<User> existing = userRepository.findById(userId);
+        if (existing.isEmpty()) {
+            String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
+            String username = request.getUsername();
+            if (email == null || email.isBlank() || username == null || username.isBlank()) {
+                throw new AppException(ErrorCode.USER_NOT_FOUND);
+            }
+            if (userRepository.existsByEmail(email)) {
+                User byEmail = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+                return updateUser(byEmail.getId(), toUpdateRequest(request));
+            }
+            UserCreationRequest create = UserCreationRequest.builder()
+                    .id(userId)
+                    .email(email)
+                    .username(username.trim())
+                    .firstName(blankToNull(request.getFirstName()))
+                    .lastName(blankToNull(request.getLastName()))
+                    .avatarUrl(blankToNull(request.getAvatarUrl()))
+                    .onBoarded(false)
+                    .build();
+            return createUser(create);
+        }
+
+        return updateUser(userId, toUpdateRequest(request));
+    }
+
+    private static UserUpdatenRequest toUpdateRequest(UserProfileSyncRequest request) {
+        UserUpdatenRequest.UserUpdatenRequestBuilder builder = UserUpdatenRequest.builder();
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            builder.email(request.getEmail().trim().toLowerCase());
+        }
+        if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
+            builder.firstName(request.getFirstName().trim());
+        }
+        if (request.getLastName() != null && !request.getLastName().isBlank()) {
+            builder.lastName(request.getLastName().trim());
+        }
+        if (request.getAvatarUrl() != null && !request.getAvatarUrl().isBlank()) {
+            builder.avatarUrl(request.getAvatarUrl().trim());
+        }
+        return builder.build();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Map<String, String> resolveLoginIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+        }
+        String trimmed = identifier.trim();
+
+        if (trimmed.contains("@")) {
+            User user = userRepository.findByEmail(trimmed.toLowerCase(java.util.Locale.ROOT))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+            return java.util.Map.of("username", user.getUsername());
+        }
+
+        if (isLikelyPhone(trimmed)) {
+            User user = findUserByPhone(trimmed)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+            return java.util.Map.of("username", user.getUsername());
+        }
+
+        return userRepository.findByUsername(trimmed)
+                .map(user -> java.util.Map.of("username", user.getUsername()))
+                .orElse(java.util.Map.of("username", trimmed));
+    }
+
+    private static boolean isLikelyPhone(String raw) {
+        String stripped = raw.replaceAll("[\\s\\-().]", "");
+        if (stripped.startsWith("+")) {
+            stripped = stripped.substring(1);
+        }
+        return stripped.matches("\\d{9,15}");
+    }
+
+    private java.util.Optional<User> findUserByPhone(String raw) {
+        for (String candidate : phoneLookupCandidates(raw)) {
+            java.util.Optional<User> found = userRepository.findByPhone(candidate);
+            if (found.isPresent()) {
+                return found;
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    private static java.util.List<String> phoneLookupCandidates(String raw) {
+        String digits = raw.replaceAll("\\D", "");
+        java.util.LinkedHashSet<String> candidates = new java.util.LinkedHashSet<>();
+        candidates.add(raw.trim());
+        if (!digits.isEmpty()) {
+            candidates.add(digits);
+            if (digits.startsWith("84") && digits.length() >= 11) {
+                candidates.add("0" + digits.substring(2));
+                candidates.add("+" + digits);
+            } else if (digits.startsWith("0")) {
+                candidates.add("+84" + digits.substring(1));
+                candidates.add("84" + digits.substring(1));
+            }
+        }
+        return new java.util.ArrayList<>(candidates);
     }
 }

@@ -2,6 +2,7 @@ package com.nexatech.user.service;
 
 import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.UserCreationRequest;
+import com.nexatech.user.dto.request.UserProfileSyncRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.OnboardingStatusResponse;
 import com.nexatech.user.dto.response.UserResponse;
@@ -35,4 +36,9 @@ public interface UserService {
     void verifyEmailVerificationOtp(String userId, String otp);
     
     void updatePasswordChangeRequired(String userId, boolean required);
+
+    UserResponse syncProfileFromSocialLogin(String userId, UserProfileSyncRequest request);
+
+    /** Resolve login identifier (username / email / phone) to Keycloak username. */
+    java.util.Map<String, String> resolveLoginIdentifier(String identifier);
 }

@@ -14,6 +14,7 @@ import java.util.Map;
 import com.nexatech.identity.dto.base.ApiResponse;
 import com.nexatech.identity.dto.request.IntrospectTokenRequest;
 import com.nexatech.identity.dto.request.LoginRequest;
+import com.nexatech.identity.dto.request.SocialMediaLoginRequest;
 import com.nexatech.identity.dto.request.ForgotPasswordRequest;
 import com.nexatech.identity.dto.request.LogoutRequest;
 import com.nexatech.identity.dto.request.RefreshTokenRequest;
@@ -44,6 +45,14 @@ public class AuthController {
     public ApiResponse<UserTokenExchangeResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.<UserTokenExchangeResponse>builder()
                 .result(authService.login(request))
+                .build();
+    }
+
+    @PostMapping("/social-media")
+    public ApiResponse<UserTokenExchangeResponse> loginWithSocialMedia(
+            @Valid @RequestBody SocialMediaLoginRequest request) {
+        return ApiResponse.<UserTokenExchangeResponse>builder()
+                .result(authService.loginWithSocialMedia(request))
                 .build();
     }
 
