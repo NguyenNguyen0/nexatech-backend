@@ -237,6 +237,7 @@ services:
       - "8084:8084"
     environment:
       - CONFIG_SERVER_URI=http://config-server:8888
+      - SERVER_PORT=8084
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-order:5432/nexatech_orders
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-nexatech}
@@ -253,6 +254,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 120s
     deploy:
       resources:
         limits:
@@ -272,24 +279,33 @@ services:
       - "8086:8086"
     environment:
       - CONFIG_SERVER_URI=http://config-server:8888
+      - SERVER_PORT=8086
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-payment:5432/nexatech_payments
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-nexatech}
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-nexatech123}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - JAVA_TOOL_OPTIONS=-Xmx200m -XX:+UseSerialGC -XX:TieredStopAtLevel=4
-      - VNPAY_TMN_CODE=${VNPAY_TMN_CODE:-}
-      - VNPAY_HASH_SECRET=${VNPAY_HASH_SECRET:-}
+      - VNPAY_TMN_CODE=${VNPAY_TMN_CODE:-E0N2B1W3}
+      - VNPAY_HASH_SECRET=${VNPAY_HASH_SECRET:-G0U4942C75J1TARXV9C5KMH4OGR6ESTL}
       - VNPAY_PAYMENT_URL=${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
       - VNPAY_RETURN_URL=${VNPAY_RETURN_URL:-http://localhost:8086/api/v1/payments/vnpay/return}
       - VNPAY_IPN_URL=${VNPAY_IPN_URL:-https://965t8z7w-8086.asse.devtunnels.ms/api/v1/payments/vnpay/ipn}
     depends_on:
+      discovery-server:
+        condition: service_healthy
       config-server:
         condition: service_healthy
       postgres-payment:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8086/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 120s
     deploy:
       resources:
         limits:
@@ -316,7 +332,7 @@ services:
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - JAVA_TOOL_OPTIONS=-Xmx200m -XX:+UseSerialGC -XX:TieredStopAtLevel=4
       - SHIPPING_PROVIDER=${SHIPPING_PROVIDER:-ghn}
-      - GHN_TOKEN=${GHN_TOKEN:-}
+      - GHN_TOKEN=${GHN_TOKEN:-0cde2f2d-5016-11f1-a973-aee5264794df}
       - GHN_SHOP_ID=${GHN_SHOP_ID:-200306}
       - GHN_FROM_DISTRICT_ID=${GHN_FROM_DISTRICT_ID:-3695}
       - GHN_FROM_WARD_CODE=${GHN_FROM_WARD_CODE:-90768}
@@ -329,6 +345,12 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8091/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 120s
     deploy:
       resources:
         limits:
@@ -355,9 +377,12 @@ services:
       - "8080:8000"
       - "8001:8001"
     depends_on:
-      - order-service
-      - payment-service
-      - shipping-service
+      order-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      shipping-service:
+        condition: service_healthy
     networks:
       - nexatech-net
 
