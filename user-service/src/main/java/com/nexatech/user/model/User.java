@@ -46,4 +46,8 @@ public class User extends BaseEntity {
 
     @Column(name = "on_boarded", nullable = false)
     Boolean onBoarded;
+
+    @Column(name = "requires_password_change", nullable = false)
+    @Builder.Default
+    Boolean requiresPasswordChange = false;
 }

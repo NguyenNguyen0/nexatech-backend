@@ -4,7 +4,8 @@ import java.util.List;
 
 /**
  * Realm role names that <strong>grant</strong> access (positive permissions).
- * Must match Keycloak realm role names and {@link com.nexatech.user.config.security.CustomAuthoritiesConverter}.
+ * Must match Keycloak realm role names and
+ * {@link com.nexatech.user.config.security.CustomAuthoritiesConverter}.
  */
 public final class PermissionsAccept {
 
@@ -23,17 +24,9 @@ public final class PermissionsAccept {
         public static final String ENABLE = "USER_ENABLE";
     }
 
-    /** {@link com.nexatech.user.controller.GroupController} */
-    public static final class Group {
-        private Group() {
-        }
-
-        public static final String READ = "GROUP_READ";
-        public static final String WRITE = "GROUP_WRITE";
-    }
-
     /**
-     * Keycloak realm role CRUD ({@link com.nexatech.user.controller.RoleController}).
+     * Keycloak realm role CRUD
+     * ({@link com.nexatech.user.controller.RoleController}).
      */
     public static final class RealmRole {
         private RealmRole() {
@@ -43,7 +36,10 @@ public final class PermissionsAccept {
         public static final String WRITE = "ROLE_WRITE";
     }
 
-    /** Keycloak permission-role definitions ({@link com.nexatech.user.controller.PermissionController}). */
+    /**
+     * Keycloak permission-role definitions
+     * ({@link com.nexatech.user.controller.PermissionController}).
+     */
     public static final class Definition {
         private Definition() {
         }
@@ -60,8 +56,6 @@ public final class PermissionsAccept {
                 User.UPDATE,
                 User.DELETE,
                 User.ENABLE,
-                Group.READ,
-                Group.WRITE,
                 RealmRole.READ,
                 RealmRole.WRITE,
                 Definition.READ,

@@ -83,6 +83,13 @@ public class ProductController {
         return ApiResponse.ok(productService.suggestProducts(q));
     }
 
+    @GetMapping("/tags")
+    public ApiResponse<PageResponse<ProductResponse>> getProductsByTags(
+            @RequestParam List<String> tags,
+            Pageable pageable) {
+        return ApiResponse.ok(PageResponse.of(productService.getProductsByTags(tags, pageable)));
+    }
+
     @GetMapping("/category/{categoryId}")
     public ApiResponse<PageResponse<ProductResponse>> getProductsByCategory(
             @PathVariable String categoryId,

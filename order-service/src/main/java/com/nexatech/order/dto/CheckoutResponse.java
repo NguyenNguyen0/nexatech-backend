@@ -1,14 +1,18 @@
 package com.nexatech.order.dto;
 
 import com.nexatech.order.enums.PaymentMethod;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CheckoutResponse {
 
     private UUID orderId;

@@ -24,8 +24,13 @@ public class Order extends BaseEntity {
     @Column(nullable = false, unique = true)
     private String orderNumber;
 
-    @Column(nullable = false)
+    // null for guest orders
     private UUID customerId;
+
+    // Guest / buyer contact info (stored for customer-service lookup)
+    private String guestName;
+    private String guestEmail;
+    private String guestPhone;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

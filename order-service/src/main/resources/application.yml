@@ -2,4 +2,43 @@ spring:
   application:
     name: order-service
   config:
-    import: "optional:configserver:"
+    import: "optional:file:./.env[.properties],optional:file:./order-service/.env[.properties],optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/nexatech_orders}
+    username: ${DB_USERNAME:nexatech}
+    password: ${DB_PASSWORD:nexatech123}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: false
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: order-service-group
+      properties:
+        request.timeout.ms: 30000
+        default.api.timeout.ms: 30000
+        reconnect.backoff.ms: 1000
+        reconnect.backoff.max.ms: 10000
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://discovery-server:8761/eureka/}
+    fetch-registry: true
+    register-with-eureka: true

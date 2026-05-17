@@ -2,7 +2,7 @@ spring:
   application:
     name: product-service
   config:
-    import: "configserver:"
+    import: "configserver:${CONFIG_SERVER_URI}/"
   cloud:
     config:
       fail-fast: true

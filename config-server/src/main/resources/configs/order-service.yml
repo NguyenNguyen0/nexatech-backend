@@ -3,14 +3,18 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/nexatech_orders
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/nexatech_orders}
     username: ${DB_USERNAME:nexatech}
     password: ${DB_PASSWORD:nexatech123}
     driver-class-name: org.postgresql.Driver
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
     show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
   flyway:
     enabled: false
   data:
@@ -18,6 +22,7 @@ spring:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
   kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: order-service-group
       properties:

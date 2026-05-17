@@ -2,14 +2,14 @@
   "info": {
     "_postman_id": "f4f3d03a-a6dd-4f8f-93b8-8ac0df5d5f31",
     "name": "Product-Inventory Services API Check (Nexatech)",
-    "description": "Collection test nhanh cho Product Service (8083) va Inventory Service (8085). Chay theo thu tu: tao category -> tao product -> cap nhat ton kho -> reserve/release/check.",
+    "description": "Collection test nhanh cho Product Service (8090) va Inventory Service (8085). Chay theo thu tu: tao category -> tao product -> cap nhat ton kho -> reserve/release/check.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "40740215"
   },
   "variable": [
     {
       "key": "productBaseUrl",
-      "value": "http://localhost:8083"
+      "value": "http://localhost:8090"
     },
     {
       "key": "inventoryBaseUrl",
@@ -767,6 +767,49 @@
               ]
             },
             "description": "Phase 5: Autocomplete/suggest endpoint. Returns up to 5 product name suggestions matching the query string. Optimised for low latency (<200 ms) via regex index on name field."
+          },
+          "response": []
+        },
+        {
+          "name": "get products by tags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/tags?tags=iphone&tags=pro&page=0&size=10&sort=createdAt,desc",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "tags"
+              ],
+              "query": [
+                {
+                  "key": "tags",
+                  "value": "iphone"
+                },
+                {
+                  "key": "tags",
+                  "value": "pro"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "createdAt,desc"
+                }
+              ]
+            },
+            "description": "Filter products by one or more tags. Endpoint: GET /api/v1/products/tags"
           },
           "response": []
         },

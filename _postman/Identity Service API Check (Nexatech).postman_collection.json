@@ -199,6 +199,92 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "forgot-password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{loginUsername}}\"\n}"
+            },
+            "url": {
+              "raw": "{{identityBaseUrl}}/auth/forgot-password",
+              "host": [
+                "{{identityBaseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "sessions — list my sessions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json()?.result; if (Array.isArray(r) && r.length > 0) { const cur = r.find(s => s.current) || r[0]; pm.collectionVariables.set('sessionId', cur.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{identityBaseUrl}}/auth/sessions/me",
+              "host": ["{{identityBaseUrl}}"],
+              "path": ["auth", "sessions", "me"]
+            },
+            "description": "List all active sessions of the authenticated user. current=true marks the session of the current token. Auto-saves first sessionId to {{sessionId}}."
+          },
+          "response": []
+        },
+        {
+          "name": "sessions — sign out one session",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{identityBaseUrl}}/auth/sessions/{{sessionId}}",
+              "host": ["{{identityBaseUrl}}"],
+              "path": ["auth", "sessions", "{{sessionId}}"]
+            },
+            "description": "Sign out a specific session. Only succeeds if the session belongs to the current user."
+          },
+          "response": []
+        },
+        {
+          "name": "sessions — logout all devices",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{identityBaseUrl}}/auth/sessions/logout-all",
+              "host": ["{{identityBaseUrl}}"],
+              "path": ["auth", "sessions", "logout-all"]
+            },
+            "description": "Sign out ALL active sessions of the authenticated user across all devices."
+          },
+          "response": []
         }
       ]
     },
@@ -769,6 +855,182 @@
           ]
         },
         {
+          "name": "5. Sessions (admin)",
+          "item": [
+            {
+              "name": "list user sessions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/sessions/users/{{userId}}",
+                  "host": ["{{identityBaseUrl}}"],
+                  "path": ["internal", "sessions", "users", "{{userId}}"]
+                },
+                "description": "Admin: list all active sessions for a specific userId."
+              },
+              "response": []
+            },
+            {
+              "name": "logout user (all sessions)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/sessions/users/{{userId}}/logout",
+                  "host": ["{{identityBaseUrl}}"],
+                  "path": ["internal", "sessions", "users", "{{userId}}", "logout"]
+                },
+                "description": "Admin: force logout all sessions of a user."
+              },
+              "response": []
+            },
+            {
+              "name": "delete single session",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/sessions/{{sessionId}}",
+                  "host": ["{{identityBaseUrl}}"],
+                  "path": ["internal", "sessions", "{{sessionId}}"],
+                  "query": [
+                    { "key": "isOffline", "value": "false", "disabled": true }
+                  ]
+                },
+                "description": "Admin: delete a session by sessionId. Add ?isOffline=true for offline sessions."
+              },
+              "response": []
+            },
+            {
+              "name": "logout all realm",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/sessions/logout-all",
+                  "host": ["{{identityBaseUrl}}"],
+                  "path": ["internal", "sessions", "logout-all"]
+                },
+                "description": "Admin: sign out ALL sessions in the entire realm. Use with caution."
+              },
+              "response": []
+            },
+            {
+              "name": "client session stats",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/sessions/client-session-stats",
+                  "host": ["{{identityBaseUrl}}"],
+                  "path": ["internal", "sessions", "client-session-stats"]
+                },
+                "description": "Admin: get session stats for all clients in the realm."
+              },
+              "response": []
+            },
+            {
+              "name": "client user sessions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/sessions/clients/{{clientUuid}}/user-sessions?first=0&max=100",
+                  "host": ["{{identityBaseUrl}}"],
+                  "path": ["internal", "sessions", "clients", "{{clientUuid}}", "user-sessions"],
+                  "query": [
+                    { "key": "first", "value": "0" },
+                    { "key": "max", "value": "100" }
+                  ]
+                },
+                "description": "Admin: list active user sessions for a specific client UUID."
+              },
+              "response": []
+            },
+            {
+              "name": "client session count",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/sessions/clients/{{clientUuid}}/session-count",
+                  "host": ["{{identityBaseUrl}}"],
+                  "path": ["internal", "sessions", "clients", "{{clientUuid}}", "session-count"]
+                },
+                "description": "Admin: get session count for a specific client UUID."
+              },
+              "response": []
+            },
+            {
+              "name": "client offline sessions",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/sessions/clients/{{clientUuid}}/offline-sessions?first=0&max=100",
+                  "host": ["{{identityBaseUrl}}"],
+                  "path": ["internal", "sessions", "clients", "{{clientUuid}}", "offline-sessions"],
+                  "query": [
+                    { "key": "first", "value": "0" },
+                    { "key": "max", "value": "100" }
+                  ]
+                },
+                "description": "Admin: list offline sessions for a specific client UUID."
+              },
+              "response": []
+            },
+            {
+              "name": "client offline session count",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/sessions/clients/{{clientUuid}}/offline-session-count",
+                  "host": ["{{identityBaseUrl}}"],
+                  "path": ["internal", "sessions", "clients", "{{clientUuid}}", "offline-session-count"]
+                },
+                "description": "Admin: get offline session count for a specific client UUID."
+              },
+              "response": []
+            },
+            {
+              "name": "user offline sessions by client",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }
+                ],
+                "url": {
+                  "raw": "{{identityBaseUrl}}/internal/sessions/users/{{userId}}/offline-sessions/{{clientUuid}}",
+                  "host": ["{{identityBaseUrl}}"],
+                  "path": ["internal", "sessions", "users", "{{userId}}", "offline-sessions", "{{clientUuid}}"]
+                },
+                "description": "Admin: list offline sessions for a specific user + client UUID."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
           "name": "4. Groups & Membership",
           "item": [
             {
@@ -1132,6 +1394,14 @@
     {
       "key": "groupName",
       "value": "TEST_GROUP"
+    },
+    {
+      "key": "sessionId",
+      "value": ""
+    },
+    {
+      "key": "clientUuid",
+      "value": ""
     }
   ]
 }

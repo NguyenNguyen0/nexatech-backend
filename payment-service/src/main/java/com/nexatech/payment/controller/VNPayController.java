@@ -5,8 +5,12 @@ import com.nexatech.payment.dto.VNPayResponse;
 import com.nexatech.payment.service.VNPayService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Map;
 import java.util.UUID;
@@ -28,13 +32,16 @@ public class VNPayController {
 
     private final VNPayService vnPayService;
 
+    @Value("${frontend.url:http://localhost:3000}")
+    private String frontendUrl;
+
     /**
      * Tạo URL thanh toán VNPay.
      * Response: { paymentId, paymentUrl } — redirect client tới paymentUrl.
      */
     @PostMapping("/create")
     public ResponseEntity<VNPayResponse> createPayment(
-            @RequestHeader("X-User-Id") UUID customerId,
+            @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
             @Valid @RequestBody VNPayPaymentRequest request) {
         return ResponseEntity.ok(vnPayService.createPaymentUrl(customerId, request));
     }
@@ -52,11 +59,39 @@ public class VNPayController {
 
     /**
      * Return URL — VNPay redirect trình duyệt về đây sau khi thanh toán xong.
-     * Trả về JSON để frontend kiểm tra kết quả.
+     * Redirect trình duyệt tới frontend (trang success hoặc failed).
      */
     @GetMapping("/return")
-    public ResponseEntity<Map<String, String>> handleReturn(
+    public ResponseEntity<Void> handleReturn(
             @RequestParam Map<String, String> params) {
-        return ResponseEntity.ok(vnPayService.processReturn(params));
+        Map<String, String> result = vnPayService.processReturn(params);
+        boolean success = "true".equals(result.get("success"));
+        String txnRef = params.get("vnp_TxnRef");
+
+        // Look up orderId from payment record using txnRef
+        String orderId = vnPayService.getOrderIdByTxnRef(txnRef);
+
+        java.net.URI redirectUri;
+        if (success && orderId != null) {
+            // Use UriComponentsBuilder to safely encode vnp_OrderInfo (may contain spaces)
+            redirectUri = UriComponentsBuilder.fromUriString(frontendUrl)
+                    .path("/cart/checkout/success")
+                    .queryParam("orderId", orderId)
+                    .queryParam("orderNumber", result.getOrDefault("vnp_OrderInfo", ""))
+                    .queryParam("paymentMethod", "VNPAY")
+                    .build()
+                    .encode()
+                    .toUri();
+        } else {
+            redirectUri = UriComponentsBuilder.fromUriString(frontendUrl)
+                    .path("/cart")
+                    .queryParam("paymentFailed", "true")
+                    .build()
+                    .toUri();
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setLocation(redirectUri);
+        return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 }

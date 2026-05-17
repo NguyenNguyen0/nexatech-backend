@@ -2,8 +2,10 @@ package com.nexatech.order.dto;
 
 import com.nexatech.order.enums.OrderStatus;
 import com.nexatech.order.enums.PaymentMethod;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -12,12 +14,19 @@ import java.util.UUID;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OrderResponse {
 
     private UUID id;
     private String orderNumber;
     private UUID customerId;
     private OrderStatus status;
+
+    // Guest / buyer contact info
+    private String guestName;
+    private String guestEmail;
+    private String guestPhone;
     private BigDecimal totalAmount;
     private BigDecimal shippingFee;
     private BigDecimal discount;
@@ -37,6 +46,8 @@ public class OrderResponse {
 
     @Data
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class OrderItemResponse {
         private UUID id;
         private String productId;

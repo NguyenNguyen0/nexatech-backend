@@ -2,6 +2,7 @@ package com.nexatech.notification.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.notification.event.dto.EmailVerificationEvent;
+import com.nexatech.notification.event.dto.ForgotPasswordEvent;
 import com.nexatech.notification.event.dto.InventoryEvent;
 import com.nexatech.notification.event.dto.OrderEvent;
 import com.nexatech.notification.event.dto.PaymentEvent;
@@ -16,7 +17,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
+import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -44,6 +52,9 @@ public class NotificationEventConsumer {
 
             if ("EMAIL_VERIFICATION_REQUESTED".equals(eventType)) {
                 handleEmailVerificationEvent(message);
+                return;
+            } else if ("FORGOT_PASSWORD".equals(eventType)) {
+                handleForgotPasswordEvent(message);
                 return;
             }
 
@@ -146,44 +157,95 @@ public class NotificationEventConsumer {
         }
     }
 
+    private void handleForgotPasswordEvent(String message) {
+        try {
+            ForgotPasswordEvent event = objectMapper.readValue(message, ForgotPasswordEvent.class);
+
+            if (event.getEmail() == null || event.getNewPassword() == null) {
+                log.warn("Forgot password event missing email or newPassword, skipping");
+                return;
+            }
+
+            UUID userId = event.getUserId() != null ? UUID.fromString(event.getUserId()) : adminUserId;
+            String name = event.getDisplayName() != null ? event.getDisplayName() : "there";
+
+            // Create in-app notification
+            Notification notification = notificationService.createNotification(
+                    userId,
+                    Notification.NotificationType.GENERAL,
+                    "Mật khẩu của bạn đã được đặt lại",
+                    "Hệ thống đã tạo mật khẩu mới cho bạn. Vui lòng kiểm tra email."
+            );
+
+            // Send email
+            sendEmailWithRetrySupport(notification, event.getEmail(),
+                    "forgot-password", "NexaTech — Mật khẩu mới của bạn",
+                    Map.of(
+                        "displayName", name, 
+                        "newPassword", event.getNewPassword(),
+                        "loginUrl", "http://localhost:3000/auth/login" // Using default frontend URL
+                    ));
+
+            log.info("Processed FORGOT_PASSWORD event for userId={}, email={}",
+                    userId, event.getEmail());
+        } catch (Exception e) {
+            log.error("Failed to process forgot password event: {}", e.getMessage(), e);
+        }
+    }
+
     @KafkaListener(topics = "order.events", groupId = "notification-order-group")
     public void handleOrderEvent(String message) {
         if (message == null) return;
         try {
             OrderEvent event = objectMapper.readValue(message, OrderEvent.class);
-            UUID customerId = UUID.fromString(event.getCustomerId());
+            if (!"ORDER_SHIPMENT_CREATED".equals(event.getEventType())) {
+                log.debug("Order event ignored for email: type={} paymentMethod={} orderId={}",
+                        event.getEventType(), event.getPaymentMethod(), event.getOrderId());
+                return;
+            }
+
+            String recipientEmail = resolveOrderRecipientEmail(event);
+            if (!StringUtils.hasText(recipientEmail)) {
+                log.info("Skipping shipment-created email because buyer did not provide email: orderId={}",
+                        event.getOrderId());
+                return;
+            }
+            if (event.getTotalAmount() == null) {
+                log.warn("Shipment-created order event missing totalAmount, skipping email: orderId={}",
+                        event.getOrderId());
+                return;
+            }
+
+            UUID recipientUserId = parseNullableUuid(
+                    StringUtils.hasText(event.getRecipientUserId())
+                            ? event.getRecipientUserId()
+                            : event.getCustomerId());
             String orderRef = event.getOrderNumber() != null ? event.getOrderNumber() : event.getOrderId();
 
-            switch (event.getStatus()) {
-                case "PENDING", "ORDER_PLACED", "CONFIRMED" -> {
-                    Notification notification = notificationService.createNotification(
-                            customerId,
-                            Notification.NotificationType.ORDER_CONFIRMATION,
-                            "Order Confirmed",
-                            "Your order #" + orderRef + " has been placed successfully."
-                    );
-                    if (event.getCustomerEmail() != null && event.getTotalAmount() != null
-                            && preferenceService.isEmailEnabled(customerId, Notification.NotificationType.ORDER_CONFIRMATION)) {
-                        sendEmailWithRetrySupport(notification, event.getCustomerEmail(),
-                                "order-confirmation", "Order Confirmed – #" + orderRef,
-                                Map.of("orderId", orderRef, "total", event.getTotalAmount()));
-                    }
+            if (recipientUserId != null) {
+                Notification notification = notificationService.createNotification(
+                        recipientUserId,
+                        Notification.NotificationType.ORDER_CONFIRMATION,
+                        "Shipment created",
+                        "Your shipment for order #" + orderRef + " has been created."
+                );
+
+                if (preferenceService.isEmailEnabled(recipientUserId, Notification.NotificationType.ORDER_CONFIRMATION)) {
+                    sendEmailWithRetrySupport(notification, recipientEmail,
+                            "order-confirmation", "NexaTech - Đơn hàng đã tạo vận đơn #" + orderRef,
+                            buildOrderEmailVariables(event, orderRef));
                 }
-                case "CANCELLED" -> notificationService.createNotification(
-                        customerId,
-                        Notification.NotificationType.ORDER_STATUS_UPDATE,
-                        "Order Cancelled",
-                        "Your order #" + orderRef + " has been cancelled."
-                );
-                case "DELIVERED" -> notificationService.createNotification(
-                        customerId,
-                        Notification.NotificationType.ORDER_STATUS_UPDATE,
-                        "Order Delivered",
-                        "Your order #" + orderRef + " has been delivered successfully."
-                );
-                default -> log.debug("Unhandled order status: {}", event.getStatus());
+            } else {
+                emailService.sendEmail(recipientEmail,
+                        "NexaTech - Đơn hàng đã tạo vận đơn #" + orderRef,
+                        "order-confirmation",
+                        buildOrderEmailVariables(event, orderRef));
+                log.info("Sent shipment-created email for guest orderId={} recipient={}",
+                        event.getOrderId(), recipientEmail);
             }
-            log.info("Processed order event status={} orderId={}", event.getStatus(), event.getOrderId());
+
+            log.info("Processed shipment-created order email event orderId={} recipientUserId={}",
+                    event.getOrderId(), recipientUserId);
         } catch (Exception e) {
             log.error("Failed to process order event: {}", e.getMessage(), e);
         }
@@ -287,5 +349,83 @@ public class NotificationEventConsumer {
             log.warn("Email send failed for notificationId={}, will be retried: {}",
                     notification.getId(), e.getMessage());
         }
+    }
+
+    private String resolveOrderRecipientEmail(OrderEvent event) {
+        if (StringUtils.hasText(event.getRecipientEmail())) {
+            return event.getRecipientEmail().trim();
+        }
+        return null;
+    }
+
+    private UUID parseNullableUuid(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid notification recipient user id: {}", value);
+            return null;
+        }
+    }
+
+    private Map<String, Object> buildOrderEmailVariables(OrderEvent event, String orderRef) {
+        BigDecimal subtotal = defaultAmount(event.getTotalAmount());
+        BigDecimal shippingFee = defaultAmount(event.getShippingFee());
+        BigDecimal discount = defaultAmount(event.getDiscount());
+        BigDecimal grandTotal = subtotal.add(shippingFee).subtract(discount);
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        if (event.getItems() != null) {
+            for (OrderEvent.OrderItemEvent item : event.getItems()) {
+                Map<String, Object> row = new HashMap<>();
+                row.put("productName", StringUtils.hasText(item.getProductName()) ? item.getProductName() : item.getProductId());
+                row.put("quantity", item.getQuantity());
+                row.put("unitPrice", formatVnd(defaultAmount(item.getUnitPrice())));
+                row.put("subtotal", formatVnd(defaultAmount(item.getSubtotal())));
+                items.add(row);
+            }
+        }
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderId", orderRef);
+        variables.put("buyerName", event.getGuestName());
+        variables.put("buyerEmail", event.getRecipientEmail());
+        variables.put("buyerPhone", event.getGuestPhone());
+        variables.put("shippingAddress", event.getShippingAddress());
+        variables.put("shippingMethod", event.getShippingMethod());
+        variables.put("paymentMethod", event.getPaymentMethod());
+        variables.put("paymentNote", resolvePaymentNote(event.getPaymentMethod()));
+        variables.put("carrierName", event.getCarrierName());
+        variables.put("trackingNumber", event.getTrackingNumber());
+        variables.put("note", event.getNote());
+        variables.put("items", items);
+        variables.put("subtotal", formatVnd(subtotal));
+        variables.put("shippingFee", formatVnd(shippingFee));
+        variables.put("discount", formatVnd(discount));
+        variables.put("grandTotal", formatVnd(grandTotal));
+        return variables;
+    }
+
+    private BigDecimal defaultAmount(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private String formatVnd(BigDecimal amount) {
+        NumberFormat formatter = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi-VN"));
+        formatter.setMaximumFractionDigits(0);
+        formatter.setMinimumFractionDigits(0);
+        return formatter.format(amount) + " ₫";
+    }
+
+    private String resolvePaymentNote(String paymentMethod) {
+        if ("COD".equalsIgnoreCase(paymentMethod)) {
+            return "Bạn sẽ thanh toán khi nhận hàng.";
+        }
+        if (StringUtils.hasText(paymentMethod)) {
+            return "Đơn hàng đã được xác nhận với phương thức thanh toán " + paymentMethod + ".";
+        }
+        return "Đơn hàng đã được xác nhận thanh toán.";
     }
 }

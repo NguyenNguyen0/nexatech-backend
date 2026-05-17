@@ -38,7 +38,7 @@ spring:
             - id: order-service
               uri: lb://order-service
               predicates:
-                - Path=/api/v1/orders/**,/api/v1/admin/orders/**,/api/v1/returns/**
+                - Path=/api/v1/orders/**,/api/v1/admin/orders/**,/api/v1/returns/**,/api/v1/checkout/**,/api/v1/cart/**
             - id: inventory-service
               uri: lb://inventory-service
               predicates:
@@ -47,10 +47,18 @@ spring:
               uri: lb://payment-service
               predicates:
                 - Path=/api/v1/payments/**
+            - id: shipping-service
+              uri: lb://shipping-service
+              predicates:
+                - Path=/api/v1/shipping/**
             - id: notification-service
               uri: lb://notification-service
               predicates:
                 - Path=/api/v1/notifications/**
+            - id: chat-service
+              uri: lb://chat-service
+              predicates:
+                - Path=/api/v1/conversations/**
             - id: storage-service
               uri: lb://storage-service
               predicates:

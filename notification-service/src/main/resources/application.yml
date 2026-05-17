@@ -2,7 +2,7 @@ spring:
   application:
     name: notification-service
   config:
-    import: "configserver:"
+    import: "configserver:${CONFIG_SERVER_URI}/"
 
 app:
   admin-user-id: ${ADMIN_USER_ID:00000000-0000-0000-0000-000000000001}

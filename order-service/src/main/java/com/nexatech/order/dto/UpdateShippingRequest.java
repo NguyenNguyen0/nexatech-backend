@@ -3,6 +3,7 @@ package com.nexatech.order.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
@@ -18,4 +19,6 @@ public class UpdateShippingRequest {
     private String carrierName;  // GHN, GHTK, VNPost, J&T, ...
 
     private Instant estimatedDelivery;
+
+    private BigDecimal shippingFee;
 }

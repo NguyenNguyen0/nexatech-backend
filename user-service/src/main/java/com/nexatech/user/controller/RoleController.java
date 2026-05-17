@@ -14,10 +14,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nexatech.user.client.IdentityIamClient;
+import com.nexatech.user.constant.PermissionsAccept;
+import com.nexatech.user.constant.PermissionsDeny;
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.request.RoleCreateRequest;
 import com.nexatech.user.dto.request.RoleRefRequest;
 import com.nexatech.user.dto.response.RoleSummaryResponse;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -41,9 +46,18 @@ public class RoleController {
     @GetMapping
     // @RequiresPermission(PermissionsAccept.RealmRole.READ)
     public ApiResponse<List<RoleSummaryResponse>> listRoles() {
+        List<String> allPermissions = new ArrayList<>();
+        allPermissions.addAll(PermissionsAccept.allCodes());
+        allPermissions.addAll(PermissionsDeny.allCodes());
+        List<String> defaultRoles = Arrays.asList("offline_access", "uma_authorization", "default-roles-nexatech");
+
         List<RoleSummaryResponse> roles = identityIamClient.listRoles().getResult()
                 .stream()
                 .map(this::toRoleSummary)
+                .filter(r -> {
+                    String n = r.getName();
+                    return n != null && !allPermissions.contains(n) && !defaultRoles.contains(n);
+                })
                 .toList();
         return ApiResponse.<List<RoleSummaryResponse>>builder().result(roles).build();
     }

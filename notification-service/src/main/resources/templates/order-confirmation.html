@@ -1,50 +1,144 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Order Confirmed</title>
+    <title>Đơn hàng đã tạo vận đơn</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
-        .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .header { text-align: center; margin-bottom: 32px; }
-        .header h1 { color: #34a853; font-size: 26px; margin: 0; }
-        .body-text { color: #444444; font-size: 16px; line-height: 1.6; }
-        .summary-box { background-color: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 20px; margin: 24px 0; }
-        .summary-box table { width: 100%; border-collapse: collapse; }
-        .summary-box td { padding: 8px 0; font-size: 15px; color: #333; }
-        .summary-box td.label { color: #777; width: 40%; }
-        .summary-box td.value { font-weight: bold; text-align: right; }
-        .footer { margin-top: 40px; text-align: center; color: #999999; font-size: 12px; }
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; color: #1f2937; }
+        .container { max-width: 680px; margin: 32px auto; background: #ffffff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+        .header { margin-bottom: 24px; }
+        .header h1 { color: #16a34a; font-size: 24px; margin: 0 0 8px; }
+        .header p { margin: 0; color: #6b7280; }
+        .section { margin-top: 24px; }
+        .section h2 { font-size: 17px; margin: 0 0 12px; color: #111827; }
+        .card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { padding: 10px 0; font-size: 14px; vertical-align: top; }
+        th { text-align: left; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
+        .label { color: #6b7280; width: 34%; }
+        .value { font-weight: 600; }
+        .items td { border-bottom: 1px solid #e5e7eb; }
+        .items tr:last-child td { border-bottom: 0; }
+        .amount td:last-child, .items td:last-child, .items th:last-child { text-align: right; }
+        .grand-total td { font-size: 16px; font-weight: 700; border-top: 1px solid #d1d5db; padding-top: 14px; }
+        .footer { margin-top: 28px; color: #6b7280; font-size: 13px; line-height: 1.6; }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1>Your Order is Confirmed ✅</h1>
+        <h1>Đơn hàng đã được tạo vận đơn</h1>
+        <p>Cảm ơn bạn đã mua hàng tại NexaTech.</p>
     </div>
-    <div class="body-text">
-        <p>Thank you for your purchase! Here's a summary of your order:</p>
 
-        <div class="summary-box">
+    <div class="section">
+        <h2>Thông tin đơn hàng</h2>
+        <div class="card">
             <table>
                 <tr>
-                    <td class="label">Order ID</td>
-                    <td class="value" th:text="${orderId}">—</td>
+                    <td class="label">Mã đơn hàng</td>
+                    <td class="value" th:text="${orderId}">ORD-0001</td>
                 </tr>
                 <tr>
-                    <td class="label">Order Total</td>
-                    <td class="value" th:text="'$' + ${#numbers.formatDecimal(total, 1, 2)}">$0.00</td>
+                    <td class="label">Thanh toán</td>
+                    <td class="value" th:text="${paymentMethod}">COD</td>
+                </tr>
+                <tr>
+                    <td class="label">Phương thức giao</td>
+                    <td class="value" th:text="${shippingMethod}">STANDARD</td>
+                </tr>
+                <tr>
+                    <td class="label">Đơn vị vận chuyển</td>
+                    <td class="value" th:text="${carrierName}">Giao Hàng Nhanh (GHN)</td>
+                </tr>
+                <tr>
+                    <td class="label">Mã vận đơn</td>
+                    <td class="value" th:text="${trackingNumber}">ABC123</td>
                 </tr>
             </table>
         </div>
-
-        <p>We'll send you another email once your order has been shipped.</p>
-        <p>Thank you for shopping with NexaTech!</p>
-        <p>Best regards,<br/>The NexaTech Team</p>
     </div>
+
+    <div class="section">
+        <h2>Thông tin người nhận</h2>
+        <div class="card">
+            <table>
+                <tr th:if="${buyerName}">
+                    <td class="label">Người nhận</td>
+                    <td class="value" th:text="${buyerName}">Nguyễn Văn A</td>
+                </tr>
+                <tr th:if="${buyerPhone}">
+                    <td class="label">Số điện thoại</td>
+                    <td class="value" th:text="${buyerPhone}">0900000000</td>
+                </tr>
+                <tr th:if="${buyerEmail}">
+                    <td class="label">Email</td>
+                    <td class="value" th:text="${buyerEmail}">customer@example.com</td>
+                </tr>
+                <tr th:if="${shippingAddress}">
+                    <td class="label">Địa chỉ</td>
+                    <td class="value" th:text="${shippingAddress}">Địa chỉ nhận hàng</td>
+                </tr>
+                <tr th:if="${note}">
+                    <td class="label">Ghi chú</td>
+                    <td class="value" th:text="${note}">Ghi chú đơn hàng</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Sản phẩm</h2>
+        <div class="card">
+            <table class="items">
+                <thead>
+                <tr>
+                    <th>Sản phẩm</th>
+                    <th>Số lượng</th>
+                    <th>Đơn giá</th>
+                    <th>Thành tiền</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${items}">
+                    <td th:text="${item.productName}">Sản phẩm</td>
+                    <td th:text="${item.quantity}">1</td>
+                    <td th:text="${item.unitPrice}">0 ₫</td>
+                    <td th:text="${item.subtotal}">0 ₫</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Thanh toán</h2>
+        <div class="card">
+            <table class="amount">
+                <tr>
+                    <td class="label">Tạm tính</td>
+                    <td th:text="${subtotal}">0 ₫</td>
+                </tr>
+                <tr>
+                    <td class="label">Phí vận chuyển</td>
+                    <td th:text="${shippingFee}">0 ₫</td>
+                </tr>
+                <tr>
+                    <td class="label">Giảm giá</td>
+                    <td th:text="${discount}">0 ₫</td>
+                </tr>
+                <tr class="grand-total">
+                    <td>Tổng thanh toán</td>
+                    <td th:text="${grandTotal}">0 ₫</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
     <div class="footer">
-        <p>&copy; 2026 NexaTech. All rights reserved.</p>
+        <p th:text="${paymentNote}">Đơn hàng đã được xác nhận.</p>
+        <p>Trân trọng,<br/>NexaTech</p>
     </div>
 </div>
 </body>

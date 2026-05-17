@@ -17,6 +17,7 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class LoginRequest {
+    /** Login identifier: username, email, or phone (resolved server-side). */
     @NotBlank(message = "USERNAME_IS_MISSING")
     String username;
 
