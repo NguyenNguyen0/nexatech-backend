@@ -128,6 +128,7 @@ plugins:
         - X-User-Id
         - X-User-Role
         - X-User-Email
+        - X-Guest-Session-Id
         - Idempotency-Key
         - X-Requested-With
       exposed_headers:
