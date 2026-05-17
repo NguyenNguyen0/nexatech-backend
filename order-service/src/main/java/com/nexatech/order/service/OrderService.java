@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -213,9 +214,18 @@ public class OrderService {
         order.setTrackingNumber(request.getTrackingNumber());
         order.setCarrierName(request.getCarrierName());
         order.setEstimatedDelivery(request.getEstimatedDelivery());
+        if (request.getShippingFee() != null) {
+            order.setShippingFee(request.getShippingFee());
+        }
         Order saved = orderRepository.save(order);
         log.info("Cập nhật tracking đơn hàng {}: {} / {}", orderId, request.getCarrierName(), request.getTrackingNumber());
         return orderMapper.toResponse(saved);
+    }
+
+    @Transactional
+    public void publishShipmentCreatedEvent(UUID orderId) {
+        Order order = findById(orderId);
+        saveOrderEventToOutbox(order, "ORDER_SHIPMENT_CREATED");
     }
 
     /**
@@ -301,7 +311,9 @@ public class OrderService {
             throw new BadRequestException("Không thể xác định giá sản phẩm: " + productId);
         }
         if (productName == null) {
-            productName = "Sản phẩm " + productId;
+            productName = StringUtils.hasText(itemReq.getProductName())
+                    ? itemReq.getProductName().trim()
+                    : "Sản phẩm " + productId;
         }
 
         BigDecimal subtotal = price.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
@@ -352,16 +364,27 @@ public class OrderService {
                 .orderId(order.getId())
                 .orderNumber(order.getOrderNumber())
                 .customerId(order.getCustomerId())
+                .recipientUserId(order.getCustomerId())
+                .recipientEmail(order.getGuestEmail())
                 .status(order.getStatus())
                 .paymentMethod(order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null)
                 .totalAmount(order.getTotalAmount())
+                .shippingFee(order.getShippingFee())
+                .discount(order.getDiscount())
                 .shippingAddress(order.getShippingAddress())
+                .shippingMethod(order.getShippingMethod())
+                .carrierName(order.getCarrierName())
+                .trackingNumber(order.getTrackingNumber())
                 .guestName(order.getGuestName())
                 .guestPhone(order.getGuestPhone())
+                .note(order.getNote())
                 .items(order.getItems().stream()
                         .map(item -> OrderEvent.OrderItemEvent.builder()
                                 .productId(item.getProductId())
+                                .productName(item.getProductName())
                                 .quantity(item.getQuantity())
+                                .unitPrice(item.getUnitPrice())
+                                .subtotal(item.getSubtotal())
                                 .build())
                         .toList())
                 .build();

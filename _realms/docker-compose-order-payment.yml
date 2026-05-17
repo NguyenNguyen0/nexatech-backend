@@ -94,6 +94,37 @@ services:
     networks:
       - nexatech-net
 
+  postgres-notification:
+    image: postgres:16-alpine
+    container_name: nexatech-notification-postgres
+    environment:
+      POSTGRES_DB: nexatech_notifications
+      POSTGRES_USER: ${POSTGRES_USER:-nexatech}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexatech123}
+    command: >
+      postgres
+      -c shared_buffers=32MB
+      -c max_connections=30
+      -c work_mem=2MB
+      -c maintenance_work_mem=16MB
+      -c wal_buffers=4MB
+    ports:
+      - "5438:5432"
+    volumes:
+      - postgres-notification-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexatech} -d nexatech_notifications"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+      - nexatech-net
+
   # ─── Cache ────────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
@@ -359,6 +390,47 @@ services:
     networks:
       - nexatech-net
 
+  notification-service:
+    build:
+      context: ..
+      args:
+        SERVICE_NAME: notification-service
+    image: nexatech/notification-service:latest
+    container_name: nexatech-notification
+    env_file:
+      - ../.env
+    ports:
+      - "8087:8087"
+    environment:
+      - CONFIG_SERVER_URI=http://config-server:8888
+      - SERVER_PORT=8087
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - DB_URL=jdbc:postgresql://postgres-notification:5432/nexatech_notifications
+      - DB_USERNAME=${POSTGRES_USER:-nexatech}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-nexatech123}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - JAVA_TOOL_OPTIONS=-Xmx200m -XX:+UseSerialGC -XX:TieredStopAtLevel=4
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres-notification:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8087/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 280M
+    networks:
+      - nexatech-net
+
   # ─── API Gateway (Kong) ───────────────────────────────────────────────────────
   kong:
     image: kong:3.6
@@ -383,6 +455,8 @@ services:
         condition: service_healthy
       shipping-service:
         condition: service_healthy
+      notification-service:
+        condition: service_healthy
     networks:
       - nexatech-net
 
@@ -390,6 +464,7 @@ volumes:
   postgres-order-data:
   postgres-payment-data:
   postgres-shipping-data:
+  postgres-notification-data:
   redis-data:
 
 networks:
