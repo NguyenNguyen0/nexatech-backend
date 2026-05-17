@@ -34,3 +34,10 @@ vnpay:
   payment-url: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
   return-url: ${VNPAY_RETURN_URL}
   ipn-url: ${VNPAY_IPN_URL}
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://discovery-server:8761/eureka/}
+    fetch-registry: true
+    register-with-eureka: true
