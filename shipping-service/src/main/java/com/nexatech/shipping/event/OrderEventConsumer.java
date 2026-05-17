@@ -112,10 +112,11 @@ public class OrderEventConsumer {
         }
 
         boolean isCod = "COD".equalsIgnoreCase(event.getPaymentMethod());
-        BigDecimal codAmount = isCod && event.getTotalAmount() != null
-                ? event.getTotalAmount()
-                : BigDecimal.ZERO;
-        BigDecimal insuranceValue = event.getTotalAmount() != null ? event.getTotalAmount() : BigDecimal.ZERO;
+        // GHN sandbox caps both COD amount and insurance value at 50,000,000 VND
+        BigDecimal GHN_MAX_VALUE = new BigDecimal("50000000");
+        BigDecimal rawTotal = event.getTotalAmount() != null ? event.getTotalAmount() : BigDecimal.ZERO;
+        BigDecimal codAmount = isCod ? rawTotal.min(GHN_MAX_VALUE) : BigDecimal.ZERO;
+        BigDecimal insuranceValue = rawTotal.min(GHN_MAX_VALUE);
 
         ShipmentItemRequest defaultItem = ShipmentItemRequest.builder()
                 .name("NexaTech order #" + event.getOrderNumber())
