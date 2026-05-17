@@ -28,17 +28,19 @@ public class CheckoutController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<CheckoutResponse> checkout(
             @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
+            @RequestHeader(value = "X-User-Email", required = false) String customerEmail,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CheckoutRequest request) {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            return handleIdempotentCheckout(customerId, idempotencyKey, request);
+            return handleIdempotentCheckout(customerId, customerEmail, idempotencyKey, request);
         }
 
-        return ApiResponse.ok(checkoutService.checkout(customerId, request));
+        return ApiResponse.ok(checkoutService.checkout(customerId, customerEmail, request));
     }
 
     private ApiResponse<CheckoutResponse> handleIdempotentCheckout(
             UUID customerId,
+            String customerEmail,
             String idempotencyKey,
             CheckoutRequest request) {
         return idempotencyService.checkAndGetCached(idempotencyKey, IDEMPOTENCY_OPERATION)
@@ -46,7 +48,7 @@ public class CheckoutController {
                 .orElseGet(() -> {
                     idempotencyService.markProcessing(idempotencyKey, IDEMPOTENCY_OPERATION);
                     try {
-                        CheckoutResponse response = checkoutService.checkout(customerId, request);
+                        CheckoutResponse response = checkoutService.checkout(customerId, customerEmail, request);
                         idempotencyService.markCompleted(idempotencyKey, response.getOrderId(), response);
                         return ApiResponse.ok(response);
                     } catch (RuntimeException ex) {

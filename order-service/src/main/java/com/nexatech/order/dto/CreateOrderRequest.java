@@ -34,6 +34,7 @@ public class CreateOrderRequest {
 
         @NotBlank
         private String productId;
+        private String productName;
 
         @Min(1)
         private int quantity;

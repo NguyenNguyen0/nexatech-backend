@@ -40,6 +40,7 @@ public class CheckoutRequest {
     public static class ItemRequest {
         @NotBlank
         private String productId;
+        private String productName;
         @Min(1)
         private int quantity;
         /** Giá đơn vị từ frontend (localStorage cart). Dùng làm fallback khi product-service không khả dụng. */

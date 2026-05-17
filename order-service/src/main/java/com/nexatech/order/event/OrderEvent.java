@@ -22,12 +22,20 @@ public class OrderEvent extends BaseEvent {
     private UUID orderId;
     private String orderNumber;
     private UUID customerId;
+    private UUID recipientUserId;
+    private String recipientEmail;
     private OrderStatus status;
     private String paymentMethod;
     private BigDecimal totalAmount;
+    private BigDecimal shippingFee;
+    private BigDecimal discount;
     private String shippingAddress;
+    private String shippingMethod;
+    private String carrierName;
+    private String trackingNumber;
     private String guestName;
     private String guestPhone;
+    private String note;
     private List<OrderItemEvent> items;
 
     @Data
@@ -36,6 +44,9 @@ public class OrderEvent extends BaseEvent {
     @AllArgsConstructor
     public static class OrderItemEvent {
         private String productId;
+        private String productName;
         private int quantity;
+        private BigDecimal unitPrice;
+        private BigDecimal subtotal;
     }
 }
