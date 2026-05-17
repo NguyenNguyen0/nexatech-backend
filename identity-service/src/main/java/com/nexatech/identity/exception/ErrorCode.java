@@ -46,6 +46,10 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(2030, "Invalid username or password", HttpStatus.BAD_REQUEST),
     INVALID_JSON_BODY(2031, "Invalid or malformed JSON", HttpStatus.BAD_REQUEST),
     DEPENDENCY_UNAVAILABLE(2032, "Dependent service is temporarily unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    INVALID_PASSWORD(2033, "Invalid password", HttpStatus.BAD_REQUEST),
+    UNSUPPORTED_SOCIAL_PROVIDER(2034, "Unsupported social login provider", HttpStatus.BAD_REQUEST),
+    SOCIAL_LOGIN_FAILED(2035, "Social login failed", HttpStatus.BAD_REQUEST),
+    USER_ACCOUNT_DISABLED(2036, "This account has been disabled", HttpStatus.FORBIDDEN),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

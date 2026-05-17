@@ -14,6 +14,8 @@ import java.util.Map;
 import com.nexatech.identity.dto.base.ApiResponse;
 import com.nexatech.identity.dto.request.IntrospectTokenRequest;
 import com.nexatech.identity.dto.request.LoginRequest;
+import com.nexatech.identity.dto.request.SocialMediaLoginRequest;
+import com.nexatech.identity.dto.request.ForgotPasswordRequest;
 import com.nexatech.identity.dto.request.LogoutRequest;
 import com.nexatech.identity.dto.request.RefreshTokenRequest;
 import com.nexatech.identity.dto.request.UserCreationParam;
@@ -43,6 +45,14 @@ public class AuthController {
     public ApiResponse<UserTokenExchangeResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.<UserTokenExchangeResponse>builder()
                 .result(authService.login(request))
+                .build();
+    }
+
+    @PostMapping("/social-media")
+    public ApiResponse<UserTokenExchangeResponse> loginWithSocialMedia(
+            @Valid @RequestBody SocialMediaLoginRequest request) {
+        return ApiResponse.<UserTokenExchangeResponse>builder()
+                .result(authService.loginWithSocialMedia(request))
                 .build();
     }
 
@@ -79,5 +89,30 @@ public class AuthController {
         return ApiResponse.<Map<String, Object>>builder()
                 .result(authService.introspect(request))
                 .build();
+    }
+
+    @PostMapping("/change-password")
+    public ApiResponse<Void> changePassword(
+            @RequestHeader(value = "Authorization") String authorization,
+            @Valid @RequestBody com.nexatech.identity.dto.request.PasswordChangeRequest request) {
+        authService.changePassword(authorization, request);
+        return ApiResponse.<Void>builder().build();
+    }
+
+    /**
+     * Lightweight session liveness check.
+     * Requires a valid, non-revoked Bearer token (goes through SessionRevocationFilter).
+     * Returns 200 if the session is still active, 401 if revoked.
+     * Used by the frontend heartbeat to detect remote logouts in real time.
+     */
+    @GetMapping("/session/ping")
+    public ApiResponse<Void> sessionPing() {
+        return ApiResponse.<Void>builder().build();
+    }
+
+    @PostMapping("/forgot-password")
+    public ApiResponse<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ApiResponse.<Void>builder().build();
     }
 }

@@ -9,7 +9,6 @@ import com.nexatech.order.dto.OrderResponse;
 import com.nexatech.order.dto.UpdateShippingRequest;
 import com.nexatech.order.enums.OrderStatus;
 import com.nexatech.order.event.OrderEvent;
-import com.nexatech.order.event.OrderEventProducer;
 import com.nexatech.order.exception.BadRequestException;
 import com.nexatech.order.exception.ForbiddenException;
 import com.nexatech.order.exception.ResourceNotFoundException;
@@ -23,12 +22,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -50,29 +53,32 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final InventoryClient inventoryClient;
     private final ProductClient productClient;
-    private final OrderEventProducer orderEventProducer;
+    private final OutboxEventService outboxEventService;
+    private final AuditLogService auditLogService;
+    private final PlatformTransactionManager transactionManager;
 
     /**
      * Tạo đơn hàng mới.
      *
-     * Luồng xử lý:
-     *   1. Kiểm tra tồn kho qua inventory-service (Feign)
-     *   2. Lấy giá sản phẩm từ product-service (Feign)
-     *   3. Lưu Order + OrderItems vào DB
-     *   4. Giữ hàng (reserve) — nếu bước này thất bại, @Transactional tự rollback đơn hàng,
-     *      tránh tạo ra đơn hàng "mồ côi" không có hàng giữ tương ứng.
-     *   5. Publish OrderEvent (ORDER_PLACED) lên Kafka
+     * Luồng xử lý (tách Feign calls ra ngoài transaction để tránh long-held DB lock):
+     *   1. Kiểm tra tồn kho qua inventory-service (Feign) — ngoài transaction
+     *   2. Lấy giá sản phẩm từ product-service (Feign) — ngoài transaction
+     *   3. Lưu Order + OrderItems + Outbox event trong một transaction ngắn gọn
+     *   4. Giữ hàng (reserve) qua inventory-service (Feign) — ngoài transaction
+     *      Nếu bước này thất bại, best-effort cancel đơn hàng vừa tạo.
+     *
+     * Anti-pattern được khắc phục: không gọi I/O mạng (Feign) trong @Transactional
+     * để tránh giam lock DB trong thời gian chờ mạng.
      */
-    @Transactional
     public OrderResponse createOrder(UUID customerId, CreateOrderRequest request) {
-        // 1. Xây dựng request và kiểm tra tồn kho
+        // 1. Xây dựng request và kiểm tra tồn kho (ngoài transaction)
         StockOperationRequest stockRequest = buildStockRequest(request.getItems());
         Boolean inStock = inventoryClient.checkStock(stockRequest).getData();
         if (!Boolean.TRUE.equals(inStock)) {
             throw new BadRequestException("Một hoặc nhiều sản phẩm không đủ tồn kho");
         }
 
-        // 2. Lấy thông tin sản phẩm và xây dựng danh sách OrderItem
+        // 2. Lấy thông tin sản phẩm và xây dựng danh sách OrderItem (ngoài transaction)
         List<OrderItem> items = request.getItems().stream()
                 .map(this::buildOrderItem)
                 .collect(Collectors.toList());
@@ -81,7 +87,6 @@ public class OrderService {
                 .map(OrderItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 3. Tạo đơn hàng và lưu vào DB
         Order order = Order.builder()
                 .orderNumber(generateOrderNumber())
                 .customerId(customerId)
@@ -93,19 +98,43 @@ public class OrderService {
                 .shippingMethod(request.getShippingMethod() != null ? request.getShippingMethod() : "STANDARD")
                 .paymentMethod(request.getPaymentMethod())
                 .note(request.getNote())
+                .guestName(request.getGuestName())
+                .guestEmail(request.getGuestEmail())
+                .guestPhone(request.getGuestPhone())
                 .items(items)
                 .build();
-
-        // Thiết lập quan hệ hai chiều @ManyToOne (JPA yêu cầu)
         items.forEach(item -> item.setOrder(order));
-        Order saved = orderRepository.save(order);
 
-        // 4. Giữ hàng — nếu FeignException (RuntimeException) được throw,
-        //    @Transactional sẽ rollback cả đơn hàng vừa lưu ở trên
-        inventoryClient.reserveStock(stockRequest);
+        // 3. Lưu đơn hàng + outbox event trong transaction ngắn gọn (không có I/O mạng)
+        Order saved = new TransactionTemplate(transactionManager).execute(status -> {
+            Order o = orderRepository.save(order);
+            saveOrderEventToOutbox(o, "ORDER_PLACED");
+            auditLogService.log("ORDER_CREATED", "Order", o.getId().toString(),
+                    "status=" + o.getStatus(), customerId != null ? customerId.toString() : "guest");
+            return o;
+        });
 
-        // 5. Publish event sau khi DB và tồn kho đều thành công
-        publishEvent(saved, "ORDER_PLACED");
+        // 4. Giữ hàng sau khi transaction DB đã commit — tránh orphan reservation
+        try {
+            inventoryClient.reserveStock(stockRequest);
+        } catch (Exception e) {
+            log.error("Giữ hàng thất bại cho đơn hàng {}: {}", saved.getId(), e.getMessage());
+            // Best-effort: đánh dấu đơn hàng là CANCELLED để tránh đơn mồ côi
+            try {
+                new TransactionTemplate(transactionManager).execute(st -> {
+                    Order o = orderRepository.findById(saved.getId()).orElse(null);
+                    if (o != null && o.getStatus() == OrderStatus.PENDING) {
+                        o.setStatus(OrderStatus.CANCELLED);
+                        orderRepository.save(o);
+                        saveOrderEventToOutbox(o, "ORDER_CANCELLED");
+                    }
+                    return null;
+                });
+            } catch (Exception ex) {
+                log.error("Không thể rollback đơn hàng {}: {}", saved.getId(), ex.getMessage());
+            }
+            throw new BadRequestException("Không thể giữ hàng, vui lòng thử lại sau");
+        }
 
         log.info("Tạo đơn hàng thành công: {} | customer: {}", saved.getOrderNumber(), customerId);
         return orderMapper.toResponse(saved);
@@ -168,7 +197,9 @@ public class OrderService {
         }
 
         Order saved = orderRepository.save(order);
-        publishEvent(saved, "ORDER_STATUS_UPDATED");
+        saveOrderEventToOutbox(saved, "ORDER_STATUS_UPDATED");
+        auditLogService.log("ORDER_STATUS_CHANGED", "Order", orderId.toString(),
+                oldStatus.name(), newStatus.name(), "system", null);
         log.info("Cập nhật trạng thái đơn hàng {} : {} → {}", orderId, oldStatus, newStatus);
 
         return orderMapper.toResponse(saved);
@@ -183,25 +214,34 @@ public class OrderService {
         order.setTrackingNumber(request.getTrackingNumber());
         order.setCarrierName(request.getCarrierName());
         order.setEstimatedDelivery(request.getEstimatedDelivery());
+        if (request.getShippingFee() != null) {
+            order.setShippingFee(request.getShippingFee());
+        }
         Order saved = orderRepository.save(order);
         log.info("Cập nhật tracking đơn hàng {}: {} / {}", orderId, request.getCarrierName(), request.getTrackingNumber());
         return orderMapper.toResponse(saved);
     }
 
+    @Transactional
+    public void publishShipmentCreatedEvent(UUID orderId) {
+        Order order = findById(orderId);
+        saveOrderEventToOutbox(order, "ORDER_SHIPMENT_CREATED");
+    }
+
     /**
      * Customer tự huỷ đơn hàng.
      *
-     * Luồng:
-     *   1. Validate quyền sở hữu và trạng thái cho phép
-     *   2. Giải phóng tồn kho đã giữ — nếu thất bại, đơn hàng giữ nguyên PENDING (an toàn)
-     *   3. Cập nhật trạng thái CANCELLED và publish event
+     * Luồng (tách Feign calls ra ngoài transaction):
+     *   1. Validate quyền sở hữu và trạng thái cho phép (không cần transaction)
+     *   2. Giải phóng tồn kho đã giữ — ngoài transaction
+     *      Nếu thất bại, đơn hàng giữ nguyên PENDING (an toàn hơn là huỷ mà không nhả kho)
+     *   3. Cập nhật trạng thái CANCELLED và lưu outbox event trong transaction ngắn gọn
      */
-    @Transactional
     public OrderResponse cancelOrder(UUID customerId, UUID orderId) {
         Order order = findById(orderId);
 
-        // Xác thực quyền sở hữu
-        if (!order.getCustomerId().equals(customerId)) {
+        // Xác thực quyền sở hữu (dùng Objects.equals để tránh NPE với guest orders)
+        if (!Objects.equals(order.getCustomerId(), customerId)) {
             throw new ForbiddenException("Bạn không có quyền huỷ đơn hàng này");
         }
 
@@ -212,7 +252,7 @@ public class OrderService {
             );
         }
 
-        // Giải phóng tồn kho — nếu thất bại thì dừng lại, đơn hàng vẫn giữ nguyên (không mất hàng)
+        // Giải phóng tồn kho ngoài transaction — nếu thất bại, đơn hàng vẫn giữ nguyên (không mất hàng)
         try {
             inventoryClient.releaseStock(buildStockRequestFromOrder(order));
         } catch (Exception e) {
@@ -220,12 +260,17 @@ public class OrderService {
             throw new BadRequestException("Không thể hoàn trả tồn kho, vui lòng thử lại sau");
         }
 
-        order.setStatus(OrderStatus.CANCELLED);
-        Order saved = orderRepository.save(order);
-
-        publishEvent(saved, "ORDER_CANCELLED");
-        log.info("Huỷ đơn hàng thành công: {} | customer: {}", orderId, customerId);
-        return orderMapper.toResponse(saved);
+        // Cập nhật trạng thái trong transaction ngắn gọn (không có I/O mạng)
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            Order o = findById(orderId);
+            o.setStatus(OrderStatus.CANCELLED);
+            Order saved = orderRepository.save(o);
+            saveOrderEventToOutbox(saved, "ORDER_CANCELLED");
+            auditLogService.log("ORDER_CANCELLED", "Order", orderId.toString(),
+                    null, "CANCELLED", customerId != null ? customerId.toString() : "guest", "customer request");
+            log.info("Huỷ đơn hàng thành công: {} | customer: {}", orderId, customerId);
+            return orderMapper.toResponse(saved);
+        });
     }
 
     // ==================== Private helpers ====================
@@ -237,18 +282,46 @@ public class OrderService {
 
     /**
      * Gọi product-service lấy thông tin và tính giá cho một dòng sản phẩm.
+     * Nếu product-service không khả dụng, dùng unitPrice từ frontend (localStorage cart) làm fallback.
      */
     private OrderItem buildOrderItem(CreateOrderRequest.OrderItemRequest itemReq) {
-        ProductInfo product = productClient.getProduct(itemReq.getProductId()).getData();
-        if (product == null || !product.isActive()) {
-            throw new BadRequestException("Sản phẩm không tồn tại hoặc đã ngừng bán: " + itemReq.getProductId());
+        BigDecimal price = null;
+        String productName = null;
+        String productId = itemReq.getProductId();
+
+        try {
+            ProductInfo product = productClient.getProduct(productId).getData();
+            if (product != null && product.isActive()) {
+                price = product.getPrice();
+                productName = product.getName();
+            } else if (product != null && !product.isActive()) {
+                throw new BadRequestException("Sản phẩm không tồn tại hoặc đã ngừng bán: " + productId);
+            }
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Không thể lấy thông tin sản phẩm {} từ product-service ({}), dùng giá từ request", productId, e.getMessage());
         }
-        BigDecimal subtotal = product.getPrice().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+
+        // Fallback to client-provided price when product-service is unavailable
+        if (price == null) {
+            price = itemReq.getUnitPrice();
+        }
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Không thể xác định giá sản phẩm: " + productId);
+        }
+        if (productName == null) {
+            productName = StringUtils.hasText(itemReq.getProductName())
+                    ? itemReq.getProductName().trim()
+                    : "Sản phẩm " + productId;
+        }
+
+        BigDecimal subtotal = price.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
         return OrderItem.builder()
-                .productId(product.getId())
-                .productName(product.getName())
+                .productId(productId)
+                .productName(productName)
                 .quantity(itemReq.getQuantity())
-                .unitPrice(product.getPrice())
+                .unitPrice(price)
                 .subtotal(subtotal)
                 .build();
     }
@@ -280,33 +353,42 @@ public class OrderService {
     }
 
     /**
-     * Publish OrderEvent lên Kafka.
-     * Catch tất cả exception để tránh rollback DB vì lỗi Kafka.
-     * TODO: thay bằng Outbox Pattern khi cần đảm bảo at-least-once delivery.
+     * Xây dựng OrderEvent và lưu vào outbox trong cùng transaction nghiệp vụ.
+     * Scheduler sẽ đọc và publish lên Kafka sau — đảm bảo at-least-once delivery.
      */
-    private void publishEvent(Order order, String eventType) {
-        try {
-            OrderEvent event = OrderEvent.builder()
-                    .eventId(UUID.randomUUID())
-                    .eventType(eventType)
-                    .timestamp(Instant.now())
-                    .orderId(order.getId())
-                    .orderNumber(order.getOrderNumber())
-                    .customerId(order.getCustomerId())
-                    .status(order.getStatus())
-                    .totalAmount(order.getTotalAmount())
-                    .items(order.getItems().stream()
+    private void saveOrderEventToOutbox(Order order, String eventType) {
+        OrderEvent event = OrderEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventType(eventType)
+                .timestamp(Instant.now())
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .customerId(order.getCustomerId())
+                .recipientUserId(order.getCustomerId())
+                .recipientEmail(order.getGuestEmail())
+                .status(order.getStatus())
+                .paymentMethod(order.getPaymentMethod() != null ? order.getPaymentMethod().name() : null)
+                .totalAmount(order.getTotalAmount())
+                .shippingFee(order.getShippingFee())
+                .discount(order.getDiscount())
+                .shippingAddress(order.getShippingAddress())
+                .shippingMethod(order.getShippingMethod())
+                .carrierName(order.getCarrierName())
+                .trackingNumber(order.getTrackingNumber())
+                .guestName(order.getGuestName())
+                .guestPhone(order.getGuestPhone())
+                .note(order.getNote())
+                .items(order.getItems().stream()
                         .map(item -> OrderEvent.OrderItemEvent.builder()
-                            .productId(item.getProductId())
-                            .quantity(item.getQuantity())
-                            .build())
+                                .productId(item.getProductId())
+                                .productName(item.getProductName())
+                                .quantity(item.getQuantity())
+                                .unitPrice(item.getUnitPrice())
+                                .subtotal(item.getSubtotal())
+                                .build())
                         .toList())
-                    .build();
-            orderEventProducer.publishOrderEvent(event);
-        } catch (Exception e) {
-            log.warn("Không thể publish Kafka event [{}] cho đơn hàng {}: {}",
-                    eventType, order.getId(), e.getMessage());
-        }
+                .build();
+        outboxEventService.saveEvent("Order", order.getId().toString(), eventType, event);
     }
 
     /**

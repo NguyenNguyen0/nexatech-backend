@@ -32,9 +32,9 @@ public class Address extends BaseEntity {
     String receiverName;
     String phone;
 
-    String province; // Tỉnh/Thành phố
-    String ward;     // Phường/Xã
-    String detail;   // Số nhà, tên đường
+    String province;
+    String ward;
+    String detail;
 
     @Column(name = "latitude", nullable = false)
     Double latitude;
@@ -45,8 +45,17 @@ public class Address extends BaseEntity {
     @Enumerated(EnumType.STRING)
     AddressType addressType;
 
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
     @Column(name = "is_default", nullable = false)
     @Builder.Default
-    boolean isDefault = false;
+    boolean defaultAddress = false;
 
+    public boolean isDefaultAddress() {
+        return defaultAddress;
+    }
+
+    public void setDefaultAddress(boolean value) {
+        this.defaultAddress = value;
+    }
 }

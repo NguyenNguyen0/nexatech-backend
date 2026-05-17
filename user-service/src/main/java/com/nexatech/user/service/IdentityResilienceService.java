@@ -16,7 +16,9 @@ import com.nexatech.user.exception.ErrorCode;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class IdentityResilienceService {
@@ -59,6 +61,16 @@ public class IdentityResilienceService {
         identityClient.removeRealmRolesFromUser(userId, roles);
     }
 
+    /**
+     * Revokes all Keycloak sessions for a user (Redis sid blacklist + Keycloak logout).
+     * Used when admin disables an account so active clients are kicked immediately.
+     */
+    @Retry(name = "identityService")
+    @CircuitBreaker(name = "identityService", fallbackMethod = "onLogoutUserSessionsFailure")
+    public void logoutAllUserSessions(String userId) {
+        identityClient.logoutUserSessions(userId);
+    }
+
     private ApiResponse<String> onCreateUserFailure(KeycloakUserProvisionPayload payload, Throwable throwable) {
         throw new AppException(ErrorCode.DEPENDENCY_UNAVAILABLE);
     }
@@ -81,5 +93,9 @@ public class IdentityResilienceService {
 
     private void onRemoveRealmRolesFailure(String userId, List<RoleRefRequest> roles, Throwable throwable) {
         throw new AppException(ErrorCode.DEPENDENCY_UNAVAILABLE);
+    }
+
+    private void onLogoutUserSessionsFailure(String userId, Throwable throwable) {
+        log.warn("Failed to revoke sessions for user {}: {}", userId, throwable.getMessage());
     }
 }

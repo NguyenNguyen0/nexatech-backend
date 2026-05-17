@@ -1,0 +1,29 @@
+server:
+  port: 8089
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/nexatech_chats}
+    username: ${DB_USERNAME:nexatech}
+    password: ${DB_PASSWORD:nexatech123}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baselineOnMigrate: true
+  data:
+    mongodb:
+      uri: ${MONGO_CHAT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_chats?authSource=admin&authMechanism=SCRAM-SHA-256}
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+app:
+  presence-ttl-seconds: 90
+  last-message-preview-length: 120
+  guest-conversation-ttl-minutes: 1440
+  assignment-agent-roles: STAFF

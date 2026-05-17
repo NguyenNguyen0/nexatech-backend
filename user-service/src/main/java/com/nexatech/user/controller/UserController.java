@@ -95,7 +95,8 @@ public class UserController {
 
     @PutMapping("/{userId}")
     // @RequiresPermission(PermissionsAccept.User.UPDATE)
-    public ApiResponse<UserResponse> updateUser(@PathVariable String userId, @Valid @RequestBody UserUpdatenRequest request) {
+    public ApiResponse<UserResponse> updateUser(@PathVariable String userId,
+            @Valid @RequestBody UserUpdatenRequest request) {
         UserResponse result = userService.updateUser(userId, request);
         if (request != null && request.getRole() != null) {
             adminUserService.updateUserRole(userId, request.getRole());
@@ -106,7 +107,8 @@ public class UserController {
     }
 
     @PutMapping("/{userId}/role")
-    public ApiResponse<Void> updateUserRole(@PathVariable String userId, @Valid @RequestBody UserRoleUpdateRequest request) {
+    public ApiResponse<Void> updateUserRole(@PathVariable String userId,
+            @Valid @RequestBody UserRoleUpdateRequest request) {
         adminUserService.updateUserRole(userId, request.getRole());
         return ApiResponse.<Void>builder().build();
     }

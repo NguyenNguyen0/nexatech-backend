@@ -23,41 +23,55 @@ import feign.Response;
 @FeignClient(name = "keycloak", contextId = "keycloakUser", url = "${openfeign.keycloak.url}")
 public interface KeycloakUserClient {
 
-    @PostMapping(value = "/admin/realms/{realm}/users", consumes = MediaType.APPLICATION_JSON_VALUE)
-    Response createUser(@PathVariable("realm") String realm, @RequestHeader("Authorization") String authorization,
-            @RequestBody KeycloakUserCreationParam body);
+        @PostMapping(value = "/admin/realms/{realm}/users", consumes = MediaType.APPLICATION_JSON_VALUE)
+        Response createUser(@PathVariable("realm") String realm, @RequestHeader("Authorization") String authorization,
+                        @RequestBody KeycloakUserCreationParam body);
 
-    @GetMapping("/admin/realms/{realm}/users")
-    List<Map<String, Object>> listUsers(@PathVariable("realm") String realm, @RequestHeader("Authorization") String authorization,
-            @RequestParam(value = "username", required = false) String username,
-            @RequestParam(value = "email", required = false) String email,
-            @RequestParam(value = "exact", required = false) Boolean exact);
+        @GetMapping("/admin/realms/{realm}/users")
+        List<Map<String, Object>> listUsers(@PathVariable("realm") String realm,
+                        @RequestHeader("Authorization") String authorization,
+                        @RequestParam(value = "username", required = false) String username,
+                        @RequestParam(value = "email", required = false) String email,
+                        @RequestParam(value = "exact", required = false) Boolean exact);
 
-    @GetMapping("/admin/realms/{realm}/users/{userId}")
-    Map<String, Object> getUserById(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
-            @RequestHeader("Authorization") String authorization);
+        @GetMapping("/admin/realms/{realm}/users/{userId}")
+        Map<String, Object> getUserById(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
+                        @RequestHeader("Authorization") String authorization);
 
-    @PutMapping(value = "/admin/realms/{realm}/users/{userId}", consumes = MediaType.APPLICATION_JSON_VALUE)
-    void updateUser(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
-            @RequestHeader("Authorization") String authorization, @RequestBody UserUpdateParam body);
+        @PutMapping(value = "/admin/realms/{realm}/users/{userId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+        void updateUser(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
+                        @RequestHeader("Authorization") String authorization, @RequestBody UserUpdateParam body);
 
-    @DeleteMapping("/admin/realms/{realm}/users/{userId}")
-    void deleteUser(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
-            @RequestHeader("Authorization") String authorization);
+        @DeleteMapping("/admin/realms/{realm}/users/{userId}")
+        void deleteUser(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
+                        @RequestHeader("Authorization") String authorization);
 
-    @GetMapping("/admin/realms/{realm}/users/{userId}/credentials")
-    List<Map<String, Object>> getCredentials(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
-            @RequestHeader("Authorization") String authorization);
+        @GetMapping("/admin/realms/{realm}/users/{userId}/credentials")
+        List<Map<String, Object>> getCredentials(@PathVariable("realm") String realm,
+                        @PathVariable("userId") String userId,
+                        @RequestHeader("Authorization") String authorization);
 
-    @PutMapping(value = "/admin/realms/{realm}/users/{userId}/reset-password", consumes = MediaType.APPLICATION_JSON_VALUE)
-    void resetPassword(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
-            @RequestHeader("Authorization") String authorization, @RequestBody Credential body);
+        @PutMapping(value = "/admin/realms/{realm}/users/{userId}/reset-password", consumes = MediaType.APPLICATION_JSON_VALUE)
+        void resetPassword(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
+                        @RequestHeader("Authorization") String authorization, @RequestBody Credential body);
 
-    @GetMapping("/admin/realms/{realm}/users/{userId}/role-mappings")
-    Map<String, Object> getRoleMappings(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
-            @RequestHeader("Authorization") String authorization);
+        @GetMapping("/admin/realms/{realm}/users/{userId}/role-mappings")
+        Map<String, Object> getRoleMappings(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
+                        @RequestHeader("Authorization") String authorization);
 
-    @GetMapping("/admin/realms/{realm}/users/{userId}/sessions")
-    List<Map<String, Object>> getSessions(@PathVariable("realm") String realm, @PathVariable("userId") String userId,
-            @RequestHeader("Authorization") String authorization);
+        @GetMapping("/admin/realms/{realm}/users/{userId}/sessions")
+        List<Map<String, Object>> getSessions(@PathVariable("realm") String realm,
+                        @PathVariable("userId") String userId,
+                        @RequestHeader("Authorization") String authorization);
+
+        @PostMapping("/admin/realms/{realm}/users/{userId}/logout")
+        void logoutUser(@PathVariable("realm") String realm,
+                        @PathVariable("userId") String userId,
+                        @RequestHeader("Authorization") String authorization);
+
+        @GetMapping("/admin/realms/{realm}/users/{userId}/offline-sessions/{clientUuid}")
+        List<Map<String, Object>> getOfflineSessions(@PathVariable("realm") String realm,
+                        @PathVariable("userId") String userId,
+                        @PathVariable("clientUuid") String clientUuid,
+                        @RequestHeader("Authorization") String authorization);
 }

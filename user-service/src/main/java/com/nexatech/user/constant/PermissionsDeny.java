@@ -3,9 +3,12 @@ package com.nexatech.user.constant;
 import java.util.List;
 
 /**
- * Realm role names that <strong>deny</strong> a matching grant (suffix {@code _DENY});
- * see {@link com.nexatech.user.config.security.EffectiveRealmAuthoritiesResolver}.
- * Each entry corresponds to a grant in {@link PermissionsAccept} with {@code _DENY} appended.
+ * Realm role names that <strong>deny</strong> a matching grant (suffix
+ * {@code _DENY});
+ * see
+ * {@link com.nexatech.user.config.security.EffectiveRealmAuthoritiesResolver}.
+ * Each entry corresponds to a grant in {@link PermissionsAccept} with
+ * {@code _DENY} appended.
  */
 public final class PermissionsDeny {
 
@@ -22,15 +25,6 @@ public final class PermissionsDeny {
         public static final String UPDATE = "USER_UPDATE_DENY";
         public static final String DELETE = "USER_DELETE_DENY";
         public static final String ENABLE = "USER_ENABLE_DENY";
-    }
-
-    /** Deny counterparts for {@link PermissionsAccept.Group}. */
-    public static final class Group {
-        private Group() {
-        }
-
-        public static final String READ = "GROUP_READ_DENY";
-        public static final String WRITE = "GROUP_WRITE_DENY";
     }
 
     /** Deny counterparts for {@link PermissionsAccept.RealmRole}. */
@@ -59,8 +53,6 @@ public final class PermissionsDeny {
                 User.UPDATE,
                 User.DELETE,
                 User.ENABLE,
-                Group.READ,
-                Group.WRITE,
                 RealmRole.READ,
                 RealmRole.WRITE,
                 Definition.READ,

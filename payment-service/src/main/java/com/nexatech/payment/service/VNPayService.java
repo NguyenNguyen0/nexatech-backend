@@ -6,7 +6,6 @@ import com.nexatech.payment.dto.VNPayResponse;
 import com.nexatech.payment.enums.PaymentMethod;
 import com.nexatech.payment.enums.PaymentStatus;
 import com.nexatech.payment.event.PaymentEvent;
-import com.nexatech.payment.event.PaymentEventProducer;
 import com.nexatech.payment.exception.BadRequestException;
 import com.nexatech.payment.model.Payment;
 import com.nexatech.payment.repository.PaymentRepository;
@@ -29,7 +28,8 @@ public class VNPayService {
 
     private final VNPayConfig vnPayConfig;
     private final PaymentRepository paymentRepository;
-    private final PaymentEventProducer paymentEventProducer;
+    private final OutboxEventService outboxEventService;
+    private final AuditLogService auditLogService;
 
     /**
      * Tạo URL thanh toán VNPay và lưu giao dịch với trạng thái PENDING.
@@ -78,8 +78,10 @@ public class VNPayService {
     public Map<String, String> processIpn(Map<String, String> params) {
         Map<String, String> result = new LinkedHashMap<>();
 
-        // Tách vnp_SecureHash ra để xác thực — KHÔNG đưa vào tính hash
+        // Tách vnp_SecureHash và vnp_SecureHashType ra trước khi tính hash
+        // VNPay v2.1.0 có thể gửi thêm vnp_SecureHashType (vd: SHA512) trong callback
         String receivedHash = params.remove("vnp_SecureHash");
+        params.remove("vnp_SecureHashType");
 
         // Tính lại chữ ký từ params còn lại
         String hashData = VNPayUtil.buildHashData(params);
@@ -116,14 +118,18 @@ public class VNPayService {
             // Thanh toán thành công
             payment.setStatus(PaymentStatus.COMPLETED);
             paymentRepository.save(payment);
-            publishEvent(payment, "PAYMENT_COMPLETED");
+            savePaymentEventToOutbox(payment, "PAYMENT_COMPLETED");
+            auditLogService.log("VNPAY_PAYMENT_COMPLETED", "Payment", payment.getId().toString(),
+                    "orderId=" + payment.getOrderId(), "vnpay");
             log.info("IPN: thanh toán VNPay thành công — orderId={}", payment.getOrderId());
         } else {
             // Thanh toán thất bại (user hủy / hết hạn / lỗi ngân hàng)
             payment.setStatus(PaymentStatus.FAILED);
             payment.setFailureReason("VNPay response code: " + responseCode);
             paymentRepository.save(payment);
-            publishEvent(payment, "PAYMENT_FAILED");
+            savePaymentEventToOutbox(payment, "PAYMENT_FAILED");
+            auditLogService.log("VNPAY_PAYMENT_FAILED", "Payment", payment.getId().toString(),
+                    "responseCode=" + responseCode, "vnpay");
             log.warn("IPN: thanh toán VNPay thất bại — responseCode={}, orderId={}", responseCode, payment.getOrderId());
         }
 
@@ -141,6 +147,7 @@ public class VNPayService {
         Map<String, String> result = new LinkedHashMap<>(params);
 
         String receivedHash = params.remove("vnp_SecureHash");
+        params.remove("vnp_SecureHashType");
         String hashData = VNPayUtil.buildHashData(params);
         String expectedHash = VNPayUtil.hmacSha512(vnPayConfig.getHashSecret(), hashData);
 
@@ -149,6 +156,17 @@ public class VNPayService {
         result.put("success", valid && "00".equals(params.get("vnp_ResponseCode")) ? "true" : "false");
 
         return result;
+    }
+
+    /**
+     * Tra cứu orderId từ txnRef (payment UUID không dấu gạch ngang).
+     * Dùng khi xử lý redirect về frontend sau thanh toán VNPAY.
+     */
+    public String getOrderIdByTxnRef(String txnRef) {
+        if (txnRef == null || txnRef.isBlank()) return null;
+        return paymentRepository.findByTransactionId(txnRef)
+                .map(p -> p.getOrderId().toString())
+                .orElse(null);
     }
 
     // ==================== Private helpers ====================
@@ -187,22 +205,17 @@ public class VNPayService {
         return vnPayConfig.getPaymentUrl() + "?" + VNPayUtil.buildQueryString(params);
     }
 
-    private void publishEvent(Payment payment, String eventType) {
-        try {
-            PaymentEvent event = PaymentEvent.builder()
-                    .eventId(UUID.randomUUID())
-                    .eventType(eventType)
-                    .timestamp(Instant.now())
-                    .paymentId(payment.getId())
-                    .orderId(payment.getOrderId())
-                    .customerId(payment.getCustomerId())
-                    .amount(payment.getAmount())
-                    .status(payment.getStatus())
-                    .build();
-            paymentEventProducer.publishPaymentEvent(event);
-        } catch (Exception e) {
-            log.warn("Không thể publish event [{}] cho paymentId {}: {}",
-                    eventType, payment.getId(), e.getMessage());
-        }
+    private void savePaymentEventToOutbox(Payment payment, String eventType) {
+        PaymentEvent event = PaymentEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventType(eventType)
+                .timestamp(Instant.now())
+                .paymentId(payment.getId())
+                .orderId(payment.getOrderId())
+                .customerId(payment.getCustomerId())
+                .amount(payment.getAmount())
+                .status(payment.getStatus())
+                .build();
+        outboxEventService.saveEvent("Payment", payment.getId().toString(), eventType, event);
     }
 }

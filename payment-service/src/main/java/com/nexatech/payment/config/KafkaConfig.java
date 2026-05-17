@@ -1,5 +1,6 @@
 package com.nexatech.payment.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -7,10 +8,14 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -40,8 +45,23 @@ public class KafkaConfig {
     }
 
     @Bean
+    @Primary
     public KafkaTemplate<Object, Object> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
+    }
+
+    /**
+     * KafkaTemplate dùng StringSerializer — cho OutboxEventPublisher.
+     * Tránh double-encoding JSON khi payload đã là String.
+     */
+    @Bean("stringKafkaTemplate")
+    public KafkaTemplate<String, String> stringKafkaTemplate() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        ProducerFactory<String, String> factory = new DefaultKafkaProducerFactory<>(props);
+        return new KafkaTemplate<>(factory);
     }
 
     @Bean
@@ -55,11 +75,25 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
+    /**
+     * Container factory với Dead Letter Queue (DLQ):
+     * - Retry tối đa 3 lần (1 giây giữa mỗi lần) cho transient errors (DB, network)
+     * - Messages lỗi vĩnh viễn (sau 3 retry) được đẩy sang topic "{original-topic}.DLT"
+     * - JSON parse errors không retry (non-retryable) — gửi thẳng DLT
+     */
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {
+    public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
+            KafkaTemplate<String, String> stringKafkaTemplate) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
+
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(stringKafkaTemplate);
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 3));
+        // Không retry khi JSON không parse được — retry sẽ luôn thất bại
+        errorHandler.addNotRetryableExceptions(JsonProcessingException.class);
+        factory.setCommonErrorHandler(errorHandler);
+
         return factory;
     }
 }

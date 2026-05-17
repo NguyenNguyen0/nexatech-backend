@@ -32,7 +32,7 @@
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
         }
         .header {
-            background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+            background: linear-gradient(135deg, #004d75 0%, #0077b6 55%, #00a8e8 100%);
             padding: 40px 32px;
             text-align: center;
         }
@@ -69,7 +69,7 @@
         .cta-btn {
             display: inline-block;
             padding: 16px 48px;
-            background: linear-gradient(135deg, #1a73e8 0%, #1565c0 100%);
+            background: linear-gradient(135deg, #004d75 0%, #0077b6 100%);
             color: #ffffff;
             text-decoration: none;
             border-radius: 8px;
@@ -87,7 +87,7 @@
             border: 1px solid #e8eaed;
         }
         .link-fallback a {
-            color: #1a73e8;
+            color: #0077b6;
             text-decoration: none;
         }
         .divider {
@@ -119,29 +119,29 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>Verify Your Email Address</h1>
-            <p>One more step to activate your NexaTech account</p>
+            <h1>Xác minh địa chỉ email</h1>
+            <p>Một bước nữa để kích hoạt tài khoản NexaTech</p>
         </div>
 
         <!-- Body -->
         <div class="body-content">
-            <p class="greeting">Hi <strong th:text="${displayName}">there</strong>,</p>
-            <p>Thanks for signing up for NexaTech! Please verify your email address by clicking the button below:</p>
+            <p class="greeting">Xin chào <strong th:text="${displayName}">bạn</strong>,</p>
+            <p>Cảm ơn bạn đã đăng ký NexaTech! Vui lòng xác minh email bằng cách nhấn nút bên dưới:</p>
 
             <div class="cta-wrapper">
-                <a class="cta-btn" th:href="${verificationUrl}">Verify My Email</a>
+                <a class="cta-btn" th:href="${verificationUrl}">Xác minh email</a>
             </div>
 
             <div class="link-fallback">
-                <strong>Button not working?</strong> Copy and paste this link into your browser:<br/>
+                <strong>Nút không hoạt động?</strong> Sao chép liên kết sau vào trình duyệt:<br/>
                 <a th:href="${verificationUrl}" th:text="${verificationUrl}">https://nexatech.com/verify?token=xxx</a>
             </div>
 
             <hr class="divider"/>
 
             <p class="note">
-                This verification link will expire in <strong>24 hours</strong>.<br/>
-                If you didn't create a NexaTech account, you can safely ignore this email.
+                Liên kết xác minh sẽ hết hạn sau <strong>24 giờ</strong>.<br/>
+                Nếu bạn không tạo tài khoản NexaTech, hãy bỏ qua email này.
             </p>
         </div>
 

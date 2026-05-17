@@ -32,5 +32,12 @@ public class UserTokenExchangeResponse {
 
     String sessionState;
     String scope;
+    Boolean requiresPasswordChange;
+    /**
+     * True when this social login created a new account (first-time Google sign-up).
+     * Serialized as {@code new_user} for API clients.
+     */
+    @JsonProperty("new_user")
+    Boolean newUser;
 }
 

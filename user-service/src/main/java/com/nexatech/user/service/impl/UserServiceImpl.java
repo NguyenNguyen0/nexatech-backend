@@ -26,6 +26,7 @@ import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.IdentityUserUpdateRequest;
 import com.nexatech.user.dto.request.UserCreationRequest;
+import com.nexatech.user.dto.request.UserProfileSyncRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.response.OnboardingStatusResponse;
 import com.nexatech.user.dto.response.UserResponse;
@@ -134,11 +135,13 @@ public class UserServiceImpl implements UserService {
         return new PageResponse<>(pageUsers);
     }
 
+    private static final List<String> ROLE_PRIORITY = List.of("ADMIN", "MANAGER", "STAFF", "WAREHOUSE", "ACCOUNTANT", "CUSTOMER");
+
     @Override
     public UserResponse getUserById(String id) {
         User user = userRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        return enrichAuditUsernames(userMapper.toResponse(user));
+        return mapToUserResponseWithRole(user);
     }
 
     @Transactional
@@ -164,7 +167,7 @@ public class UserServiceImpl implements UserService {
             syncUserToIdentity(updatedUser, true);
         }
 
-        return enrichAuditUsernames(userMapper.toResponse(updatedUser));
+        return mapToUserResponseWithRole(updatedUser);
     }
 
     /**
@@ -206,7 +209,18 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
         user.setActive(false);
         User deletedUser = userRepository.save(user);
+        revokeAllUserSessionsQuietly(id);
         syncUserToIdentity(deletedUser, false);
+    }
+
+    /** {@link com.nexatech.identity.service.SessionService#logoutUser} — đá mọi thiết bị đang đăng nhập. */
+    private void revokeAllUserSessionsQuietly(String userId) {
+        try {
+            identityResilienceService.logoutAllUserSessions(userId);
+            log.info("Revoked all login sessions for disabled user {}", userId);
+        } catch (Exception ex) {
+            log.warn("User {} disabled but session revoke failed: {}", userId, ex.getMessage());
+        }
     }
 
     @Transactional
@@ -234,9 +248,6 @@ public class UserServiceImpl implements UserService {
     public void requestEmailVerificationOtp(String userId) {
         User user = userRepository.findByIdAndActiveTrue(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-        if (Boolean.TRUE.equals(user.getOnBoarded())) {
-            return;
-        }
 
         String otp = generateOtp();
         Instant expiresAt = Instant.now().plusSeconds(OTP_TTL_SECONDS);
@@ -326,28 +337,36 @@ public class UserServiceImpl implements UserService {
             ApiResponse<Map<String, Object>> roleMappings = identityResilienceService.getUserRoleMappings(userId);
             Map<String, Object> payload = roleMappings != null ? roleMappings.getResult() : null;
             if (payload == null) {
-                return null;
+                return "UNASSIGNED";
             }
             Object realmMappingsObj = payload.get("realmMappings");
             if (!(realmMappingsObj instanceof List<?> realmMappings) || realmMappings.isEmpty()) {
-                return null;
+                return "UNASSIGNED";
             }
-            for (Object roleItem : realmMappings) {
-                if (!(roleItem instanceof Map<?, ?> roleMap)) {
-                    continue;
-                }
-                Object roleNameObj = roleMap.get("name");
-                if (roleNameObj == null) {
-                    continue;
-                }
-                String roleName = roleNameObj.toString().trim();
-                if (!roleName.isEmpty()) {
-                    return roleName.toUpperCase(Locale.ROOT);
-                }
+
+            List<String> roles = realmMappings.stream()
+                    .filter(item -> item instanceof Map)
+                    .map(item -> (Map<?, ?>) item)
+                    .map(map -> map.get("name"))
+                    .filter(Objects::nonNull)
+                    .map(Object::toString)
+                    .map(String::trim)
+                    .filter(name -> !name.isEmpty() && !name.startsWith("default-roles-"))
+                    .map(name -> name.toUpperCase(Locale.ROOT))
+                    .collect(Collectors.toList());
+
+            if (roles.isEmpty()) {
+                return "UNASSIGNED";
             }
-            return null;
+
+            // Return first role based on priority, otherwise the first role in the list
+            return ROLE_PRIORITY.stream()
+                    .filter(roles::contains)
+                    .findFirst()
+                    .orElse(roles.get(0));
         } catch (Exception ex) {
-            return null;
+            log.warn("Failed to resolve primary role for userId={}: {}", userId, ex.getMessage());
+            return "UNASSIGNED";
         }
     }
 
@@ -449,4 +468,143 @@ public class UserServiceImpl implements UserService {
         return at > 0 && at < email.length() - 1;
     }
 
+    @Override
+    @Transactional
+    public void updatePasswordChangeRequired(String userId, boolean required) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        user.setRequiresPasswordChange(required);
+        userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse syncProfileFromSocialLogin(String userId, UserProfileSyncRequest request) {
+        if (userId == null || userId.isBlank()) {
+            throw new AppException(ErrorCode.USER_NOT_FOUND);
+        }
+        if (request == null) {
+            throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
+        }
+
+        java.util.Optional<User> existing = userRepository.findById(userId);
+        if (existing.isEmpty()) {
+            String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
+            String username = request.getUsername();
+            if (email == null || email.isBlank() || username == null || username.isBlank()) {
+                throw new AppException(ErrorCode.USER_NOT_FOUND);
+            }
+            if (userRepository.existsByEmail(email)) {
+                User byEmail = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+                return updateUser(byEmail.getId(), toUpdateRequest(request));
+            }
+            UserCreationRequest create = UserCreationRequest.builder()
+                    .id(userId)
+                    .email(email)
+                    .username(username.trim())
+                    .firstName(blankToNull(request.getFirstName()))
+                    .lastName(blankToNull(request.getLastName()))
+                    .avatarUrl(blankToNull(request.getAvatarUrl()))
+                    .onBoarded(false)
+                    .build();
+            return createUser(create);
+        }
+
+        return updateUser(userId, toUpdateRequest(request));
+    }
+
+    private static UserUpdatenRequest toUpdateRequest(UserProfileSyncRequest request) {
+        UserUpdatenRequest.UserUpdatenRequestBuilder builder = UserUpdatenRequest.builder();
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            builder.email(request.getEmail().trim().toLowerCase());
+        }
+        if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
+            builder.firstName(request.getFirstName().trim());
+        }
+        if (request.getLastName() != null && !request.getLastName().isBlank()) {
+            builder.lastName(request.getLastName().trim());
+        }
+        if (request.getAvatarUrl() != null && !request.getAvatarUrl().isBlank()) {
+            builder.avatarUrl(request.getAvatarUrl().trim());
+        }
+        return builder.build();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void assertAccountActiveForLogin(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new AppException(ErrorCode.USER_NOT_FOUND);
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (!Boolean.TRUE.equals(user.getActive())) {
+            throw new AppException(ErrorCode.USER_ACCOUNT_DISABLED);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Map<String, String> resolveLoginIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+        }
+        String trimmed = identifier.trim();
+
+        if (trimmed.contains("@")) {
+            User user = userRepository.findByEmail(trimmed.toLowerCase(java.util.Locale.ROOT))
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+            return java.util.Map.of("username", user.getUsername(), "userId", user.getId());
+        }
+
+        if (isLikelyPhone(trimmed)) {
+            User user = findUserByPhone(trimmed)
+                    .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+            return java.util.Map.of("username", user.getUsername(), "userId", user.getId());
+        }
+
+        return userRepository.findByUsername(trimmed)
+                .map(user -> java.util.Map.of("username", user.getUsername(), "userId", user.getId()))
+                .orElse(java.util.Map.of("username", trimmed));
+    }
+
+    private static boolean isLikelyPhone(String raw) {
+        String stripped = raw.replaceAll("[\\s\\-().]", "");
+        if (stripped.startsWith("+")) {
+            stripped = stripped.substring(1);
+        }
+        return stripped.matches("\\d{9,15}");
+    }
+
+    private java.util.Optional<User> findUserByPhone(String raw) {
+        for (String candidate : phoneLookupCandidates(raw)) {
+            java.util.Optional<User> found = userRepository.findByPhone(candidate);
+            if (found.isPresent()) {
+                return found;
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    private static java.util.List<String> phoneLookupCandidates(String raw) {
+        String digits = raw.replaceAll("\\D", "");
+        java.util.LinkedHashSet<String> candidates = new java.util.LinkedHashSet<>();
+        candidates.add(raw.trim());
+        if (!digits.isEmpty()) {
+            candidates.add(digits);
+            if (digits.startsWith("84") && digits.length() >= 11) {
+                candidates.add("0" + digits.substring(2));
+                candidates.add("+" + digits);
+            } else if (digits.startsWith("0")) {
+                candidates.add("+84" + digits.substring(1));
+                candidates.add("84" + digits.substring(1));
+            }
+        }
+        return new java.util.ArrayList<>(candidates);
+    }
 }

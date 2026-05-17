@@ -184,6 +184,35 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "forgot-password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{loginUsername}}\"\n}"
+            },
+            "url": {
+              "raw": "{{gatewayBaseUrl}}/api/v1/auth/forgot-password",
+              "host": [
+                "{{gatewayBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "forgot-password"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },

@@ -1,0 +1,309 @@
+{
+  "info": {
+    "_postman_id": "8a3d4f0a-219c-45b2-9e34-111111111111",
+    "name": "Shipping Service API Check (Nexatech)",
+    "description": "Test Shipping Service with Mock provider and GHN sandbox provider. To test GHN, start shipping-service with SHIPPING_PROVIDER=ghn and set GHN_TOKEN, GHN_SHOP_ID, GHN_FROM_DISTRICT_ID, GHN_FROM_WARD_CODE in the service environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Mock Provider",
+      "description": "Use when shipping.provider=mock or SHIPPING_PROVIDER=mock.",
+      "item": [
+        {
+          "name": "Calculate Fee - Mock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "ship-mock-{{$timestamp}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"ORDER-SHIP-MOCK-001\",\n  \"toDistrictId\": 1454,\n  \"toWardCode\": \"21211\",\n  \"customerProvince\": \"TP. Ho Chi Minh\",\n  \"customerDistrict\": \"Quan 1\",\n  \"customerWard\": \"Ben Nghe\",\n  \"customerAddress\": \"123 Nguyen Hue\",\n  \"weight\": 1800,\n  \"length\": 30,\n  \"width\": 20,\n  \"height\": 10,\n  \"insuranceValue\": 1000000,\n  \"serviceTypeId\": 2\n}"
+            },
+            "url": {
+              "raw": "{{shippingBaseUrl}}/api/v1/shipping/fee",
+              "host": [
+                "{{shippingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shipping",
+                "fee"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Shipment - Mock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.data && json.data.trackingCode) {",
+                  "  pm.environment.set('shippingTrackingCode', json.data.trackingCode);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "ship-ghn-{{$timestamp}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"ORDER-SHIP-MOCK-001\",\n  \"customerName\": \"Nguyen Van A\",\n  \"customerPhone\": \"0909123456\",\n  \"customerAddress\": \"123 Nguyen Hue\",\n  \"customerProvince\": \"TP. Ho Chi Minh\",\n  \"customerDistrict\": \"Quan 1\",\n  \"customerWard\": \"Ben Nghe\",\n  \"toDistrictId\": 1454,\n  \"toWardCode\": \"21211\",\n  \"weight\": 1800,\n  \"length\": 30,\n  \"width\": 20,\n  \"height\": 10,\n  \"codAmount\": 0,\n  \"insuranceValue\": 1000000,\n  \"serviceTypeId\": 2,\n  \"items\": [\n    {\n      \"name\": \"Laptop NexaTech\",\n      \"quantity\": 1,\n      \"price\": 15000000,\n      \"weight\": 1800,\n      \"length\": 30,\n      \"width\": 20,\n      \"height\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{shippingBaseUrl}}/api/v1/shipping/shipments",
+              "host": [
+                "{{shippingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shipping",
+                "shipments"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Tracking - Mock",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{shippingBaseUrl}}/api/v1/shipping/shipments/{{shippingTrackingCode}}/tracking",
+              "host": [
+                "{{shippingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shipping",
+                "shipments",
+                "{{shippingTrackingCode}}",
+                "tracking"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Mock Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_TRANSIT\",\n  \"lat\": 10.7769,\n  \"lng\": 106.7009,\n  \"locationAddress\": \"Quan 1, TP.HCM\",\n  \"note\": \"Don hang dang duoc van chuyen\"\n}"
+            },
+            "url": {
+              "raw": "{{shippingBaseUrl}}/api/v1/shipping/mock/{{shippingTrackingCode}}/status",
+              "host": [
+                "{{shippingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shipping",
+                "mock",
+                "{{shippingTrackingCode}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel Shipment - Mock",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{shippingBaseUrl}}/api/v1/shipping/shipments/{{shippingTrackingCode}}/cancel",
+              "host": [
+                "{{shippingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shipping",
+                "shipments",
+                "{{shippingTrackingCode}}",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Shipment By Order - Mock",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{shippingBaseUrl}}/api/v1/shipping/orders/ORDER-SHIP-MOCK-001",
+              "host": [
+                "{{shippingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shipping",
+                "orders",
+                "ORDER-SHIP-MOCK-001"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "GHN Provider",
+      "description": "Use when shipping.provider=ghn or SHIPPING_PROVIDER=ghn. Required service env: GHN_TOKEN, GHN_SHOP_ID, GHN_FROM_DISTRICT_ID, GHN_FROM_WARD_CODE.",
+      "item": [
+        {
+          "name": "Calculate Fee - GHN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"ORDER-SHIP-GHN-001\",\n  \"toDistrictId\": 1454,\n  \"toWardCode\": \"21211\",\n  \"customerProvince\": \"TP. Ho Chi Minh\",\n  \"customerDistrict\": \"Quan 1\",\n  \"customerWard\": \"Ben Nghe\",\n  \"customerAddress\": \"123 Nguyen Hue\",\n  \"weight\": 1800,\n  \"length\": 30,\n  \"width\": 20,\n  \"height\": 10,\n  \"insuranceValue\": 1000000,\n  \"serviceTypeId\": 2\n}"
+            },
+            "url": {
+              "raw": "{{shippingBaseUrl}}/api/v1/shipping/fee",
+              "host": [
+                "{{shippingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shipping",
+                "fee"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Shipment - GHN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.data && json.data.trackingCode) {",
+                  "  pm.environment.set('shippingTrackingCode', json.data.trackingCode);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"ORDER-SHIP-GHN-001\",\n  \"customerName\": \"Nguyen Van A\",\n  \"customerPhone\": \"0909123456\",\n  \"customerAddress\": \"123 Nguyen Hue\",\n  \"customerProvince\": \"TP. Ho Chi Minh\",\n  \"customerDistrict\": \"Quan 1\",\n  \"customerWard\": \"Ben Nghe\",\n  \"toDistrictId\": 1454,\n  \"toWardCode\": \"21211\",\n  \"weight\": 1800,\n  \"length\": 30,\n  \"width\": 20,\n  \"height\": 10,\n  \"codAmount\": 0,\n  \"insuranceValue\": 1000000,\n  \"serviceTypeId\": 2,\n  \"items\": [\n    {\n      \"name\": \"Laptop NexaTech\",\n      \"quantity\": 1,\n      \"price\": 15000000,\n      \"weight\": 1800,\n      \"length\": 30,\n      \"width\": 20,\n      \"height\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{shippingBaseUrl}}/api/v1/shipping/shipments",
+              "host": [
+                "{{shippingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shipping",
+                "shipments"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Tracking - GHN",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{shippingBaseUrl}}/api/v1/shipping/shipments/{{shippingTrackingCode}}/tracking",
+              "host": [
+                "{{shippingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shipping",
+                "shipments",
+                "{{shippingTrackingCode}}",
+                "tracking"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Cancel Shipment - GHN Not Implemented",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{shippingBaseUrl}}/api/v1/shipping/shipments/{{shippingTrackingCode}}/cancel",
+              "host": [
+                "{{shippingBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "shipping",
+                "shipments",
+                "{{shippingTrackingCode}}",
+                "cancel"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "shippingBaseUrl",
+      "value": "http://localhost:8091"
+    },
+    {
+      "key": "shippingTrackingCode",
+      "value": "NX-SHIP-CHANGE-ME"
+    }
+  ]
+}

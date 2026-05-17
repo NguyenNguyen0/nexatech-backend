@@ -23,4 +23,12 @@ public class UserTokenExchangeParam {
     String client_id;
     String client_secret;
     String scope;
+    /** Token exchange: service account access token. */
+    String subject_token;
+    /** Token exchange: target Keycloak user id. */
+    String requested_subject;
+    /** Token exchange: audience (typically the same client_id). */
+    String audience;
+    /** Token exchange: requested token type (access_token). */
+    String requested_token_type;
 }

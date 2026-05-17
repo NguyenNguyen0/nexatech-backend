@@ -33,6 +33,7 @@ public class UserResponse {
 
     Boolean onBoarded;
     Boolean active;
+    Boolean requiresPasswordChange;
     String role;
     String createdBy;
     String updatedBy;

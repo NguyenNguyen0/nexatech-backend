@@ -15,7 +15,7 @@ import java.util.UUID;
 public class PaymentClientFallback implements PaymentClient {
 
     @Override
-    public ApiResponse<PaymentInfo> createPayment(UUID customerId, CreatePaymentDto request) {
+    public ApiResponse<PaymentInfo> createPayment(UUID customerId, String idempotencyKey, CreatePaymentDto request) {
         log.warn("Fallback: payment-service createPayment không khả dụng, orderId={}", request.getOrderId());
         return ApiResponse.<PaymentInfo>builder().success(false).message("Payment service unavailable").build();
     }
