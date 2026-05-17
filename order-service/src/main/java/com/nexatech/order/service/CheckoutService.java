@@ -47,6 +47,7 @@ public class CheckoutService {
                         var item = new CreateOrderRequest.OrderItemRequest();
                         item.setProductId(i.getProductId());
                         item.setQuantity(i.getQuantity());
+                        item.setUnitPrice(i.getUnitPrice());
                         return item;
                     })
                     .collect(Collectors.toList());
@@ -102,6 +103,17 @@ public class CheckoutService {
                 compensateOrderAfterPaymentFailure(customerId, order.getId(), "Payment creation failed");
             }
             paymentId = paymentResp.getData().getId();
+
+            // COD orders: auto-confirm immediately (no upfront payment needed)
+            // This triggers ORDER_STATUS_UPDATED:CONFIRMED → shipping-service creates GHN shipment
+            if (request.getPaymentMethod() == PaymentMethod.COD) {
+                try {
+                    orderService.updateOrderStatus(order.getId(), com.nexatech.order.enums.OrderStatus.CONFIRMED);
+                    log.info("COD order auto-confirmed: orderId={}", order.getId());
+                } catch (Exception e) {
+                    log.error("Failed to auto-confirm COD order {}: {}", order.getId(), e.getMessage());
+                }
+            }
         }
 
         // 5. Xóa cart (chỉ khi đăng nhập — Redis cart)

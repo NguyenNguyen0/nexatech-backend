@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -229,8 +230,8 @@ public class OrderService {
     public OrderResponse cancelOrder(UUID customerId, UUID orderId) {
         Order order = findById(orderId);
 
-        // Xác thực quyền sở hữu
-        if (!order.getCustomerId().equals(customerId)) {
+        // Xác thực quyền sở hữu (dùng Objects.equals để tránh NPE với guest orders)
+        if (!Objects.equals(order.getCustomerId(), customerId)) {
             throw new ForbiddenException("Bạn không có quyền huỷ đơn hàng này");
         }
 
@@ -271,18 +272,44 @@ public class OrderService {
 
     /**
      * Gọi product-service lấy thông tin và tính giá cho một dòng sản phẩm.
+     * Nếu product-service không khả dụng, dùng unitPrice từ frontend (localStorage cart) làm fallback.
      */
     private OrderItem buildOrderItem(CreateOrderRequest.OrderItemRequest itemReq) {
-        ProductInfo product = productClient.getProduct(itemReq.getProductId()).getData();
-        if (product == null || !product.isActive()) {
-            throw new BadRequestException("Sản phẩm không tồn tại hoặc đã ngừng bán: " + itemReq.getProductId());
+        BigDecimal price = null;
+        String productName = null;
+        String productId = itemReq.getProductId();
+
+        try {
+            ProductInfo product = productClient.getProduct(productId).getData();
+            if (product != null && product.isActive()) {
+                price = product.getPrice();
+                productName = product.getName();
+            } else if (product != null && !product.isActive()) {
+                throw new BadRequestException("Sản phẩm không tồn tại hoặc đã ngừng bán: " + productId);
+            }
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Không thể lấy thông tin sản phẩm {} từ product-service ({}), dùng giá từ request", productId, e.getMessage());
         }
-        BigDecimal subtotal = product.getPrice().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+
+        // Fallback to client-provided price when product-service is unavailable
+        if (price == null) {
+            price = itemReq.getUnitPrice();
+        }
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Không thể xác định giá sản phẩm: " + productId);
+        }
+        if (productName == null) {
+            productName = "Sản phẩm " + productId;
+        }
+
+        BigDecimal subtotal = price.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
         return OrderItem.builder()
-                .productId(product.getId())
-                .productName(product.getName())
+                .productId(productId)
+                .productName(productName)
                 .quantity(itemReq.getQuantity())
-                .unitPrice(product.getPrice())
+                .unitPrice(price)
                 .subtotal(subtotal)
                 .build();
     }

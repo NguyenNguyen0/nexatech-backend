@@ -10,8 +10,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
 
@@ -71,17 +71,27 @@ public class VNPayController {
         // Look up orderId from payment record using txnRef
         String orderId = vnPayService.getOrderIdByTxnRef(txnRef);
 
-        String redirectUrl;
+        java.net.URI redirectUri;
         if (success && orderId != null) {
-            redirectUrl = frontendUrl + "/cart/checkout/success?orderId=" + orderId
-                    + "&orderNumber=" + result.getOrDefault("vnp_OrderInfo", "")
-                    + "&paymentMethod=VNPAY";
+            // Use UriComponentsBuilder to safely encode vnp_OrderInfo (may contain spaces)
+            redirectUri = UriComponentsBuilder.fromUriString(frontendUrl)
+                    .path("/cart/checkout/success")
+                    .queryParam("orderId", orderId)
+                    .queryParam("orderNumber", result.getOrDefault("vnp_OrderInfo", ""))
+                    .queryParam("paymentMethod", "VNPAY")
+                    .build()
+                    .encode()
+                    .toUri();
         } else {
-            redirectUrl = frontendUrl + "/cart?paymentFailed=true";
+            redirectUri = UriComponentsBuilder.fromUriString(frontendUrl)
+                    .path("/cart")
+                    .queryParam("paymentFailed", "true")
+                    .build()
+                    .toUri();
         }
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setLocation(URI.create(redirectUrl));
+        headers.setLocation(redirectUri);
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 }

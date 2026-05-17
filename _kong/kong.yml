@@ -31,6 +31,10 @@ services:
 
   - name: order-service
     url: http://order-service:8084
+    connect_timeout: 10000
+    read_timeout: 60000
+    write_timeout: 10000
+    retries: 3
     routes:
       - name: order-route
         paths:
@@ -51,6 +55,10 @@ services:
 
   - name: payment-service
     url: http://payment-service:8086
+    connect_timeout: 10000
+    read_timeout: 60000
+    write_timeout: 10000
+    retries: 3
     routes:
       - name: payment-route
         paths:
@@ -60,6 +68,10 @@ services:
 
   - name: shipping-service
     url: http://shipping-service:8091
+    connect_timeout: 10000
+    read_timeout: 60000
+    write_timeout: 10000
+    retries: 3
     routes:
       - name: shipping-route
         paths:
