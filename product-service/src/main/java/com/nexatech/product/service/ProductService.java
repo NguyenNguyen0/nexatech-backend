@@ -38,6 +38,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -307,6 +308,26 @@ public class ProductService {
             .toList();
     }
 
+            public Page<ProductResponse> getProductsByTags(List<String> tags, Pageable pageable) {
+            List<String> normalizedTags = normalizeTags(tags);
+            if (normalizedTags.isEmpty()) {
+                throw new BadRequestException("tags must not be empty");
+            }
+
+            Pageable safePageable = sanitizePageable(pageable, Sort.by(Sort.Direction.DESC, "createdAt"));
+            Criteria finalCriteria = new Criteria().andOperator(
+                Criteria.where("active").is(true),
+                anyTagCriteria(normalizedTags));
+
+            Query query = Query.query(finalCriteria).with(safePageable);
+            List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
+                .map(p -> enrichProductResponse(productMapper.toResponse(p)))
+                .toList();
+
+            long total = mongoTemplate.count(Query.query(finalCriteria), Product.class);
+            return new PageImpl<>(content, safePageable, total);
+            }
+
     public Page<ProductResponse> getProductsByCategory(String categoryId, Pageable pageable) {
         validateCategory(categoryId);
 
@@ -536,6 +557,28 @@ public class ProductService {
             return Criteria.where(fieldName).nin(idValue, new ObjectId(idValue));
         }
         return Criteria.where(fieldName).ne(idValue);
+    }
+
+    private Criteria anyTagCriteria(List<String> tags) {
+        List<Criteria> tagCriteria = tags.stream()
+                .map(tag -> Criteria.where("tags").regex("^" + Pattern.quote(tag) + "$", "i"))
+                .toList();
+        return new Criteria().orOperator(tagCriteria.toArray(new Criteria[0]));
+    }
+
+    private List<String> normalizeTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return List.of();
+        }
+
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String tag : tags) {
+            if (!StringUtils.hasText(tag)) {
+                continue;
+            }
+            normalized.add(tag.trim());
+        }
+        return List.copyOf(normalized);
     }
 
     private boolean matchesRatingRange(Double rating, Double minRating, Double maxRating) {

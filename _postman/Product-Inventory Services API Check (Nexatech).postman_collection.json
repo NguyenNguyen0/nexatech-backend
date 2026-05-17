@@ -771,6 +771,49 @@
           "response": []
         },
         {
+          "name": "get products by tags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{productBaseUrl}}/api/v1/products/tags?tags=iphone&tags=pro&page=0&size=10&sort=createdAt,desc",
+              "host": [
+                "{{productBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "products",
+                "tags"
+              ],
+              "query": [
+                {
+                  "key": "tags",
+                  "value": "iphone"
+                },
+                {
+                  "key": "tags",
+                  "value": "pro"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "createdAt,desc"
+                }
+              ]
+            },
+            "description": "Filter products by one or more tags. Endpoint: GET /api/v1/products/tags"
+          },
+          "response": []
+        },
+        {
           "name": "get products by category",
           "request": {
             "method": "GET",
