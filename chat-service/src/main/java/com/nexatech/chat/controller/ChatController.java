@@ -24,6 +24,21 @@ public class ChatController {
 
     private final ChatService chatService;
 
+    @GetMapping("/current")
+    public ApiResponse<ConversationResponse> getCurrentConversation(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-Guest-Session-Id", required = false) String guestSessionId) {
+        return ApiResponse.ok(chatService.getCurrentConversation(userId, guestSessionId));
+    }
+
+    @PostMapping("/current")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<ConversationResponse> createOrGetCurrentConversation(
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-Guest-Session-Id", required = false) String guestSessionId) {
+        return ApiResponse.ok(chatService.createOrGetCurrentConversation(userId, guestSessionId));
+    }
+
     @GetMapping
     public ApiResponse<PageResponse<ConversationResponse>> getConversations(
             @RequestHeader("X-User-Id") UUID userId,
@@ -33,35 +48,39 @@ public class ChatController {
 
     @GetMapping("/{conversationId}/messages")
     public ApiResponse<CursorPageResponse<MessageResponse>> getMessages(
-            @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-Guest-Session-Id", required = false) String guestSessionId,
             @PathVariable UUID conversationId,
             @RequestParam(required = false) UUID cursor,
             @RequestParam(required = false) Integer size) {
-        return ApiResponse.ok(chatService.getMessages(userId, conversationId, cursor, size));
+        return ApiResponse.ok(chatService.getMessages(userId, guestSessionId, conversationId, cursor, size));
     }
 
     @PostMapping("/{conversationId}/messages")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<MessageResponse> sendMessage(
-            @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-Guest-Session-Id", required = false) String guestSessionId,
             @PathVariable UUID conversationId,
             @Valid @RequestBody SendMessageRequest request) {
-        return ApiResponse.ok(chatService.sendMessage(userId, conversationId, request));
+        return ApiResponse.ok(chatService.sendMessage(userId, guestSessionId, conversationId, request));
     }
 
     @PutMapping("/{conversationId}/messages/{messageId}/delivered")
     public ApiResponse<MessageResponse> markDelivered(
-            @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-Guest-Session-Id", required = false) String guestSessionId,
             @PathVariable UUID conversationId,
             @PathVariable UUID messageId) {
-        return ApiResponse.ok(chatService.markDelivered(userId, conversationId, messageId));
+        return ApiResponse.ok(chatService.markDelivered(userId, guestSessionId, conversationId, messageId));
     }
 
     @PutMapping("/{conversationId}/messages/{messageId}/seen")
     public ApiResponse<MessageResponse> markSeen(
-            @RequestHeader("X-User-Id") UUID userId,
+            @RequestHeader(value = "X-User-Id", required = false) UUID userId,
+            @RequestHeader(value = "X-Guest-Session-Id", required = false) String guestSessionId,
             @PathVariable UUID conversationId,
             @PathVariable UUID messageId) {
-        return ApiResponse.ok(chatService.markSeen(userId, conversationId, messageId));
+        return ApiResponse.ok(chatService.markSeen(userId, guestSessionId, conversationId, messageId));
     }
 }

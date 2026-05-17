@@ -198,8 +198,7 @@ public class NotificationEventConsumer {
         if (message == null) return;
         try {
             OrderEvent event = objectMapper.readValue(message, OrderEvent.class);
-            if (!"ORDER_SHIPMENT_CREATED".equals(event.getEventType())
-                    || !"COD".equalsIgnoreCase(event.getPaymentMethod())) {
+            if (!"ORDER_SHIPMENT_CREATED".equals(event.getEventType())) {
                 log.debug("Order event ignored for email: type={} paymentMethod={} orderId={}",
                         event.getEventType(), event.getPaymentMethod(), event.getOrderId());
                 return;
@@ -228,7 +227,7 @@ public class NotificationEventConsumer {
                         recipientUserId,
                         Notification.NotificationType.ORDER_CONFIRMATION,
                         "Shipment created",
-                        "Your shipment for COD order #" + orderRef + " has been created."
+                        "Your shipment for order #" + orderRef + " has been created."
                 );
 
                 if (preferenceService.isEmailEnabled(recipientUserId, Notification.NotificationType.ORDER_CONFIRMATION)) {
@@ -397,6 +396,7 @@ public class NotificationEventConsumer {
         variables.put("shippingAddress", event.getShippingAddress());
         variables.put("shippingMethod", event.getShippingMethod());
         variables.put("paymentMethod", event.getPaymentMethod());
+        variables.put("paymentNote", resolvePaymentNote(event.getPaymentMethod()));
         variables.put("carrierName", event.getCarrierName());
         variables.put("trackingNumber", event.getTrackingNumber());
         variables.put("note", event.getNote());
@@ -417,5 +417,15 @@ public class NotificationEventConsumer {
         formatter.setMaximumFractionDigits(0);
         formatter.setMinimumFractionDigits(0);
         return formatter.format(amount) + " ₫";
+    }
+
+    private String resolvePaymentNote(String paymentMethod) {
+        if ("COD".equalsIgnoreCase(paymentMethod)) {
+            return "Bạn sẽ thanh toán khi nhận hàng.";
+        }
+        if (StringUtils.hasText(paymentMethod)) {
+            return "Đơn hàng đã được xác nhận với phương thức thanh toán " + paymentMethod + ".";
+        }
+        return "Đơn hàng đã được xác nhận thanh toán.";
     }
 }
