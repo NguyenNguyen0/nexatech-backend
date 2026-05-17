@@ -12,6 +12,7 @@ import com.nexatech.order.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.UUID;
@@ -36,7 +37,7 @@ public class CheckoutService {
      *   5. Nếu VNPay → tạo URL redirect
      *   6. Xóa cart sau khi checkout thành công (chỉ khi customerId != null)
      */
-    public CheckoutResponse checkout(UUID customerId, CheckoutRequest request) {
+    public CheckoutResponse checkout(UUID customerId, String customerEmail, CheckoutRequest request) {
         // 1. Resolve cart items
         List<CreateOrderRequest.OrderItemRequest> resolvedItems;
 
@@ -46,6 +47,7 @@ public class CheckoutService {
                     .map(i -> {
                         var item = new CreateOrderRequest.OrderItemRequest();
                         item.setProductId(i.getProductId());
+                        item.setProductName(i.getProductName());
                         item.setQuantity(i.getQuantity());
                         item.setUnitPrice(i.getUnitPrice());
                         return item;
@@ -136,7 +138,8 @@ public class CheckoutService {
                 .build();
     }
 
-    private CreateOrderRequest buildOrderRequest(List<CreateOrderRequest.OrderItemRequest> items, CheckoutRequest request) {
+    private CreateOrderRequest buildOrderRequest(List<CreateOrderRequest.OrderItemRequest> items,
+                                                 CheckoutRequest request) {
         CreateOrderRequest orderRequest = new CreateOrderRequest();
         orderRequest.setItems(items);
         orderRequest.setShippingAddress(request.getShippingAddress());
@@ -144,9 +147,16 @@ public class CheckoutService {
         orderRequest.setPaymentMethod(request.getPaymentMethod());
         orderRequest.setNote(request.getNote());
         orderRequest.setGuestName(request.getGuestName());
-        orderRequest.setGuestEmail(request.getGuestEmail());
+        orderRequest.setGuestEmail(resolveRecipientEmail(request.getGuestEmail()));
         orderRequest.setGuestPhone(request.getGuestPhone());
         return orderRequest;
+    }
+
+    private String resolveRecipientEmail(String requestEmail) {
+        if (StringUtils.hasText(requestEmail)) {
+            return requestEmail.trim();
+        }
+        return null;
     }
 
     private void compensateOrderAfterPaymentFailure(UUID customerId, UUID orderId, String reason) {

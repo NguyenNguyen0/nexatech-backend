@@ -107,9 +107,11 @@ public class OrderShippingEventConsumer {
         UpdateShippingRequest request = new UpdateShippingRequest();
         request.setTrackingNumber(event.getTrackingCode());
         request.setCarrierName(resolveCarrierName(event.getProvider()));
+        request.setShippingFee(event.getShippingFee());
         // estimatedDelivery không có trong ShippingEvent, để null
 
         orderService.updateShipping(orderId, request);
+        orderService.publishShipmentCreatedEvent(orderId);
         auditLogService.log("SHIPMENT_CREATED_RECEIVED", "Order", orderId.toString(),
                 "trackingNumber=" + event.getTrackingCode(), CONSUMER_NAME);
         log.info("Cập nhật tracking cho order {}: carrier={}, code={}",
