@@ -20,6 +20,7 @@ import java.util.UUID;
 @Table(name = "conversations", indexes = {
         @Index(name = "idx_conversations_customer_id", columnList = "customer_id"),
         @Index(name = "idx_conversations_agent_id", columnList = "agent_id"),
+        @Index(name = "idx_conversations_guest_session_id", columnList = "guest_session_id"),
         @Index(name = "idx_conversations_last_message_at", columnList = "last_message_at")
 })
 @Getter
@@ -29,16 +30,27 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ChatConversation extends BaseEntity {
 
-    @Column(name = "customer_id", nullable = false)
+    @Column(name = "customer_id")
     private UUID customerId;
 
-    @Column(name = "agent_id", nullable = false)
+    @Column(name = "agent_id")
     private UUID agentId;
+
+    @Column(name = "guest_session_id", length = 128)
+    private String guestSessionId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "conversation_type", nullable = false)
+    @Builder.Default
+    private ConversationType conversationType = ConversationType.AUTHENTICATED;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private ConversationStatus status = ConversationStatus.OPEN;
+    private ConversationStatus status = ConversationStatus.WAITING;
+
+    @Column(name = "expires_at")
+    private Instant expiresAt;
 
     @Column(name = "last_message_id")
     private UUID lastMessageId;
