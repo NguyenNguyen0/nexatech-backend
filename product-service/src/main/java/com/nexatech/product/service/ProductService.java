@@ -41,6 +41,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -114,12 +115,14 @@ public class ProductService {
     }
 
     public Page<ProductResponse> getProducts(String categoryId,
+                                             String categorySlug,
                                              String brandId,
                                              BigDecimal minPrice,
                                              BigDecimal maxPrice,
                                              Double minRating,
                                              Double maxRating,
                                              Boolean featured,
+                                             Map<String, List<String>> specsFilters,
                                              Pageable pageable) {
         if (Boolean.TRUE.equals(featured)) {
             return getFeaturedProducts(pageable);
@@ -131,9 +134,9 @@ public class ProductService {
         List<Criteria> criteriaList = new ArrayList<>();
         criteriaList.add(Criteria.where("active").is(true));
 
-        if (StringUtils.hasText(categoryId)) {
-            validateCategory(categoryId);
-            criteriaList.add(categoryArrayCriteria(categoryId));
+        String resolvedCategoryId = resolveCategoryId(categoryId, categorySlug);
+        if (StringUtils.hasText(resolvedCategoryId)) {
+            criteriaList.add(categoryArrayCriteria(resolvedCategoryId));
         }
         if (StringUtils.hasText(brandId)) {
             validateBrand(brandId);
@@ -149,6 +152,7 @@ public class ProductService {
             }
             criteriaList.add(priceCriteria);
         }
+        criteriaList.addAll(buildSpecsCriteria(specsFilters));
 
         Criteria finalCriteria = criteriaList.size() == 1
                 ? criteriaList.getFirst()
@@ -180,7 +184,7 @@ public class ProductService {
     }
 
     public Page<ProductResponse> getProducts(Pageable pageable) {
-        return getProducts(null, null, null, null, null, null, false, pageable);
+        return getProducts(null, null, null, null, null, null, null, false, Map.of(), pageable);
     }
 
     public Page<ProductResponse> getFeaturedProducts(Pageable pageable) {
@@ -203,14 +207,26 @@ public class ProductService {
 
     public Page<ProductResponse> searchProducts(String keyword,
                                                  String categoryId,
+                                                 String categorySlug,
                                                  String brandId,
                                                  BigDecimal minPrice,
                                                  BigDecimal maxPrice,
                                                  Double minRating,
                                                  Double maxRating,
+                                                 Map<String, List<String>> specsFilters,
                                                  Pageable pageable) {
         if (!StringUtils.hasText(keyword)) {
-            return getProducts(categoryId, brandId, minPrice, maxPrice, minRating, maxRating, false, pageable);
+            return getProducts(
+                    categoryId,
+                    categorySlug,
+                    brandId,
+                    minPrice,
+                    maxPrice,
+                    minRating,
+                    maxRating,
+                    false,
+                    specsFilters,
+                    pageable);
         }
 
         String normalizedKeyword = keyword.trim();
@@ -219,9 +235,9 @@ public class ProductService {
         // Build extra Criteria for additional filters
         List<Criteria> extra = new ArrayList<>();
         extra.add(Criteria.where("active").is(true));
-        if (StringUtils.hasText(categoryId)) {
-            validateCategory(categoryId);
-            extra.add(categoryArrayCriteria(categoryId));
+        String resolvedCategoryId = resolveCategoryId(categoryId, categorySlug);
+        if (StringUtils.hasText(resolvedCategoryId)) {
+            extra.add(categoryArrayCriteria(resolvedCategoryId));
         }
         if (StringUtils.hasText(brandId)) {
             validateBrand(brandId);
@@ -233,6 +249,7 @@ public class ProductService {
             if (maxPrice != null) priceCriteria = priceCriteria.lte(maxPrice);
             extra.add(priceCriteria);
         }
+        extra.addAll(buildSpecsCriteria(specsFilters));
 
         Criteria combinedCriteria = extra.size() == 1
                 ? extra.getFirst()
@@ -355,6 +372,7 @@ public class ProductService {
                                                             Double minRating,
                                                             Double maxRating,
                                                             Boolean featured,
+                                                            Map<String, List<String>> specsFilters,
                                                             Pageable pageable) {
         Category category = categoryRepository.findBySlug(slug)
                 .filter(Category::isActive)
@@ -388,12 +406,14 @@ public class ProductService {
 
         return getProducts(
                 category.getId(),
+                null,
                 resolvedBrandId,
                 resolvedMinPrice,
                 resolvedMaxPrice,
                 minRating,
                 maxRating,
                 featured,
+                specsFilters,
                 pageable);
     }
 
@@ -550,6 +570,54 @@ public class ProductService {
             );
         }
         return Criteria.where("categoryIds").is(categoryId);
+    }
+
+    private String resolveCategoryId(String categoryId, String categorySlug) {
+        if (StringUtils.hasText(categoryId)) {
+            validateCategory(categoryId);
+            return categoryId;
+        }
+
+        if (!StringUtils.hasText(categorySlug)) {
+            return null;
+        }
+
+        return categoryRepository.findBySlug(categorySlug)
+                .filter(Category::isActive)
+                .map(Category::getId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", categorySlug));
+    }
+
+    private List<Criteria> buildSpecsCriteria(Map<String, List<String>> specsFilters) {
+        if (specsFilters == null || specsFilters.isEmpty()) {
+            return List.of();
+        }
+
+        List<Criteria> criteria = new ArrayList<>();
+        specsFilters.forEach((key, values) -> {
+            if (!StringUtils.hasText(key) || values == null || values.isEmpty()) {
+                return;
+            }
+
+            String specField = "specs." + key.trim();
+            List<Criteria> valueCriterias = values.stream()
+                    .filter(StringUtils::hasText)
+                    .map(String::trim)
+                    .map(value -> Criteria.where(specField).regex("^" + Pattern.quote(value) + "$", "i"))
+                    .toList();
+
+            if (valueCriterias.isEmpty()) {
+                return;
+            }
+
+            if (valueCriterias.size() == 1) {
+                criteria.add(valueCriterias.getFirst());
+            } else {
+                criteria.add(new Criteria().orOperator(valueCriterias.toArray(new Criteria[0])));
+            }
+        });
+
+        return criteria;
     }
 
     private Criteria idNotEqualCriteria(String fieldName, String idValue) {

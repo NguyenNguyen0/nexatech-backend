@@ -112,6 +112,9 @@ public class CategoryService {
     public CategoryMetaResponse getCategoryMetaBySlug(String slug) {
         Category category = getActiveCategoryBySlug(slug);
         Map<String, Object> metadata = sanitizeMetadata(category.getMetadata());
+        List<String> filterableSpecs = category.getFilter() == null || category.getFilter().getFilterableSpecs() == null
+                ? List.of()
+                : List.copyOf(category.getFilter().getFilterableSpecs());
 
         return CategoryMetaResponse.builder()
                 .id(category.getId())
@@ -122,6 +125,7 @@ public class CategoryService {
                 .bannerImage(resolveMetadataString(metadata, "bannerImage", null))
                 .productCount(productRepository.countByCategoryIdsContainingAndActiveTrue(category.getId()))
                 .subcategoryCount(categoryRepository.findByParentIdAndActiveTrue(category.getId()).size())
+                .filterableSpecs(filterableSpecs)
                 .metadata(metadata)
                 .build();
     }
