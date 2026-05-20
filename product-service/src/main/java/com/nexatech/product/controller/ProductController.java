@@ -6,17 +6,17 @@ import com.nexatech.product.dto.response.PageResponse;
 import com.nexatech.product.dto.response.ProductResponse;
 import com.nexatech.product.dto.response.ProductSuggestResponse;
 import com.nexatech.product.service.ProductService;
+import com.nexatech.product.util.TextUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -180,28 +180,12 @@ public class ProductController {
                 return;
             }
 
-            List<String> normalizedValues = normalizeSpecValues(values);
+            List<String> normalizedValues = TextUtils.normalizeDistinct(values);
             if (!normalizedValues.isEmpty()) {
                 specsFilters.put(specKey, normalizedValues);
             }
         });
 
         return specsFilters.isEmpty() ? Map.of() : Map.copyOf(specsFilters);
-    }
-
-    private List<String> normalizeSpecValues(List<String> values) {
-        if (values == null || values.isEmpty()) {
-            return List.of();
-        }
-
-        LinkedHashSet<String> normalized = new LinkedHashSet<>();
-        for (String value : values) {
-            if (!StringUtils.hasText(value)) {
-                continue;
-            }
-            normalized.add(value.trim());
-        }
-
-        return normalized.isEmpty() ? List.of() : List.copyOf(normalized);
     }
 }

@@ -11,6 +11,7 @@ import com.nexatech.product.model.Category;
 import com.nexatech.product.repository.CategoryRepository;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.util.MongoIdUtils;
+import com.nexatech.product.util.TextUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -18,12 +19,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +33,7 @@ public class CategoryService {
     private final MongoTemplate mongoTemplate;
 
     public CategoryResponse createCategory(CategoryRequest request) {
-        String normalizedName = normalizeName(request.getName());
+        String normalizedName = TextUtils.normalizeName(request.getName());
         if (categoryRepository.existsByNameIgnoreCase(normalizedName)) {
             throw new BadRequestException("Category name already exists: " + normalizedName);
         }
@@ -57,7 +53,7 @@ public class CategoryService {
 
     public CategoryResponse updateCategory(String id, CategoryRequest request) {
         Category category = getActiveCategory(id);
-        String normalizedName = normalizeName(request.getName());
+        String normalizedName = TextUtils.normalizeName(request.getName());
 
         if (categoryRepository.existsByNameIgnoreCaseAndIdNot(normalizedName, id)) {
             throw new BadRequestException("Category name already exists: " + normalizedName);
@@ -96,14 +92,14 @@ public class CategoryService {
                 .toList();
     }
 
-        public List<CategoryMenuItemResponse> getSubCategories(String parentId) {
+    public List<CategoryMenuItemResponse> getSubCategories(String parentId) {
         getActiveCategory(parentId);
         List<Category> activeCategories = categoryRepository.findByActiveTrue();
         Map<String, List<Category>> childrenByParent = groupChildrenByParent(activeCategories);
         return buildCategoryTree(parentId, childrenByParent);
     }
 
-        public List<CategoryMenuItemResponse> getSubCategoriesBySlug(String slug) {
+    public List<CategoryMenuItemResponse> getSubCategoriesBySlug(String slug) {
         Category parentCategory = getActiveCategoryBySlug(slug);
         return getSubCategories(parentCategory.getId());
     }
@@ -166,10 +162,6 @@ public class CategoryService {
         return categoryRepository.findBySlug(slug)
                 .filter(Category::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", slug));
-    }
-
-    private String normalizeName(String name) {
-        return name == null ? "" : name.trim().replaceAll("\\s+", " ");
     }
 
     private Map<String, Object> sanitizeMetadata(Map<String, Object> metadata) {
@@ -237,11 +229,6 @@ public class CategoryService {
     }
 
     private String toSlug(String value) {
-        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
-        String slug = normalized
-                .replaceAll("[^a-z0-9\\s-]", "")
-                .replaceAll("\\s+", "-")
-                .replaceAll("-+", "-");
-        return StringUtils.hasText(slug) ? slug : "category";
+        return TextUtils.toSlug(value, "category");
     }
 }

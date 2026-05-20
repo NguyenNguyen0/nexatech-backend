@@ -1,8 +1,8 @@
 package com.nexatech.product.service;
 
+import com.nexatech.product.client.OrderClient;
 import com.nexatech.product.dto.request.ReviewRequest;
 import com.nexatech.product.dto.response.ReviewResponse;
-import com.nexatech.product.client.OrderClient;
 import com.nexatech.product.exception.BadRequestException;
 import com.nexatech.product.exception.ForbiddenException;
 import com.nexatech.product.exception.ResourceNotFoundException;
@@ -29,7 +29,7 @@ public class ReviewService {
 
     public ReviewResponse createReview(String productId, UUID userId, ReviewRequest request) {
         productRepository.findById(productId)
-            .filter(Product::isActive)
+                .filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
 
         reviewRepository.findByProductIdAndUserId(productId, userId)
@@ -52,14 +52,14 @@ public class ReviewService {
 
     public Page<ReviewResponse> getAllReviews(String productId, Integer rating, Pageable pageable) {
         productRepository.findById(productId)
-            .filter(Product::isActive)
+                .filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
         if (rating != null) {
             return reviewRepository.findByProductIdAndRating(productId, rating, pageable)
-                .map(reviewMapper::toResponse);
+                    .map(reviewMapper::toResponse);
         }
         return reviewRepository.findByProductId(productId, pageable)
-            .map(reviewMapper::toResponse);
+                .map(reviewMapper::toResponse);
     }
 
     public ReviewResponse updateReview(String reviewId, UUID userId, String role, ReviewRequest request) {
@@ -95,7 +95,7 @@ public class ReviewService {
 
     private void assertOwnerOrAdmin(Review review, UUID userId, String role) {
         boolean isOwner = review.getUserId().equals(userId);
-        boolean isAdmin = role != null && "ADMIN".equalsIgnoreCase(role);
+        boolean isAdmin = "ADMIN".equalsIgnoreCase(role);
         if (!isOwner && !isAdmin) {
             throw new ForbiddenException("Only review owner or admin can modify this review");
         }

@@ -9,6 +9,7 @@ import com.nexatech.product.model.Brand;
 import com.nexatech.product.repository.BrandRepository;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.util.MongoIdUtils;
+import com.nexatech.product.util.TextUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -17,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
-import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -29,7 +29,7 @@ public class BrandService {
     private final MongoTemplate mongoTemplate;
 
     public BrandResponse createBrand(BrandRequest request) {
-        String normalizedName = normalizeName(request.getName());
+        String normalizedName = TextUtils.normalizeName(request.getName());
         if (brandRepository.existsByNameIgnoreCase(normalizedName)) {
             throw new BadRequestException("Brand name already exists: " + normalizedName);
         }
@@ -46,7 +46,7 @@ public class BrandService {
 
     public BrandResponse updateBrand(String id, BrandRequest request) {
         Brand brand = getActiveBrand(id);
-        String normalizedName = normalizeName(request.getName());
+        String normalizedName = TextUtils.normalizeName(request.getName());
 
         if (brandRepository.existsByNameIgnoreCaseAndIdNot(normalizedName, id)) {
             throw new BadRequestException("Brand name already exists: " + normalizedName);
@@ -104,10 +104,6 @@ public class BrandService {
         return brand;
     }
 
-    private String normalizeName(String name) {
-        return name == null ? "" : name.trim().replaceAll("\\s+", " ");
-    }
-
     private void validateParentBrand(String parentBrandId, String currentBrandId) {
         if (!StringUtils.hasText(parentBrandId)) {
             return;
@@ -133,11 +129,6 @@ public class BrandService {
     }
 
     private String toSlug(String value) {
-        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
-        String slug = normalized
-                .replaceAll("[^a-z0-9\\s-]", "")
-                .replaceAll("\\s+", "-")
-                .replaceAll("-+", "-");
-        return StringUtils.hasText(slug) ? slug : "brand";
+        return TextUtils.toSlug(value, "brand");
     }
 }

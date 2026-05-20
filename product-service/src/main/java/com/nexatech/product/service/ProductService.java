@@ -2,8 +2,6 @@ package com.nexatech.product.service;
 
 import com.nexatech.product.dto.request.ProductRequest;
 import com.nexatech.product.dto.response.ProductResponse;
-import com.nexatech.product.client.InventoryClient;
-import com.nexatech.product.client.dto.InventoryStockResponse;
 import com.nexatech.product.dto.response.ProductSuggestResponse;
 import com.nexatech.product.event.ProductCatalogEvent;
 import com.nexatech.product.event.ProductEventProducer;
@@ -16,13 +14,12 @@ import com.nexatech.product.model.Product;
 import com.nexatech.product.repository.BrandRepository;
 import com.nexatech.product.repository.CategoryRepository;
 import com.nexatech.product.repository.ProductRepository;
-import com.nexatech.product.repository.ReviewRepository;
 import com.nexatech.product.util.MongoIdUtils;
+import com.nexatech.product.util.ProductQueryUtils;
+import com.nexatech.product.util.TextUtils;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.UncategorizedMongoDbException;
@@ -36,19 +33,11 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class ProductService {
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("price", "name", "createdAt");
@@ -57,11 +46,10 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
-    private final ReviewRepository reviewRepository;
     private final ProductMapper productMapper;
     private final ProductEventProducer productEventProducer;
+    private final ProductResponseEnricher productResponseEnricher;
     private final MongoTemplate mongoTemplate;
-    private final InventoryClient inventoryClient;
 
     public ProductResponse createProduct(ProductRequest request) {
         validateCategory(request.getPrimaryCategoryId());
@@ -69,7 +57,7 @@ public class ProductService {
         validateBrand(request.getBrandId());
 
         Product product = productMapper.toEntity(request);
-        String normalizedName = normalizeName(request.getName());
+        String normalizedName = TextUtils.normalizeName(request.getName());
         product.setName(normalizedName);
         product.setSlug(generateUniqueSlug(normalizedName, null));
         product.setImages(request.getImages() == null ? null : new ArrayList<>(request.getImages()));
@@ -89,7 +77,7 @@ public class ProductService {
 
         String oldName = product.getName();
         productMapper.updateEntity(request, product);
-        String normalizedName = normalizeName(request.getName());
+        String normalizedName = TextUtils.normalizeName(request.getName());
         product.setName(normalizedName);
         product.setImages(request.getImages() == null ? null : new ArrayList<>(request.getImages()));
         product.setThumbnail(resolveThumbnail(request.getThumbnail(), product.getImages()));
@@ -128,7 +116,7 @@ public class ProductService {
             return getFeaturedProducts(pageable);
         }
 
-        validatePriceRange(minPrice, maxPrice);
+        ProductQueryUtils.validatePriceRange(minPrice, maxPrice);
         Pageable safePageable = sanitizePageable(pageable, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         List<Criteria> criteriaList = new ArrayList<>();
@@ -143,16 +131,9 @@ public class ProductService {
             criteriaList.add(idCriteria("brandId", brandId));
         }
         if (minPrice != null || maxPrice != null) {
-            Criteria priceCriteria = Criteria.where("price");
-            if (minPrice != null) {
-                priceCriteria = priceCriteria.gte(minPrice);
-            }
-            if (maxPrice != null) {
-                priceCriteria = priceCriteria.lte(maxPrice);
-            }
-            criteriaList.add(priceCriteria);
+            criteriaList.add(ProductQueryUtils.buildPriceCriteria(minPrice, maxPrice));
         }
-        criteriaList.addAll(buildSpecsCriteria(specsFilters));
+        criteriaList.addAll(ProductQueryUtils.buildSpecsCriteria(specsFilters));
 
         Criteria finalCriteria = criteriaList.size() == 1
                 ? criteriaList.getFirst()
@@ -170,8 +151,8 @@ public class ProductService {
 
         Query query = Query.query(finalCriteria).with(safePageable.getSort());
         List<ProductResponse> filtered = mongoTemplate.find(query, Product.class).stream()
-            .map(p -> enrichProductResponse(productMapper.toResponse(p)))
-                .filter(response -> matchesRatingRange(response.getAverageRating(), minRating, maxRating))
+                .map(p -> enrichProductResponse(productMapper.toResponse(p)))
+                .filter(response -> ProductQueryUtils.matchesRatingRange(response.getAverageRating(), minRating, maxRating))
                 .toList();
 
         int pageSize = safePageable.getPageSize();
@@ -193,7 +174,7 @@ public class ProductService {
         query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
 
         List<ProductResponse> all = mongoTemplate.find(query, Product.class).stream()
-            .map(p -> enrichProductResponse(productMapper.toResponse(p)))
+                .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                 .sorted(featuredComparator())
                 .toList();
 
@@ -206,15 +187,15 @@ public class ProductService {
     }
 
     public Page<ProductResponse> searchProducts(String keyword,
-                                                 String categoryId,
-                                                 String categorySlug,
-                                                 String brandId,
-                                                 BigDecimal minPrice,
-                                                 BigDecimal maxPrice,
-                                                 Double minRating,
-                                                 Double maxRating,
-                                                 Map<String, List<String>> specsFilters,
-                                                 Pageable pageable) {
+                                                String categoryId,
+                                                String categorySlug,
+                                                String brandId,
+                                                BigDecimal minPrice,
+                                                BigDecimal maxPrice,
+                                                Double minRating,
+                                                Double maxRating,
+                                                Map<String, List<String>> specsFilters,
+                                                Pageable pageable) {
         if (!StringUtils.hasText(keyword)) {
             return getProducts(
                     categoryId,
@@ -230,7 +211,7 @@ public class ProductService {
         }
 
         String normalizedKeyword = keyword.trim();
-        validatePriceRange(minPrice, maxPrice);
+        ProductQueryUtils.validatePriceRange(minPrice, maxPrice);
 
         // Build extra Criteria for additional filters
         List<Criteria> extra = new ArrayList<>();
@@ -244,12 +225,9 @@ public class ProductService {
             extra.add(idCriteria("brandId", brandId));
         }
         if (minPrice != null || maxPrice != null) {
-            Criteria priceCriteria = Criteria.where("price");
-            if (minPrice != null) priceCriteria = priceCriteria.gte(minPrice);
-            if (maxPrice != null) priceCriteria = priceCriteria.lte(maxPrice);
-            extra.add(priceCriteria);
+            extra.add(ProductQueryUtils.buildPriceCriteria(minPrice, maxPrice));
         }
-        extra.addAll(buildSpecsCriteria(specsFilters));
+        extra.addAll(ProductQueryUtils.buildSpecsCriteria(specsFilters));
 
         Criteria combinedCriteria = extra.size() == 1
                 ? extra.getFirst()
@@ -270,9 +248,9 @@ public class ProductService {
             if (!hits.isEmpty()) {
                 if (hasRatingFilter) {
                     List<ProductResponse> filtered = hits.stream()
-                            .filter(r -> matchesRatingRange(r.getAverageRating(), minRating, maxRating))
+                            .filter(r -> ProductQueryUtils.matchesRatingRange(r.getAverageRating(), minRating, maxRating))
                             .toList();
-                    return pageSlice(filtered, pageable);
+                    return ProductQueryUtils.pageSlice(filtered, pageable);
                 }
                 long total = mongoTemplate.count(
                         TextQuery.queryText(textCriteria).addCriteria(combinedCriteria), Product.class);
@@ -290,9 +268,9 @@ public class ProductService {
         if (hasRatingFilter) {
             List<ProductResponse> all = mongoTemplate.find(regexQuery, Product.class).stream()
                     .map(p -> enrichProductResponse(productMapper.toResponse(p)))
-                    .filter(r -> matchesRatingRange(r.getAverageRating(), minRating, maxRating))
+                    .filter(r -> ProductQueryUtils.matchesRatingRange(r.getAverageRating(), minRating, maxRating))
                     .toList();
-            return pageSlice(all, pageable);
+            return ProductQueryUtils.pageSlice(all, pageable);
         }
 
         List<ProductResponse> content = mongoTemplate.find(regexQuery, Product.class).stream()
@@ -315,35 +293,35 @@ public class ProductService {
         query.fields().include("name").include("slug").include("thumbnail").include("price");
         query.limit(5);
         return mongoTemplate.find(query, Product.class).stream()
-            .map(p -> ProductSuggestResponse.builder()
-                .id(p.getId())
-                .name(p.getName())
-                .slug(p.getSlug())
-                .thumbnail(p.getThumbnail())
-                .price(p.getPrice())
-                .build())
-            .toList();
+                .map(p -> ProductSuggestResponse.builder()
+                        .id(p.getId())
+                        .name(p.getName())
+                        .slug(p.getSlug())
+                        .thumbnail(p.getThumbnail())
+                        .price(p.getPrice())
+                        .build())
+                .toList();
     }
 
-            public Page<ProductResponse> getProductsByTags(List<String> tags, Pageable pageable) {
-            List<String> normalizedTags = normalizeTags(tags);
-            if (normalizedTags.isEmpty()) {
-                throw new BadRequestException("tags must not be empty");
-            }
+    public Page<ProductResponse> getProductsByTags(List<String> tags, Pageable pageable) {
+        List<String> normalizedTags = TextUtils.normalizeDistinct(tags);
+        if (normalizedTags.isEmpty()) {
+            throw new BadRequestException("tags must not be empty");
+        }
 
-            Pageable safePageable = sanitizePageable(pageable, Sort.by(Sort.Direction.DESC, "createdAt"));
-            Criteria finalCriteria = new Criteria().andOperator(
+        Pageable safePageable = sanitizePageable(pageable, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Criteria finalCriteria = new Criteria().andOperator(
                 Criteria.where("active").is(true),
-                anyTagCriteria(normalizedTags));
+                ProductQueryUtils.anyTagCriteria(normalizedTags));
 
-            Query query = Query.query(finalCriteria).with(safePageable);
-            List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
+        Query query = Query.query(finalCriteria).with(safePageable);
+        List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
                 .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                 .toList();
 
-            long total = mongoTemplate.count(Query.query(finalCriteria), Product.class);
-            return new PageImpl<>(content, safePageable, total);
-            }
+        long total = mongoTemplate.count(Query.query(finalCriteria), Product.class);
+        return new PageImpl<>(content, safePageable, total);
+    }
 
     public Page<ProductResponse> getProductsByCategory(String categoryId, Pageable pageable) {
         validateCategory(categoryId);
@@ -354,7 +332,7 @@ public class ProductService {
                 .with(pageable);
 
         List<ProductResponse> content = mongoTemplate.find(query, Product.class).stream()
-            .map(p -> enrichProductResponse(productMapper.toResponse(p)))
+                .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                 .toList();
         long total = mongoTemplate.count(
                 Query.query(new Criteria().andOperator(
@@ -366,14 +344,14 @@ public class ProductService {
     }
 
     public Page<ProductResponse> getProductsByCategorySlug(String slug,
-                                                            String brandId,
-                                                            BigDecimal minPrice,
-                                                            BigDecimal maxPrice,
-                                                            Double minRating,
-                                                            Double maxRating,
-                                                            Boolean featured,
-                                                            Map<String, List<String>> specsFilters,
-                                                            Pageable pageable) {
+                                                           String brandId,
+                                                           BigDecimal minPrice,
+                                                           BigDecimal maxPrice,
+                                                           Double minRating,
+                                                           Double maxRating,
+                                                           Boolean featured,
+                                                           Map<String, List<String>> specsFilters,
+                                                           Pageable pageable) {
         Category category = categoryRepository.findBySlug(slug)
                 .filter(Category::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", slug));
@@ -432,7 +410,7 @@ public class ProductService {
         query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
 
         return mongoTemplate.find(query, Product.class).stream()
-            .map(p -> enrichProductResponse(productMapper.toResponse(p)))
+                .map(p -> enrichProductResponse(productMapper.toResponse(p)))
                 .sorted(featuredComparator())
                 .limit(RELATED_PRODUCT_LIMIT)
                 .toList();
@@ -495,47 +473,7 @@ public class ProductService {
     }
 
     private ProductResponse enrichProductResponse(ProductResponse response) {
-        if (StringUtils.hasText(response.getPrimaryCategoryId())) {
-            categoryRepository.findById(response.getPrimaryCategoryId()).ifPresent(category -> {
-                response.setPrimaryCategoryName(category.getName());
-            });
-        }
-
-        if (StringUtils.hasText(response.getBrandId())) {
-            brandRepository.findById(response.getBrandId()).ifPresent(brand -> {
-                response.setBrandName(brand.getName());
-                response.setBrandSlug(brand.getSlug());
-            });
-        }
-
-        Double avg = reviewRepository.getAverageRatingByProductId(response.getId());
-        if (avg != null) {
-            response.setAverageRating(Math.round(avg * 10.0) / 10.0);
-
-                try {
-                    InventoryStockResponse inv = inventoryClient.getStock(response.getId());
-                    if (inv != null && inv.getData() != null) {
-                        int available = inv.getData().getAvailableQuantity();
-                        int reorder = inv.getData().getReorderLevel();
-                        response.setStockQuantity(available);
-                        if (available <= 0) {
-                            response.setStockStatus("OUT_OF_STOCK");
-                        } else if (available <= reorder) {
-                            response.setStockStatus("LOW_STOCK");
-                        } else {
-                            response.setStockStatus("IN_STOCK");
-                        }
-                    }
-                } catch (Exception e) {
-                    log.debug("Could not fetch inventory for product {}: {}", response.getId(), e.getMessage());
-                }
-
-        }
-        return response;
-    }
-
-    private String normalizeName(String name) {
-        return name == null ? "" : name.trim().replaceAll("\\s+", " ");
+        return productResponseEnricher.enrichCatalogResponse(response);
     }
 
     private String generateUniqueSlug(String name, String currentProductId) {
@@ -553,12 +491,7 @@ public class ProductService {
     }
 
     private String toSlug(String value) {
-        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
-        String slug = normalized
-                .replaceAll("[^a-z0-9\\s-]", "")
-                .replaceAll("\\s+", "-")
-                .replaceAll("-+", "-");
-        return StringUtils.hasText(slug) ? slug : "product";
+        return TextUtils.toSlug(value, "product");
     }
 
     private String resolveThumbnail(String requestedThumbnail, List<String> images) {
@@ -596,73 +529,8 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", categorySlug));
     }
 
-    private List<Criteria> buildSpecsCriteria(Map<String, List<String>> specsFilters) {
-        if (specsFilters == null || specsFilters.isEmpty()) {
-            return List.of();
-        }
-
-        List<Criteria> criteria = new ArrayList<>();
-        specsFilters.forEach((key, values) -> {
-            if (!StringUtils.hasText(key) || values == null || values.isEmpty()) {
-                return;
-            }
-
-            String specField = "specs." + key.trim();
-            List<Criteria> valueCriterias = values.stream()
-                    .filter(StringUtils::hasText)
-                    .map(String::trim)
-                    .map(value -> Criteria.where(specField).regex("^" + Pattern.quote(value) + "$", "i"))
-                    .toList();
-
-            if (valueCriterias.isEmpty()) {
-                return;
-            }
-
-            if (valueCriterias.size() == 1) {
-                criteria.add(valueCriterias.getFirst());
-            } else {
-                criteria.add(new Criteria().orOperator(valueCriterias.toArray(new Criteria[0])));
-            }
-        });
-
-        return criteria;
-    }
-
     private Criteria idNotEqualCriteria(String fieldName, String idValue) {
         return MongoIdUtils.idNotEqualsCriteria(fieldName, idValue);
-    }
-
-    private Criteria anyTagCriteria(List<String> tags) {
-        List<Criteria> tagCriteria = tags.stream()
-                .map(tag -> Criteria.where("tags").regex("^" + Pattern.quote(tag) + "$", "i"))
-                .toList();
-        return new Criteria().orOperator(tagCriteria.toArray(new Criteria[0]));
-    }
-
-    private List<String> normalizeTags(List<String> tags) {
-        if (tags == null || tags.isEmpty()) {
-            return List.of();
-        }
-
-        LinkedHashSet<String> normalized = new LinkedHashSet<>();
-        for (String tag : tags) {
-            if (!StringUtils.hasText(tag)) {
-                continue;
-            }
-            normalized.add(tag.trim());
-        }
-        return List.copyOf(normalized);
-    }
-
-    private boolean matchesRatingRange(Double rating, Double minRating, Double maxRating) {
-        double value = rating == null ? 0.0 : rating;
-        if (minRating != null && value < minRating) {
-            return false;
-        }
-        if (maxRating != null && value > maxRating) {
-            return false;
-        }
-        return true;
     }
 
     private Comparator<ProductResponse> featuredComparator() {
@@ -673,36 +541,7 @@ public class ProductService {
     }
 
     private Pageable sanitizePageable(Pageable pageable, Sort defaultSort) {
-        int page = pageable == null ? 0 : pageable.getPageNumber();
-        int size = pageable == null ? 20 : pageable.getPageSize();
-
-        Sort safeSort = defaultSort;
-        if (pageable != null && pageable.getSort().isSorted()) {
-            List<Sort.Order> accepted = pageable.getSort().stream()
-                    .filter(order -> ALLOWED_SORT_FIELDS.contains(order.getProperty()))
-                    .map(order -> new Sort.Order(order.getDirection(), order.getProperty()))
-                    .toList();
-            if (!accepted.isEmpty()) {
-                safeSort = Sort.by(accepted);
-            }
-        }
-
-        return PageRequest.of(Math.max(page, 0), Math.max(size, 1), safeSort);
-    }
-
-    private Page<ProductResponse> pageSlice(List<ProductResponse> list, Pageable pageable) {
-        int from = (int) pageable.getOffset();
-        if (from >= list.size()) {
-            return new PageImpl<>(List.of(), pageable, list.size());
-        }
-        int to = Math.min(from + pageable.getPageSize(), list.size());
-        return new PageImpl<>(list.subList(from, to), pageable, list.size());
-    }
-
-    private void validatePriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
-        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
-            throw new BadRequestException("Invalid price range: minPrice must be <= maxPrice");
-        }
+        return ProductQueryUtils.sanitizePageable(pageable, defaultSort, ALLOWED_SORT_FIELDS);
     }
 
     private void publishEvent(Product product, String eventType) {
