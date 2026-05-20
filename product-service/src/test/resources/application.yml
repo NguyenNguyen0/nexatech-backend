@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: product-service-test
+  cloud:
+    config:
+      enabled: false
+      fail-fast: false
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/nexatech_products_it
+  kafka:
+    bootstrap-servers: localhost:9092
+
+eureka:
+  client:
+    enabled: false

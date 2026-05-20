@@ -6,14 +6,19 @@ import com.nexatech.product.dto.response.PageResponse;
 import com.nexatech.product.dto.response.ProductResponse;
 import com.nexatech.product.dto.response.ProductSuggestResponse;
 import com.nexatech.product.service.ProductService;
+import com.nexatech.product.util.TextUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.util.MultiValueMap;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/products")
@@ -48,15 +53,28 @@ public class ProductController {
     @GetMapping
     public ApiResponse<PageResponse<ProductResponse>> getProducts(
             @RequestParam(required = false) String categoryId,
+            @RequestParam(required = false) String categorySlug,
             @RequestParam(required = false) String brandId,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) Double minRating,
             @RequestParam(required = false) Double maxRating,
             @RequestParam(required = false) Boolean featured,
+            @RequestParam MultiValueMap<String, String> queryParams,
             Pageable pageable) {
+        Map<String, List<String>> specsFilters = extractSpecsFilters(queryParams);
         return ApiResponse.ok(PageResponse.of(
-                productService.getProducts(categoryId, brandId, minPrice, maxPrice, minRating, maxRating, featured, pageable)));
+                productService.getProducts(
+                        categoryId,
+                        categorySlug,
+                        brandId,
+                        minPrice,
+                        maxPrice,
+                        minRating,
+                        maxRating,
+                        featured,
+                        specsFilters,
+                        pageable)));
     }
 
     @GetMapping("/featured")
@@ -68,14 +86,27 @@ public class ProductController {
     public ApiResponse<PageResponse<ProductResponse>> searchProducts(
             @RequestParam String keyword,
             @RequestParam(required = false) String categoryId,
+            @RequestParam(required = false) String categorySlug,
             @RequestParam(required = false) String brandId,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) Double minRating,
             @RequestParam(required = false) Double maxRating,
+            @RequestParam MultiValueMap<String, String> queryParams,
             Pageable pageable) {
+        Map<String, List<String>> specsFilters = extractSpecsFilters(queryParams);
         return ApiResponse.ok(PageResponse.of(
-                productService.searchProducts(keyword, categoryId, brandId, minPrice, maxPrice, minRating, maxRating, pageable)));
+                productService.searchProducts(
+                        keyword,
+                        categoryId,
+                        categorySlug,
+                        brandId,
+                        minPrice,
+                        maxPrice,
+                        minRating,
+                        maxRating,
+                        specsFilters,
+                        pageable)));
     }
 
     @GetMapping("/suggest")
@@ -106,7 +137,9 @@ public class ProductController {
             @RequestParam(required = false) Double minRating,
             @RequestParam(required = false) Double maxRating,
             @RequestParam(required = false) Boolean featured,
+            @RequestParam MultiValueMap<String, String> queryParams,
             Pageable pageable) {
+        Map<String, List<String>> specsFilters = extractSpecsFilters(queryParams);
         return ApiResponse.ok(PageResponse.of(
                 productService.getProductsByCategorySlug(
                         slug,
@@ -116,6 +149,7 @@ public class ProductController {
                         minRating,
                         maxRating,
                         featured,
+                        specsFilters,
                         pageable)));
     }
 
@@ -128,5 +162,30 @@ public class ProductController {
     public ApiResponse<Void> deleteProduct(@PathVariable String id) {
         productService.deleteProduct(id);
         return ApiResponse.ok(null);
+    }
+
+    private Map<String, List<String>> extractSpecsFilters(MultiValueMap<String, String> queryParams) {
+        if (queryParams == null || queryParams.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, List<String>> specsFilters = new LinkedHashMap<>();
+        queryParams.forEach((key, values) -> {
+            if (!StringUtils.hasText(key) || !key.startsWith("specs.")) {
+                return;
+            }
+
+            String specKey = key.substring("specs.".length()).trim();
+            if (!StringUtils.hasText(specKey)) {
+                return;
+            }
+
+            List<String> normalizedValues = TextUtils.normalizeDistinct(values);
+            if (!normalizedValues.isEmpty()) {
+                specsFilters.put(specKey, normalizedValues);
+            }
+        });
+
+        return specsFilters.isEmpty() ? Map.of() : Map.copyOf(specsFilters);
     }
 }

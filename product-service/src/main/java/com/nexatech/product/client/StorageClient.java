@@ -13,7 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
  * Internal Feign client for storage-service.
  * Calls /internal/** endpoints which are NOT exposed through Kong.
  * Resolves via Eureka using application name "storage-service".
- *
+ * <p>
  * Return types are concrete non-generic DTOs to avoid Spring Framework 7
  * bean introspection failures with generic types during class loading.
  */
