@@ -111,7 +111,8 @@ public class ProductImageService {
     // -------------------------------------------------------------------------
 
     private Product getProduct(String id) {
-        return productRepository.findByIdAndActiveTrue(id)
+        return productRepository.findById(id)
+            .filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
     }
 

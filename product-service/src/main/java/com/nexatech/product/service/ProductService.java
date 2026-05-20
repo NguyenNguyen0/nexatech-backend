@@ -17,9 +17,9 @@ import com.nexatech.product.repository.BrandRepository;
 import com.nexatech.product.repository.CategoryRepository;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.ReviewRepository;
+import com.nexatech.product.util.MongoIdUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.bson.types.ObjectId;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -446,16 +446,28 @@ public class ProductService {
     }
 
     private Product getActiveProduct(String id) {
-        return productRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+        Query query = Query.query(new Criteria().andOperator(
+                MongoIdUtils.idEqualsCriteria("_id", id),
+                Criteria.where("active").is(true)
+        ));
+        Product product = mongoTemplate.findOne(query, Product.class);
+        if (product == null) {
+            throw new ResourceNotFoundException("Product", "id", id);
+        }
+        return product;
     }
 
     private void validateCategory(String categoryId) {
         if (!StringUtils.hasText(categoryId)) {
             return;
         }
-        categoryRepository.findByIdAndActiveTrue(categoryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", categoryId));
+        Query query = Query.query(new Criteria().andOperator(
+                MongoIdUtils.idEqualsCriteria("_id", categoryId),
+                Criteria.where("active").is(true)
+        ));
+        if (mongoTemplate.findOne(query, Category.class) == null) {
+            throw new ResourceNotFoundException("Category", "id", categoryId);
+        }
     }
 
     private void validateCategoryIds(List<String> categoryIds) {
@@ -473,8 +485,13 @@ public class ProductService {
         if (!StringUtils.hasText(brandId)) {
             return;
         }
-        brandRepository.findByIdAndActiveTrue(brandId)
-                .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", brandId));
+        Query query = Query.query(new Criteria().andOperator(
+                MongoIdUtils.idEqualsCriteria("_id", brandId),
+                Criteria.where("active").is(true)
+        ));
+        if (mongoTemplate.findOne(query, Brand.class) == null) {
+            throw new ResourceNotFoundException("Brand", "id", brandId);
+        }
     }
 
     private ProductResponse enrichProductResponse(ProductResponse response) {
@@ -528,7 +545,7 @@ public class ProductService {
 
         while (true) {
             Product existing = productRepository.findBySlug(candidate).orElse(null);
-            if (existing == null || (currentProductId != null && currentProductId.equals(existing.getId()))) {
+            if (existing == null || MongoIdUtils.equalsId(currentProductId, existing.getId())) {
                 return candidate;
             }
             candidate = base + "-" + suffix++;
@@ -555,21 +572,12 @@ public class ProductService {
     }
 
     private Criteria idCriteria(String fieldName, String idValue) {
-        if (ObjectId.isValid(idValue)) {
-            return Criteria.where(fieldName).in(idValue, new ObjectId(idValue));
-        }
-        return Criteria.where(fieldName).is(idValue);
+        return MongoIdUtils.idEqualsCriteria(fieldName, idValue);
     }
 
     private Criteria categoryArrayCriteria(String categoryId) {
-        // categoryIds is a List<String>; MongoDB checks if array contains the value
-        if (ObjectId.isValid(categoryId)) {
-            return new Criteria().orOperator(
-                    Criteria.where("categoryIds").is(categoryId),
-                    Criteria.where("categoryIds").is(new ObjectId(categoryId))
-            );
-        }
-        return Criteria.where("categoryIds").is(categoryId);
+        // Backward-compatible match for mixed String/ObjectId data in categoryIds array.
+        return MongoIdUtils.arrayContainsIdCriteria("categoryIds", categoryId);
     }
 
     private String resolveCategoryId(String categoryId, String categorySlug) {
@@ -621,10 +629,7 @@ public class ProductService {
     }
 
     private Criteria idNotEqualCriteria(String fieldName, String idValue) {
-        if (ObjectId.isValid(idValue)) {
-            return Criteria.where(fieldName).nin(idValue, new ObjectId(idValue));
-        }
-        return Criteria.where(fieldName).ne(idValue);
+        return MongoIdUtils.idNotEqualsCriteria(fieldName, idValue);
     }
 
     private Criteria anyTagCriteria(List<String> tags) {

@@ -10,7 +10,11 @@ import com.nexatech.product.mapper.CategoryMapper;
 import com.nexatech.product.model.Category;
 import com.nexatech.product.repository.CategoryRepository;
 import com.nexatech.product.repository.ProductRepository;
+import com.nexatech.product.util.MongoIdUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -30,6 +34,7 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
     private final CategoryMapper categoryMapper;
+    private final MongoTemplate mongoTemplate;
 
     public CategoryResponse createCategory(CategoryRequest request) {
         String normalizedName = normalizeName(request.getName());
@@ -59,7 +64,7 @@ public class CategoryService {
         }
 
         if (StringUtils.hasText(request.getParentId())) {
-            if (id.equals(request.getParentId())) {
+            if (MongoIdUtils.equalsId(id, request.getParentId())) {
                 throw new BadRequestException("Category cannot be its own parent");
             }
             getActiveCategory(request.getParentId());
@@ -146,8 +151,15 @@ public class CategoryService {
     }
 
     private Category getActiveCategory(String id) {
-        return categoryRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
+        Query query = Query.query(new Criteria().andOperator(
+                MongoIdUtils.idEqualsCriteria("_id", id),
+                Criteria.where("active").is(true)
+        ));
+        Category category = mongoTemplate.findOne(query, Category.class);
+        if (category == null) {
+            throw new ResourceNotFoundException("Category", "id", id);
+        }
+        return category;
     }
 
     private Category getActiveCategoryBySlug(String slug) {
@@ -217,7 +229,7 @@ public class CategoryService {
 
         while (true) {
             Category existing = categoryRepository.findBySlug(candidate).orElse(null);
-            if (existing == null || (currentCategoryId != null && currentCategoryId.equals(existing.getId()))) {
+            if (existing == null || MongoIdUtils.equalsId(currentCategoryId, existing.getId())) {
                 return candidate;
             }
             candidate = base + "-" + suffix++;

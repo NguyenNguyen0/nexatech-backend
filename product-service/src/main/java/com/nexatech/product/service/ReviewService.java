@@ -7,6 +7,7 @@ import com.nexatech.product.exception.BadRequestException;
 import com.nexatech.product.exception.ForbiddenException;
 import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.ReviewMapper;
+import com.nexatech.product.model.Product;
 import com.nexatech.product.model.Review;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.ReviewRepository;
@@ -27,7 +28,8 @@ public class ReviewService {
     private final OrderClient orderClient;
 
     public ReviewResponse createReview(String productId, UUID userId, ReviewRequest request) {
-        productRepository.findByIdAndActiveTrue(productId)
+        productRepository.findById(productId)
+            .filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
 
         reviewRepository.findByProductIdAndUserId(productId, userId)
@@ -49,7 +51,8 @@ public class ReviewService {
     }
 
     public Page<ReviewResponse> getAllReviews(String productId, Integer rating, Pageable pageable) {
-        productRepository.findByIdAndActiveTrue(productId)
+        productRepository.findById(productId)
+            .filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
         if (rating != null) {
             return reviewRepository.findByProductIdAndRating(productId, rating, pageable)

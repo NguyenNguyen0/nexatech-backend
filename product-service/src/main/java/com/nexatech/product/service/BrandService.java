@@ -8,7 +8,11 @@ import com.nexatech.product.mapper.BrandMapper;
 import com.nexatech.product.model.Brand;
 import com.nexatech.product.repository.BrandRepository;
 import com.nexatech.product.repository.ProductRepository;
+import com.nexatech.product.util.MongoIdUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -22,6 +26,7 @@ public class BrandService {
     private final BrandRepository brandRepository;
     private final ProductRepository productRepository;
     private final BrandMapper brandMapper;
+    private final MongoTemplate mongoTemplate;
 
     public BrandResponse createBrand(BrandRequest request) {
         String normalizedName = normalizeName(request.getName());
@@ -88,8 +93,15 @@ public class BrandService {
     }
 
     private Brand getActiveBrand(String id) {
-        return brandRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
+        Query query = Query.query(new Criteria().andOperator(
+                MongoIdUtils.idEqualsCriteria("_id", id),
+                Criteria.where("active").is(true)
+        ));
+        Brand brand = mongoTemplate.findOne(query, Brand.class);
+        if (brand == null) {
+            throw new ResourceNotFoundException("Brand", "id", id);
+        }
+        return brand;
     }
 
     private String normalizeName(String name) {
@@ -100,7 +112,7 @@ public class BrandService {
         if (!StringUtils.hasText(parentBrandId)) {
             return;
         }
-        if (currentBrandId != null && currentBrandId.equals(parentBrandId)) {
+        if (MongoIdUtils.equalsId(currentBrandId, parentBrandId)) {
             throw new BadRequestException("Brand cannot be its own parent");
         }
         getActiveBrand(parentBrandId);
@@ -113,7 +125,7 @@ public class BrandService {
 
         while (true) {
             Brand existing = brandRepository.findBySlug(candidate).orElse(null);
-            if (existing == null || (currentBrandId != null && currentBrandId.equals(existing.getId()))) {
+            if (existing == null || MongoIdUtils.equalsId(currentBrandId, existing.getId())) {
                 return candidate;
             }
             candidate = base + "-" + suffix++;
