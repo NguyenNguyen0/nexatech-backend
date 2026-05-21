@@ -1,5 +1,7 @@
 package com.nexatech.news.service.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.news.dto.request.NewsCreationRequest;
 import com.nexatech.news.dto.request.NewsUpdateRequest;
 import com.nexatech.news.dto.request.NewsVisibilityRequest;
@@ -23,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,6 +36,7 @@ public class NewsServiceImpl implements NewsService {
     private final NewsRepository newsRepository;
     private final NewsMapper newsMapper;
     private final MediaStorageService mediaStorageService;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional(readOnly = true)
@@ -118,7 +122,7 @@ public class NewsServiceImpl implements NewsService {
             if (request.getThumbnailUrl() != null) {
                 news.setThumbnailUrl(request.getThumbnailUrl());
             }
-            news.setContentJson(request.getContentJson());
+            news.setContentJson(parseContentJson(request.getContentJson()));
             news.setContentHtml(request.getContentHtml());
             if (request.getIsPublic() != null) {
                 news.setIsPublic(request.getIsPublic());
@@ -132,6 +136,7 @@ public class NewsServiceImpl implements NewsService {
             }
 
             news = newsMapper.toNews(request);
+            news.setContentJson(parseContentJson(request.getContentJson()));
             news.setStatus(NewsStatus.DRAFT);
             
             log.info("Creating new news");
@@ -180,6 +185,9 @@ public class NewsServiceImpl implements NewsService {
         }
 
         newsMapper.updateNewsFromRequest(request, news);
+        if (request.getContentJson() != null) {
+            news.setContentJson(parseContentJson(request.getContentJson()));
+        }
         
         // Update publishedAt if isPublic is being set to true and not yet published
         if (request.getIsPublic() != null && request.getIsPublic()
@@ -230,5 +238,18 @@ public class NewsServiceImpl implements NewsService {
 
         newsRepository.delete(news);
         log.info("News deleted successfully: id={}", id);
+    }
+
+    private Map<String, Object> parseContentJson(String contentJson) {
+        if (contentJson == null || contentJson.isBlank()) {
+            return Map.of();
+        }
+
+        try {
+            return objectMapper.readValue(contentJson, new TypeReference<>() {});
+        } catch (IOException e) {
+            log.warn("Invalid contentJson payload", e);
+            throw new AppException(ErrorCode.INVALID_KEY);
+        }
     }
 }
