@@ -132,6 +132,25 @@ services:
     networks:
       - nexatech-net
 
+  postgres-news:
+    image: postgres:16-alpine
+    container_name: nexatech-postgres-news
+    environment:
+      POSTGRES_DB: nexatech_news
+      POSTGRES_USER: ${POSTGRES_USER:-nexatech}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexatech123}
+    ports:
+      - "5440:5432"
+    volumes:
+      - postgres-news-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexatech} -d nexatech_news"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nexatech-net
+
   mongodb:
     image: mongo:7
     container_name: nexatech-mongodb
@@ -557,6 +576,37 @@ services:
     networks:
       - nexatech-net
 
+  news-service:
+    build:
+      context: .
+      args:
+        SERVICE_NAME: news-service
+    image: nexatech/news-service:latest
+    container_name: nexatech-news
+    ports:
+      - "8092:8092"
+    environment:
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-news:5432/nexatech_news
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-nexatech}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-nexatech123}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_S3_PUBLIC_URL=${AWS_S3_PUBLIC_URL:-}
+      - AWS_S3_ENDPOINT=${AWS_S3_ENDPOINT:-}
+      - AWS_S3_PATH_STYLE_ACCESS_ENABLED=${AWS_S3_PATH_STYLE_ACCESS_ENABLED:-false}
+      - JAVA_TOOL_OPTIONS=-Xmx200m
+    depends_on:
+      config-server:
+        condition: service_healthy
+      postgres-news:
+        condition: service_healthy
+    networks:
+      - nexatech-net
+
   kong:
     image: kong:3.6
     container_name: nexatech-kong
@@ -569,7 +619,7 @@ services:
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
     volumes:
-      - ./kong:/kong
+      - ./_kong:/_kong:ro
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -583,6 +633,7 @@ services:
       - notification-service
       - chat-service
       - storage-service
+      - news-service
     networks:
       - nexatech-net
 
@@ -595,6 +646,7 @@ volumes:
   postgres-payment-data:
   postgres-notification-data:
   postgres-chat-data:
+  postgres-news-data:
   mongodb-data:
   redis-data:
   minio-data:

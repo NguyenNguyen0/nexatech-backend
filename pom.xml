@@ -32,6 +32,7 @@
         <module>notification-service</module>
         <module>chat-service</module>
         <module>storage-service</module>
+        <module>news-service</module>
     </modules>
 
     <properties>
