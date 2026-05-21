@@ -18,6 +18,8 @@ import com.nexatech.news.service.NewsService;
 import com.nexatech.news.service.StoredImage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,6 +42,7 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "news", key = "'public_list'")
     public List<NewsListResponse> getPublicNews() {
         log.info("Getting all public news");
 
@@ -52,6 +55,7 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "news", key = "'public_detail:' + #slug")
     public NewsResponse getPublicNewsBySlug(String slug) {
         log.info("Getting public news by slug: {}", slug);
 
@@ -86,6 +90,7 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "news", allEntries = true)
     public NewsResponse createNews(NewsCreationRequest request, MultipartFile thumbnail) {
         log.info("Creating news: title={}, slug={}, id={}, hasThumbnail={}", 
                 request.getTitle(), request.getSlug(), request.getId(), thumbnail != null);
@@ -158,6 +163,7 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "news", allEntries = true)
     public NewsResponse updateNews(String id, NewsUpdateRequest request, MultipartFile thumbnail) {
         log.info("Updating news: id={}, hasThumbnail={}", id, thumbnail != null);
 
@@ -204,6 +210,7 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "news", allEntries = true)
     public NewsResponse updateNewsVisibility(String id, NewsVisibilityRequest request) {
         log.info("Updating news visibility: id={}, isPublic={}", id, request.getIsPublic());
 
@@ -230,6 +237,7 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "news", allEntries = true)
     public void deleteNews(String id) {
         log.info("Deleting news: id={}", id);
 
