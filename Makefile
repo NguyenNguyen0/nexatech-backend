@@ -8,10 +8,15 @@ DOCKER_FULL = docker-compose.yml
 DOCKER_CORE = _realms/docker-compose-order-payment.yml
 MVN = mvn
 
+# Load .env.ec2 và set env vars trong cùng một PowerShell process
+LOAD_EC2 = Get-Content .env.ec2 | Where-Object { $$_ -notmatch '^\s*\#' -and $$_ -match '=' } | ForEach-Object { $$p = $$_ -split '=',2; [Environment]::SetEnvironmentVariable($$p[0].Trim(),$$p[1].Trim(),'Process') }
+
 .PHONY: help build clean compile dev-up dev-down full-up full-down infra-reset logs-infra logs-full prune \
 	core-up core-down core-build core-logs \
 	run-discovery run-config run-gateway \
-	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-storage
+	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-storage \
+	run-gateway-ec2 run-identity-ec2 run-user-ec2 run-product-ec2 run-inventory-ec2 \
+	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-storage-ec2 run-news-ec2
 
 help:
 	@echo "Available commands:"
@@ -42,6 +47,20 @@ help:
 	@echo "  make run-notification   - Run notification-service"
 	@echo "  make run-chat           - Run chat-service"
 	@echo "  make run-storage        - Run storage-service"
+	@echo ""
+	@echo "Run with EC2 infra (loads .env.ec2):"
+	@echo "  make run-gateway-ec2      - Run api-gateway (EC2 infra)"
+	@echo "  make run-product-ec2      - Run product-service (EC2 infra)"
+	@echo "  make run-inventory-ec2    - Run inventory-service (EC2 infra)"
+	@echo "  make run-order-ec2        - Run order-service (EC2 infra)"
+	@echo "  make run-payment-ec2      - Run payment-service (EC2 infra)"
+	@echo "  make run-shipping-ec2     - Run shipping-service (EC2 infra)"
+	@echo "  make run-user-ec2         - Run user-service (EC2 infra)"
+	@echo "  make run-identity-ec2     - Run identity-service (EC2 infra)"
+	@echo "  make run-notification-ec2 - Run notification-service (EC2 infra)"
+	@echo "  make run-chat-ec2         - Run chat-service (EC2 infra)"
+	@echo "  make run-storage-ec2      - Run storage-service (EC2 infra)"
+	@echo "  make run-news-ec2         - Run news-service (EC2 infra)"
 
 # --- Maven Commands ---
 build:
@@ -127,6 +146,43 @@ run-chat:
 
 run-storage:
 	$(MVN) -pl storage-service spring-boot:run
+
+# --- Run Individual Services with EC2 Infra (.env.ec2) ---
+run-gateway-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl api-gateway spring-boot:run"
+
+run-product-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl product-service spring-boot:run"
+
+run-inventory-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl inventory-service spring-boot:run"
+
+run-identity-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl identity-service spring-boot:run"
+
+run-storage-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl storage-service spring-boot:run"
+
+run-order-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_orders'; mvn -pl order-service spring-boot:run"
+
+run-payment-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_payments'; mvn -pl payment-service spring-boot:run"
+
+run-shipping-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_shipping'; mvn -pl shipping-service spring-boot:run"
+
+run-notification-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DB_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_notifications'; mvn -pl notification-service spring-boot:run"
+
+run-chat-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DB_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_chats'; mvn -pl chat-service spring-boot:run"
+
+run-user-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_users'; $$env:DATASOURCE_USERNAME=$$env:DB_USERNAME; $$env:DATASOURCE_PASSWORD=$$env:DB_PASSWORD; $$env:KAFKA_GROUP_ID='user-service-group'; mvn -pl user-service spring-boot:run"
+
+run-news-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_news'; $$env:SPRING_DATASOURCE_USERNAME=$$env:DB_USERNAME; $$env:SPRING_DATASOURCE_PASSWORD=$$env:DB_PASSWORD; mvn -pl news-service spring-boot:run"
 
 # --- Utility ---
 # Lệnh clean container và image thừa (Dùng trong PowerShell)

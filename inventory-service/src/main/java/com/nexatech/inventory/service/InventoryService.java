@@ -224,6 +224,28 @@ public class InventoryService {
         }
     }
 
+    /**
+     * Hoàn kho khi đơn hàng trả hàng được duyệt (ORDER_RETURN_APPROVED).
+     * Chỉ cộng lại quantity (không đụng reservedQuantity vì finalizeSale đã giảm cả hai khi giao hàng).
+     */
+    @Transactional
+    public void restockReturn(StockCheckRequest request, String reference) {
+        validateItems(request);
+
+        for (StockCheckRequest.Item itemRequest : request.getItems()) {
+            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Inventory item", "productId", itemRequest.getProductId()));
+
+            item.setQuantity(item.getQuantity() + itemRequest.getQuantity());
+            InventoryItem saved = inventoryItemRepository.save(item);
+
+            recordMovement(saved.getProductId(), StockMovement.MovementType.RETURN,
+                    itemRequest.getQuantity(), reference, "Stock restocked from approved return", null);
+            publishLowStockEventIfNeeded(saved);
+        }
+    }
+
     private void validateItems(StockCheckRequest request) {
         if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
             throw new BadRequestException("Items list must not be empty");
