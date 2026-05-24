@@ -3,6 +3,7 @@ package com.nexatech.product.dto.response;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -17,5 +18,6 @@ public class CategoryMetaResponse {
     private String bannerImage;
     private long productCount;
     private int subcategoryCount;
+    private List<String> filterableSpecs;
     private Map<String, Object> metadata;
 }

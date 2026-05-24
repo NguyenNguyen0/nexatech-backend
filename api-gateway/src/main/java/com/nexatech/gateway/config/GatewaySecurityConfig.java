@@ -37,6 +37,7 @@ public class GatewaySecurityConfig {
                     "/api/v1/brands/**",
                     "/api/v1/reviews/**")
                 .permitAll()
+                .requestMatchers("/api/v1/news/**").permitAll()
                 .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
         return http.build();

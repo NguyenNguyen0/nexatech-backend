@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: news-service
+  config:
+    import: "optional:file:./.env[.properties],optional:file:./news-service/.env[.properties],optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}/"

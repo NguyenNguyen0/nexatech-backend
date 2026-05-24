@@ -535,7 +535,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products?categoryId={{categoryId}}&brandId={{brandId}}&minPrice=1000000&maxPrice=50000000&minRating=3.5&page=0&size=10&sort=price,asc",
+              "raw": "{{productBaseUrl}}/api/v1/products?categorySlug={{categorySlug}}&brandId={{brandId}}&minPrice=1000000&maxPrice=50000000&minRating=3.5&specs.series=ryzen&specs.series=core-i7&specs.compatibility=am5&page=0&size=10&sort=price,asc",
               "host": [
                 "{{productBaseUrl}}"
               ],
@@ -546,8 +546,9 @@
               ],
               "query": [
                 {
-                  "key": "categoryId",
-                  "value": "{{categoryId}}"
+                  "key": "categorySlug",
+                  "value": "{{categorySlug}}",
+                  "description": "Optional: category slug alias for categoryId"
                 },
                 {
                   "key": "brandId",
@@ -566,6 +567,21 @@
                   "value": "3.5"
                 },
                 {
+                  "key": "specs.series",
+                  "value": "ryzen",
+                  "description": "Exact ignore-case match"
+                },
+                {
+                  "key": "specs.series",
+                  "value": "core-i7",
+                  "description": "Multi-value OR on the same key"
+                },
+                {
+                  "key": "specs.compatibility",
+                  "value": "am5",
+                  "description": "Exact ignore-case match"
+                },
+                {
                   "key": "page",
                   "value": "0"
                 },
@@ -579,7 +595,7 @@
                 }
               ]
             },
-            "description": "Phase 1: Combined filter by category, brand, price range, rating and sort by allowed field."
+            "description": "Phase 1: Combined filter by category (id or slug), brand, price range, rating, specs.* and sort by allowed field."
           },
           "response": []
         },
@@ -683,7 +699,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products/search?keyword={{searchKeyword}}&categoryId=&brandId=&minPrice=&maxPrice=&minRating=&maxRating=&page=0&size=10",
+              "raw": "{{productBaseUrl}}/api/v1/products/search?keyword={{searchKeyword}}&categorySlug={{categorySlug}}&brandId=&minPrice=&maxPrice=&minRating=&maxRating=&specs.series=ryzen&specs.series=core-i7&specs.compatibility=am5&page=0&size=10",
               "host": [
                 "{{productBaseUrl}}"
               ],
@@ -702,6 +718,11 @@
                   "key": "categoryId",
                   "value": "",
                   "description": "Optional: filter by category ID"
+                },
+                {
+                  "key": "categorySlug",
+                  "value": "{{categorySlug}}",
+                  "description": "Optional: filter by category slug"
                 },
                 {
                   "key": "brandId",
@@ -729,6 +750,21 @@
                   "description": "Optional: maximum average rating (0-5)"
                 },
                 {
+                  "key": "specs.series",
+                  "value": "ryzen",
+                  "description": "Optional: exact ignore-case"
+                },
+                {
+                  "key": "specs.series",
+                  "value": "core-i7",
+                  "description": "Optional: multi-value OR"
+                },
+                {
+                  "key": "specs.compatibility",
+                  "value": "am5",
+                  "description": "Optional: exact ignore-case"
+                },
+                {
                   "key": "page",
                   "value": "0"
                 },
@@ -738,7 +774,7 @@
                 }
               ]
             },
-            "description": "Phase 5: Advanced search combining full-text keyword with optional filters: categoryId, brandId, minPrice, maxPrice, minRating, maxRating."
+            "description": "Phase 5: Advanced search combining full-text keyword with optional filters: categoryId/categorySlug, brandId, minPrice, maxPrice, minRating, maxRating, specs.*"
           },
           "response": []
         },
@@ -850,7 +886,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{productBaseUrl}}/api/v1/products/category/slug/{{categorySlug}}?brandId={{brandId}}&minPrice=1000000&maxPrice=50000000&minRating=3.5&page=0&size=10&sort=price,asc",
+              "raw": "{{productBaseUrl}}/api/v1/products/category/slug/{{categorySlug}}?brandId={{brandId}}&minPrice=1000000&maxPrice=50000000&minRating=3.5&specs.series=ryzen&specs.series=core-i7&specs.compatibility=am5&page=0&size=10&sort=price,asc",
               "host": [
                 "{{productBaseUrl}}"
               ],
@@ -880,6 +916,18 @@
                   "value": "3.5"
                 },
                 {
+                  "key": "specs.series",
+                  "value": "ryzen"
+                },
+                {
+                  "key": "specs.series",
+                  "value": "core-i7"
+                },
+                {
+                  "key": "specs.compatibility",
+                  "value": "am5"
+                },
+                {
                   "key": "page",
                   "value": "0"
                 },
@@ -893,7 +941,7 @@
                 }
               ]
             },
-            "description": "Category listing by slug with full filter/sort/pagination support."
+            "description": "Category listing by slug with full filter/sort/pagination support, including specs.* exact ignore-case filters."
           },
           "response": []
         },

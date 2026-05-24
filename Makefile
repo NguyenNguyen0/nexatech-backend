@@ -5,9 +5,11 @@
 # Biến mặc định
 DOCKER_INFRA = docker-compose.infra.yml
 DOCKER_FULL = docker-compose.yml
+DOCKER_CORE = _realms/docker-compose-order-payment.yml
 MVN = mvn
 
 .PHONY: help build clean compile dev-up dev-down full-up full-down infra-reset logs-infra logs-full prune \
+	core-up core-down core-build core-logs \
 	run-discovery run-config run-gateway \
 	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-storage
 
@@ -20,6 +22,10 @@ help:
 	@echo "  make dev-down           - Stop infrastructure"
 	@echo "  make full-up            - Start ALL services and infra (Heavy!)"
 	@echo "  make full-down          - Stop all services"
+	@echo "  make core-up            - Build + start core services (product/inventory/order/payment/shipping + infra)"
+	@echo "  make core-build         - Build only core services images (no start)"
+	@echo "  make core-down          - Stop core services"
+	@echo "  make core-logs          - Stream logs from core services"
 	@echo "  make infra-reset        - Remove all infra volumes and restart"
 	@echo "  make logs-infra         - View infrastructure logs"
 	@echo ""
@@ -60,6 +66,20 @@ infra-reset:
 
 logs-infra:
 	docker compose -f $(DOCKER_INFRA) logs -f
+
+# --- Core Stack (product + inventory + order + payment + shipping) ---
+# Đọc .env từ nexatech-backend/ (--env-file .env) để substitute biến trong compose file
+core-up:
+	docker compose --env-file .env -f $(DOCKER_CORE) up -d --build
+
+core-build:
+	docker compose --env-file .env -f $(DOCKER_CORE) build
+
+core-down:
+	docker compose --env-file .env -f $(DOCKER_CORE) down
+
+core-logs:
+	docker compose --env-file .env -f $(DOCKER_CORE) logs -f
 
 # --- Full Stack Commands (Dành cho việc chạy toàn bộ hệ thống) ---
 full-up:

@@ -6,11 +6,8 @@ import com.nexatech.product.dto.response.StorageUploadResult;
 import com.nexatech.product.exception.BadRequestException;
 import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.ProductMapper;
-import com.nexatech.product.model.Brand;
 import com.nexatech.product.model.Product;
-import com.nexatech.product.repository.BrandRepository;
 import com.nexatech.product.repository.ProductRepository;
-import com.nexatech.product.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,10 +26,9 @@ public class ProductImageService {
     private static final int MAX_IMAGES = 10;
 
     private final ProductRepository productRepository;
-    private final BrandRepository brandRepository;
-    private final ReviewRepository reviewRepository;
     private final StorageClient storageClient;
     private final ProductMapper productMapper;
+    private final ProductResponseEnricher productResponseEnricher;
 
     /**
      * Uploads multiple images and appends their URLs to the product.
@@ -46,7 +42,7 @@ public class ProductImageService {
         if (current.size() + files.size() > MAX_IMAGES) {
             throw new BadRequestException(
                     "A product can have at most " + MAX_IMAGES + " images. " +
-                    "Currently has " + current.size() + ", trying to add " + files.size() + ".");
+                            "Currently has " + current.size() + ", trying to add " + files.size() + ".");
         }
 
         for (MultipartFile file : files) {
@@ -62,7 +58,7 @@ public class ProductImageService {
         if (!StringUtils.hasText(product.getThumbnail()) && !current.isEmpty()) {
             product.setThumbnail(current.getFirst());
         }
-        return enrichWithBrandName(productMapper.toResponse(productRepository.save(product)));
+        return productResponseEnricher.enrichImageResponse(productMapper.toResponse(productRepository.save(product)));
     }
 
     /**
@@ -85,7 +81,7 @@ public class ProductImageService {
         if (!updated.contains(product.getThumbnail())) {
             product.setThumbnail(updated.isEmpty() ? null : updated.getFirst());
         }
-        return enrichWithBrandName(productMapper.toResponse(productRepository.save(product)));
+        return productResponseEnricher.enrichImageResponse(productMapper.toResponse(productRepository.save(product)));
     }
 
     /**
@@ -105,19 +101,18 @@ public class ProductImageService {
 
         product.setImages(new ArrayList<>(orderedUrls));
         product.setThumbnail(orderedUrls.isEmpty() ? null : orderedUrls.getFirst());
-        return enrichWithBrandName(productMapper.toResponse(productRepository.save(product)));
+        return productResponseEnricher.enrichImageResponse(productMapper.toResponse(productRepository.save(product)));
     }
 
-    // -------------------------------------------------------------------------
-
     private Product getProduct(String id) {
-        return productRepository.findByIdAndActiveTrue(id)
+        return productRepository.findById(id)
+                .filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
     }
 
     /**
      * Extracts [bucket, key] from a URL of the form:
-     *   http://host:port/api/v1/files/{bucket}/{key}
+     * http://host:port/api/v1/files/{bucket}/{key}
      */
     private String[] extractBucketAndKey(String url) {
         try {
@@ -133,17 +128,4 @@ public class ProductImageService {
         }
     }
 
-    private ProductResponse enrichWithBrandName(ProductResponse response) {
-        if (StringUtils.hasText(response.getBrandId())) {
-            response.setBrandName(
-                    brandRepository.findById(response.getBrandId())
-                            .map(Brand::getName)
-                            .orElse(null));
-        }
-        Double avg = reviewRepository.getAverageRatingByProductId(response.getId());
-        if (avg != null) {
-            response.setAverageRating(Math.round(avg * 10.0) / 10.0);
-        }
-        return response;
-    }
 }
