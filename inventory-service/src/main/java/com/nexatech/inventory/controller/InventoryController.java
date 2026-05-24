@@ -26,9 +26,12 @@ public class InventoryController {
 
     @GetMapping("/list")
     public ApiResponse<Page<InventoryResponse>> getAllInventory(
+            @RequestParam(required = false) String sku,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String warehouseLocation,
             Pageable pageable) {
-        return ApiResponse.ok(inventoryService.getAllInventory(warehouseLocation, pageable));
+        return ApiResponse.ok(inventoryService.getAllInventory(sku, status, keyword, warehouseLocation, pageable));
     }
 
     @GetMapping("/{productId}")

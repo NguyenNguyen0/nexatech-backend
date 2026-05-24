@@ -1,5 +1,7 @@
 package com.nexatech.inventory.service;
 
+import com.nexatech.inventory.client.ProductClient;
+import com.nexatech.inventory.client.dto.ProductSummary;
 import com.nexatech.inventory.dto.BulkImportResult;
 import com.nexatech.inventory.dto.CSVImportError;
 import com.nexatech.inventory.dto.CSVImportResult;
@@ -17,7 +19,9 @@ import com.nexatech.inventory.repository.InventoryItemRepository;
 import com.nexatech.inventory.repository.StockMovementRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -27,7 +31,10 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -35,10 +42,14 @@ import java.util.UUID;
 public class InventoryService {
 
     private static final int DEFAULT_REORDER_LEVEL = 10;
+    private static final java.util.Set<String> ALLOWED_SORT_FIELDS = java.util.Set.of(
+            "productId", "productName", "sku", "quantity", "reservedQuantity", "availableQuantity",
+            "reorderLevel", "status", "warehouseLocation");
 
     private final InventoryItemRepository inventoryItemRepository;
     private final StockMovementRepository stockMovementRepository;
     private final InventoryEventProducer inventoryEventProducer;
+    private final ProductClient productClient;
 
     public InventoryResponse getStock(String productId) {
         InventoryItem item = inventoryItemRepository.findByProductId(productId)
@@ -48,13 +59,17 @@ public class InventoryService {
 
     @Transactional
     public InventoryResponse updateStock(StockUpdateRequest request) {
+        ProductSummary productSummary = fetchProductSummary(request.getProductId()).orElse(null);
         InventoryItem item = inventoryItemRepository.findByProductId(request.getProductId())
                 .orElseGet(() -> InventoryItem.builder()
                         .productId(request.getProductId())
+                        .sku(resolveSku(request, null, productSummary))
                         .quantity(0)
                         .reservedQuantity(0)
                         .reorderLevel(DEFAULT_REORDER_LEVEL)
                         .build());
+
+        item.setSku(resolveSku(request, item.getSku(), productSummary));
 
         if (request.getQuantity() < item.getReservedQuantity()) {
             throw new BadRequestException("Quantity cannot be lower than reserved quantity");
@@ -134,12 +149,27 @@ public class InventoryService {
                 .build();
     }
 
-    public Page<InventoryResponse> getAllInventory(String warehouseLocation, Pageable pageable) {
-        if (StringUtils.hasText(warehouseLocation)) {
-            return inventoryItemRepository.findByWarehouseLocation(warehouseLocation, pageable)
-                    .map(this::toResponse);
+    public Page<InventoryResponse> getAllInventory(String sku,
+                                                   String status,
+                                                   String keyword,
+                                                   String warehouseLocation,
+                                                   Pageable pageable) {
+        Pageable safePageable = sanitizePageable(pageable);
+        List<InventoryResponse> filtered = inventoryItemRepository.findAll().stream()
+                .filter(item -> matchesWarehouse(item, warehouseLocation))
+                .filter(item -> matchesSku(item, sku))
+                .map(this::toResponse)
+                .filter(response -> matchesStatus(response, status))
+                .filter(response -> matchesKeyword(response, keyword))
+                .sorted(comparatorFor(safePageable.getSort()))
+                .toList();
+
+        int from = (int) safePageable.getOffset();
+        if (from >= filtered.size()) {
+            return new PageImpl<>(List.of(), safePageable, filtered.size());
         }
-        return inventoryItemRepository.findAll(pageable).map(this::toResponse);
+        int to = Math.min(from + safePageable.getPageSize(), filtered.size());
+        return new PageImpl<>(filtered.subList(from, to), safePageable, filtered.size());
     }
 
     @Transactional
@@ -231,15 +261,24 @@ public class InventoryService {
     }
 
     private InventoryResponse toResponse(InventoryItem item) {
-        return InventoryResponse.builder()
+        int availableQuantity = item.getQuantity() - item.getReservedQuantity();
+        InventoryResponse.InventoryResponseBuilder builder = InventoryResponse.builder()
                 .id(item.getId())
                 .productId(item.getProductId())
+            .sku(item.getSku())
                 .quantity(item.getQuantity())
                 .reservedQuantity(item.getReservedQuantity())
-                .availableQuantity(item.getQuantity() - item.getReservedQuantity())
+            .availableQuantity(availableQuantity)
                 .reorderLevel(item.getReorderLevel())
                 .warehouseLocation(item.getWarehouseLocation())
-                .build();
+            .status(resolveStatus(availableQuantity, item.getReorderLevel()));
+
+        fetchProductSummary(item.getProductId()).ifPresent(product -> builder
+            .productName(product.getName())
+            .productSlug(product.getSlug())
+            .productThumbnail(product.getThumbnail()));
+
+        return builder.build();
     }
 
     private void recordMovement(String productId,
@@ -260,6 +299,116 @@ public class InventoryService {
 
     private boolean isLowStock(InventoryItem item) {
         return item.getQuantity() - item.getReservedQuantity() <= item.getReorderLevel();
+    }
+
+    private Optional<ProductSummary> fetchProductSummary(String productId) {
+        try {
+            return Optional.ofNullable(productClient.getProduct(productId))
+                    .map(response -> response.getData());
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private String resolveSku(StockUpdateRequest request, String existingSku, ProductSummary productSummary) {
+        if (StringUtils.hasText(request.getSku())) {
+            return request.getSku().trim();
+        }
+        if (StringUtils.hasText(existingSku)) {
+            return existingSku;
+        }
+        if (productSummary != null && StringUtils.hasText(productSummary.getSku())) {
+            return productSummary.getSku().trim();
+        }
+        throw new BadRequestException("SKU is required when creating inventory for a product");
+    }
+
+    private String resolveStatus(int availableQuantity, int reorderLevel) {
+        if (availableQuantity <= 0) {
+            return "OUT_OF_STOCK";
+        }
+        if (availableQuantity <= reorderLevel) {
+            return "LOW_STOCK";
+        }
+        return "IN_STOCK";
+    }
+
+    private boolean matchesWarehouse(InventoryItem item, String warehouseLocation) {
+        if (!StringUtils.hasText(warehouseLocation)) {
+            return true;
+        }
+        return warehouseLocation.trim().equalsIgnoreCase(item.getWarehouseLocation());
+    }
+
+    private boolean matchesSku(InventoryItem item, String sku) {
+        if (!StringUtils.hasText(sku)) {
+            return true;
+        }
+        return StringUtils.hasText(item.getSku())
+                && item.getSku().toLowerCase(Locale.ROOT).contains(sku.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private boolean matchesStatus(InventoryResponse response, String status) {
+        if (!StringUtils.hasText(status)) {
+            return true;
+        }
+        return status.trim().equalsIgnoreCase(response.getStatus());
+    }
+
+    private boolean matchesKeyword(InventoryResponse response, String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return true;
+        }
+
+        String normalizedKeyword = keyword.trim().toLowerCase(Locale.ROOT);
+        return containsIgnoreCase(response.getSku(), normalizedKeyword)
+                || containsIgnoreCase(response.getProductName(), normalizedKeyword)
+                || containsIgnoreCase(response.getProductId(), normalizedKeyword)
+                || containsIgnoreCase(response.getWarehouseLocation(), normalizedKeyword);
+    }
+
+    private boolean containsIgnoreCase(String value, String normalizedKeyword) {
+        return StringUtils.hasText(value) && value.toLowerCase(Locale.ROOT).contains(normalizedKeyword);
+    }
+
+    private Pageable sanitizePageable(Pageable pageable) {
+        int page = pageable == null ? 0 : pageable.getPageNumber();
+        int size = pageable == null ? 20 : pageable.getPageSize();
+        Sort safeSort = Sort.by(Sort.Direction.ASC, "productId");
+        if (pageable != null && pageable.getSort().isSorted()) {
+            List<Sort.Order> accepted = pageable.getSort().stream()
+                    .filter(order -> ALLOWED_SORT_FIELDS.contains(order.getProperty()))
+                    .map(order -> new Sort.Order(order.getDirection(), order.getProperty()))
+                    .toList();
+            if (!accepted.isEmpty()) {
+                safeSort = Sort.by(accepted);
+            }
+        }
+        return org.springframework.data.domain.PageRequest.of(Math.max(page, 0), Math.max(size, 1), safeSort);
+    }
+
+    private Comparator<InventoryResponse> comparatorFor(Sort sort) {
+        Comparator<InventoryResponse> comparator = null;
+        for (Sort.Order order : sort) {
+            Comparator<InventoryResponse> next = comparatorFor(order);
+            comparator = comparator == null ? next : comparator.thenComparing(next);
+        }
+        return comparator == null ? Comparator.comparing(InventoryResponse::getProductId, Comparator.nullsLast(String::compareToIgnoreCase)) : comparator;
+    }
+
+    private Comparator<InventoryResponse> comparatorFor(Sort.Order order) {
+        Comparator<InventoryResponse> comparator = switch (order.getProperty()) {
+            case "productName" -> Comparator.comparing(InventoryResponse::getProductName, Comparator.nullsLast(String::compareToIgnoreCase));
+            case "sku" -> Comparator.comparing(InventoryResponse::getSku, Comparator.nullsLast(String::compareToIgnoreCase));
+            case "quantity" -> Comparator.comparingInt(InventoryResponse::getQuantity);
+            case "reservedQuantity" -> Comparator.comparingInt(InventoryResponse::getReservedQuantity);
+            case "availableQuantity" -> Comparator.comparingInt(InventoryResponse::getAvailableQuantity);
+            case "reorderLevel" -> Comparator.comparingInt(InventoryResponse::getReorderLevel);
+            case "status" -> Comparator.comparing(InventoryResponse::getStatus, Comparator.nullsLast(String::compareToIgnoreCase));
+            case "warehouseLocation" -> Comparator.comparing(InventoryResponse::getWarehouseLocation, Comparator.nullsLast(String::compareToIgnoreCase));
+            default -> Comparator.comparing(InventoryResponse::getProductId, Comparator.nullsLast(String::compareToIgnoreCase));
+        };
+        return order.isAscending() ? comparator : comparator.reversed();
     }
 
     private void publishLowStockEventIfNeeded(InventoryItem item) {
