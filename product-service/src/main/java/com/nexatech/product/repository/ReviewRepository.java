@@ -22,4 +22,6 @@ public interface ReviewRepository extends MongoRepository<Review, String> {
             "{ $group: { _id: null, avg: { $avg: '$rating' } } }"
     })
     Double getAverageRatingByProductId(String productId);
+
+    long countByProductId(String productId);
 }
