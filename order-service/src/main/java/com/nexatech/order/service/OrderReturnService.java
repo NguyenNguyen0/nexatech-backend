@@ -207,6 +207,11 @@ public class OrderReturnService {
                 .status(orderReturn.getStatus())
                 .reason(orderReturn.getReason())
                 .refundAmount(refundAmount)
+                .items(orderReturn.getItems() != null
+                        ? orderReturn.getItems().stream()
+                                .map(i -> new ReturnEvent.ReturnItemEvent(i.getProductId(), i.getQuantity()))
+                                .toList()
+                        : null)
                 .build();
         outboxEventService.saveEvent("OrderReturn", orderReturn.getOrderId().toString(), eventType, event);
     }
