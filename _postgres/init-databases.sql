@@ -1,40 +1,34 @@
 -- ============================================================
 -- Auto-create databases on first Postgres startup
 -- (mounted to /docker-entrypoint-initdb.d/)
+-- NOTE: Script chỉ chạy 1 lần khi volume được tạo mới.
+--       CREATE DATABASE không chạy được trong transaction block,
+--       nên mỗi lệnh là một statement riêng biệt.
 -- ============================================================
 
--- Keycloak IAM
-SELECT 'CREATE DATABASE keycloak'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak');
-
 -- Identity Service
-SELECT 'CREATE DATABASE nexatech_identity'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_identity');
+CREATE DATABASE nexatech_identity WITH OWNER nexatech;
 
 -- User Service
-SELECT 'CREATE DATABASE nexatech_users'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_users');
+CREATE DATABASE nexatech_users WITH OWNER nexatech;
 
 -- Order Service
-SELECT 'CREATE DATABASE nexatech_orders'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_orders');
+CREATE DATABASE nexatech_orders WITH OWNER nexatech;
 
 -- Payment Service
-SELECT 'CREATE DATABASE nexatech_payments'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_payments');
+CREATE DATABASE nexatech_payments WITH OWNER nexatech;
 
 -- Shipping Service
-SELECT 'CREATE DATABASE nexatech_shipping'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_shipping');
+CREATE DATABASE nexatech_shipping WITH OWNER nexatech;
 
 -- Inventory Service
-SELECT 'CREATE DATABASE nexatech_inventory'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_inventory');
+CREATE DATABASE nexatech_inventory WITH OWNER nexatech;
 
 -- Notification Service
-SELECT 'CREATE DATABASE nexatech_notifications'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_notifications');
+CREATE DATABASE nexatech_notifications WITH OWNER nexatech;
 
 -- Chat Service
-SELECT 'CREATE DATABASE nexatech_chats'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_chats');
+CREATE DATABASE nexatech_chats WITH OWNER nexatech;
+
+-- News Service
+CREATE DATABASE nexatech_news WITH OWNER nexatech;
