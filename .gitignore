@@ -37,6 +37,7 @@ desktop.ini
 ### Environment ###
 .env
 *.env.local
+.env.ec2
 
 ### Logs ###
 logs/
