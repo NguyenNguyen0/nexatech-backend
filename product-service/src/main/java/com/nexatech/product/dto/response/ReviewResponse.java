@@ -13,6 +13,9 @@ public class ReviewResponse {
 
     private String id;
     private String productId;
+    private String productName;
+    private String productSlug;
+    private String productThumbnail;
     private UUID userId;
     private int rating;
     private String title;
