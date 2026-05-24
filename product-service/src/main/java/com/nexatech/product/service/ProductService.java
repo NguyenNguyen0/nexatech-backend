@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class ProductService {
 
-    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("price", "name", "createdAt");
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("price", "name", "createdAt", "updatedAt", "sku");
     private static final int RELATED_PRODUCT_LIMIT = 8;
 
     private final ProductRepository productRepository;
@@ -102,14 +102,18 @@ public class ProductService {
         return enrichProductResponse(productMapper.toResponse(product));
     }
 
-    public Page<ProductResponse> getProducts(String categoryId,
+    public Page<ProductResponse> getProducts(String keyword,
+                                             String categoryId,
                                              String categorySlug,
                                              String brandId,
+                                             String sku,
                                              BigDecimal minPrice,
                                              BigDecimal maxPrice,
                                              Double minRating,
                                              Double maxRating,
                                              Boolean featured,
+                                             Boolean active,
+                                             boolean includeDeleted,
                                              Map<String, List<String>> specsFilters,
                                              Pageable pageable) {
         if (Boolean.TRUE.equals(featured)) {
@@ -120,7 +124,7 @@ public class ProductService {
         Pageable safePageable = sanitizePageable(pageable, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         List<Criteria> criteriaList = new ArrayList<>();
-        criteriaList.add(Criteria.where("active").is(true));
+        appendActiveCriteria(criteriaList, active, includeDeleted);
 
         String resolvedCategoryId = resolveCategoryId(categoryId, categorySlug);
         if (StringUtils.hasText(resolvedCategoryId)) {
@@ -129,6 +133,17 @@ public class ProductService {
         if (StringUtils.hasText(brandId)) {
             validateBrand(brandId);
             criteriaList.add(idCriteria("brandId", brandId));
+        }
+        if (StringUtils.hasText(sku)) {
+            criteriaList.add(Criteria.where("sku").regex(Pattern.quote(sku.trim()), "i"));
+        }
+        if (StringUtils.hasText(keyword)) {
+            Pattern keywordPattern = Pattern.compile(Pattern.quote(keyword.trim()), Pattern.CASE_INSENSITIVE);
+            criteriaList.add(new Criteria().orOperator(
+                    Criteria.where("name").regex(keywordPattern),
+                    Criteria.where("sku").regex(keywordPattern),
+                    Criteria.where("description").regex(keywordPattern)
+            ));
         }
         if (minPrice != null || maxPrice != null) {
             criteriaList.add(ProductQueryUtils.buildPriceCriteria(minPrice, maxPrice));
@@ -165,7 +180,7 @@ public class ProductService {
     }
 
     public Page<ProductResponse> getProducts(Pageable pageable) {
-        return getProducts(null, null, null, null, null, null, null, false, Map.of(), pageable);
+        return getProducts(null, null, null, null, null, null, null, null, null, false, null, false, Map.of(), pageable);
     }
 
     public Page<ProductResponse> getFeaturedProducts(Pageable pageable) {
@@ -198,13 +213,17 @@ public class ProductService {
                                                 Pageable pageable) {
         if (!StringUtils.hasText(keyword)) {
             return getProducts(
+                    null,
                     categoryId,
                     categorySlug,
                     brandId,
+                    null,
                     minPrice,
                     maxPrice,
                     minRating,
                     maxRating,
+                    false,
+                    null,
                     false,
                     specsFilters,
                     pageable);
@@ -383,14 +402,18 @@ public class ProductService {
         }
 
         return getProducts(
+            null,
                 category.getId(),
                 null,
                 resolvedBrandId,
+            null,
                 resolvedMinPrice,
                 resolvedMaxPrice,
                 minRating,
                 maxRating,
                 featured,
+            null,
+            false,
                 specsFilters,
                 pageable);
     }
@@ -423,6 +446,22 @@ public class ProductService {
         publishEvent(saved, "PRODUCT_DELETED");
     }
 
+    public ProductResponse restoreProduct(String id) {
+        Product product = getProductById(id);
+        if (product.isActive()) {
+            return enrichProductResponse(productMapper.toResponse(product));
+        }
+
+        validateCategory(product.getPrimaryCategoryId());
+        validateCategoryIds(product.getCategoryIds());
+        validateBrand(product.getBrandId());
+
+        product.setActive(true);
+        Product saved = productRepository.save(product);
+        publishEvent(saved, "PRODUCT_RESTORED");
+        return enrichProductResponse(productMapper.toResponse(saved));
+    }
+
     private Product getActiveProduct(String id) {
         Query query = Query.query(new Criteria().andOperator(
                 MongoIdUtils.idEqualsCriteria("_id", id),
@@ -433,6 +472,11 @@ public class ProductService {
             throw new ResourceNotFoundException("Product", "id", id);
         }
         return product;
+    }
+
+    private Product getProductById(String id) {
+        return productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
     }
 
     private void validateCategory(String categoryId) {
@@ -474,6 +518,16 @@ public class ProductService {
 
     private ProductResponse enrichProductResponse(ProductResponse response) {
         return productResponseEnricher.enrichCatalogResponse(response);
+    }
+
+    private void appendActiveCriteria(List<Criteria> criteriaList, Boolean active, boolean includeDeleted) {
+        if (active != null) {
+            criteriaList.add(Criteria.where("active").is(active));
+            return;
+        }
+        if (!includeDeleted) {
+            criteriaList.add(Criteria.where("active").is(true));
+        }
     }
 
     private String generateUniqueSlug(String name, String currentProductId) {

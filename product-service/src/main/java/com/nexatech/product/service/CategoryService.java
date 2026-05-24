@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -85,9 +86,15 @@ public class CategoryService {
         return categoryMapper.toResponse(getActiveCategoryBySlug(slug));
     }
 
-    public List<CategoryResponse> getAllCategories() {
-        return categoryRepository.findByActiveTrue().stream()
-                .sorted((a, b) -> Integer.compare(a.getSortOrder(), b.getSortOrder()))
+    public List<CategoryResponse> getAllCategories(Boolean active, boolean includeDeleted) {
+        Query query = new Query().with(Sort.by(Sort.Order.asc("sortOrder"), Sort.Order.asc("name")));
+        if (active != null) {
+            query.addCriteria(Criteria.where("active").is(active));
+        } else if (!includeDeleted) {
+            query.addCriteria(Criteria.where("active").is(true));
+        }
+
+        return mongoTemplate.find(query, Category.class).stream()
                 .map(categoryMapper::toResponse)
                 .toList();
     }
@@ -146,6 +153,20 @@ public class CategoryService {
         categoryRepository.save(category);
     }
 
+    public CategoryResponse restoreCategory(String id) {
+        Category category = getCategoryById(id);
+        if (category.isActive()) {
+            return categoryMapper.toResponse(category);
+        }
+
+        if (StringUtils.hasText(category.getParentId())) {
+            getActiveCategory(category.getParentId());
+        }
+
+        category.setActive(true);
+        return categoryMapper.toResponse(categoryRepository.save(category));
+    }
+
     private Category getActiveCategory(String id) {
         Query query = Query.query(new Criteria().andOperator(
                 MongoIdUtils.idEqualsCriteria("_id", id),
@@ -156,6 +177,11 @@ public class CategoryService {
             throw new ResourceNotFoundException("Category", "id", id);
         }
         return category;
+    }
+
+    private Category getCategoryById(String id) {
+        return categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
     }
 
     private Category getActiveCategoryBySlug(String slug) {

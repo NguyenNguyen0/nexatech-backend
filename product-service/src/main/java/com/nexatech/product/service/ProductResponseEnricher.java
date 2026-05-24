@@ -26,10 +26,8 @@ public class ProductResponseEnricher {
         enrichPrimaryCategoryName(response);
         enrichBrandNameAndSlug(response);
 
-        Double avg = enrichAverageRating(response);
-        if (avg != null) {
-            enrichStock(response);
-        }
+        enrichAverageRating(response);
+        enrichStock(response);
         return response;
     }
 

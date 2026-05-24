@@ -52,27 +52,35 @@ public class ProductController {
 
     @GetMapping
     public ApiResponse<PageResponse<ProductResponse>> getProducts(
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String categoryId,
             @RequestParam(required = false) String categorySlug,
             @RequestParam(required = false) String brandId,
+            @RequestParam(required = false) String sku,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) Double minRating,
             @RequestParam(required = false) Double maxRating,
             @RequestParam(required = false) Boolean featured,
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeleted,
             @RequestParam MultiValueMap<String, String> queryParams,
             Pageable pageable) {
         Map<String, List<String>> specsFilters = extractSpecsFilters(queryParams);
         return ApiResponse.ok(PageResponse.of(
                 productService.getProducts(
+                keyword,
                         categoryId,
                         categorySlug,
                         brandId,
+                sku,
                         minPrice,
                         maxPrice,
                         minRating,
                         maxRating,
                         featured,
+                active,
+                includeDeleted,
                         specsFilters,
                         pageable)));
     }
@@ -162,6 +170,11 @@ public class ProductController {
     public ApiResponse<Void> deleteProduct(@PathVariable String id) {
         productService.deleteProduct(id);
         return ApiResponse.ok(null);
+    }
+
+    @PatchMapping("/{id}/restore")
+    public ApiResponse<ProductResponse> restoreProduct(@PathVariable String id) {
+        return ApiResponse.ok(productService.restoreProduct(id));
     }
 
     private Map<String, List<String>> extractSpecsFilters(MultiValueMap<String, String> queryParams) {
