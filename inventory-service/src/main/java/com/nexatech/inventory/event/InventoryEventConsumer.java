@@ -33,6 +33,7 @@ public class InventoryEventConsumer {
             switch (eventType) {
                 case "ORDER_CANCELLED" -> handleOrderCancelled(event);
                 case "ORDER_DELIVERED" -> handleOrderDelivered(event);
+                case "ORDER_RETURN_APPROVED" -> handleOrderReturnApproved(event);
                 default -> log.debug("Ignoring unsupported order event type={}", eventType);
             }
         } catch (Exception e) {
@@ -53,6 +54,11 @@ public class InventoryEventConsumer {
     private void handleOrderDelivered(OrderEventDto event) {
         StockCheckRequest request = buildStockCheckRequest(event);
         inventoryService.finalizeSale(request, "ORDER:" + event.getOrderId());
+    }
+
+    private void handleOrderReturnApproved(OrderEventDto event) {
+        StockCheckRequest request = buildStockCheckRequest(event);
+        inventoryService.restockReturn(request, "RETURN:" + event.getOrderId());
     }
 
     private StockCheckRequest buildStockCheckRequest(OrderEventDto event) {
