@@ -63,3 +63,7 @@ spring:
               uri: lb://storage-service
               predicates:
                 - Path=/api/v1/files/**
+            - id: news-service
+              uri: lb://news-service
+              predicates:
+                - Path=/api/v1/news/**

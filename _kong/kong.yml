@@ -106,6 +106,14 @@ services:
           - /api/v1/files
         strip_path: false
 
+  - name: news-service
+    url: http://news-service:8092
+    routes:
+      - name: news-route
+        paths:
+          - /api/v1/news
+        strip_path: false
+
 plugins:
   - name: cors
     config:
