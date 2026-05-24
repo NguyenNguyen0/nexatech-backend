@@ -4,6 +4,7 @@ import com.nexatech.inventory.dto.response.ApiResponse;
 import com.nexatech.inventory.dto.BulkImportResult;
 import com.nexatech.inventory.dto.CSVImportResult;
 import com.nexatech.inventory.dto.InventoryResponse;
+import com.nexatech.inventory.dto.StockMovementResponse;
 import com.nexatech.inventory.dto.StockCheckRequest;
 import com.nexatech.inventory.dto.StockUpdateRequest;
 import com.nexatech.inventory.dto.WarehouseUpdateRequest;
@@ -37,6 +38,13 @@ public class InventoryController {
     @GetMapping("/{productId}")
     public ApiResponse<InventoryResponse> getStock(@PathVariable String productId) {
         return ApiResponse.ok(inventoryService.getStock(productId));
+    }
+
+    @GetMapping("/{productId}/movements")
+    public ApiResponse<Page<StockMovementResponse>> getStockMovements(
+            @PathVariable String productId,
+            Pageable pageable) {
+        return ApiResponse.ok(inventoryService.getStockMovements(productId, pageable));
     }
 
     @PutMapping

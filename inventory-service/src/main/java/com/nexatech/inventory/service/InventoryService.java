@@ -6,6 +6,7 @@ import com.nexatech.inventory.dto.BulkImportResult;
 import com.nexatech.inventory.dto.CSVImportError;
 import com.nexatech.inventory.dto.CSVImportResult;
 import com.nexatech.inventory.dto.InventoryResponse;
+import com.nexatech.inventory.dto.StockMovementResponse;
 import com.nexatech.inventory.dto.StockCheckRequest;
 import com.nexatech.inventory.dto.StockUpdateRequest;
 import com.nexatech.inventory.dto.WarehouseUpdateRequest;
@@ -56,6 +57,15 @@ public class InventoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory item", "productId", productId));
         return toResponse(item);
     }
+
+        public Page<StockMovementResponse> getStockMovements(String productId, Pageable pageable) {
+        inventoryItemRepository.findByProductId(productId)
+            .orElseThrow(() -> new ResourceNotFoundException("Inventory item", "productId", productId));
+
+        Pageable safePageable = sanitizeMovementPageable(pageable);
+        return stockMovementRepository.findByProductId(productId, safePageable)
+            .map(this::toMovementResponse);
+        }
 
     @Transactional
     public InventoryResponse updateStock(StockUpdateRequest request) {
@@ -297,6 +307,19 @@ public class InventoryService {
                 .build());
     }
 
+    private StockMovementResponse toMovementResponse(StockMovement movement) {
+        return StockMovementResponse.builder()
+                .id(movement.getId())
+                .productId(movement.getProductId())
+                .type(movement.getType())
+                .quantity(movement.getQuantity())
+                .reference(movement.getReference())
+                .reason(movement.getReason())
+                .performedBy(movement.getPerformedBy())
+                .createdAt(movement.getCreatedAt())
+                .build();
+    }
+
     private boolean isLowStock(InventoryItem item) {
         return item.getQuantity() - item.getReservedQuantity() <= item.getReorderLevel();
     }
@@ -384,6 +407,26 @@ public class InventoryService {
                 safeSort = Sort.by(accepted);
             }
         }
+        return org.springframework.data.domain.PageRequest.of(Math.max(page, 0), Math.max(size, 1), safeSort);
+    }
+
+    private Pageable sanitizeMovementPageable(Pageable pageable) {
+        int page = pageable == null ? 0 : pageable.getPageNumber();
+        int size = pageable == null ? 20 : pageable.getPageSize();
+
+        Sort safeSort = Sort.by(Sort.Direction.DESC, "createdAt");
+        if (pageable != null && pageable.getSort().isSorted()) {
+            List<Sort.Order> accepted = pageable.getSort().stream()
+                    .filter(order -> "createdAt".equals(order.getProperty())
+                            || "type".equals(order.getProperty())
+                            || "quantity".equals(order.getProperty()))
+                    .map(order -> new Sort.Order(order.getDirection(), order.getProperty()))
+                    .toList();
+            if (!accepted.isEmpty()) {
+                safeSort = Sort.by(accepted);
+            }
+        }
+
         return org.springframework.data.domain.PageRequest.of(Math.max(page, 0), Math.max(size, 1), safeSort);
     }
 
