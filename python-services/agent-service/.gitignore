@@ -1,0 +1,18 @@
+# uv-specific
+.venv/
+/.python-version
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables (recommended to keep secret)
+.env
+.env.*
+!.env.example

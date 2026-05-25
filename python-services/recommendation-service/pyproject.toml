@@ -1,0 +1,11 @@
+[project]
+name = "recommendation-service"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.116.0",
+    "uvicorn>=0.35.0",
+    "py-eureka-client>=0.13.2",
+]
