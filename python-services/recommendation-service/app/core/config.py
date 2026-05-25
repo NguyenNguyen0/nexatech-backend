@@ -1,19 +1,43 @@
-import os
-from dataclasses import dataclass
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-@dataclass(frozen=True)
-class Settings:
-    service_name: str = os.getenv("SERVICE_NAME", "recommendation-service")
-    service_version: str = os.getenv("SERVICE_VERSION", "0.1.0")
-    port: int = int(os.getenv("PORT", "8095"))
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
-    eureka_enabled: bool = os.getenv("EUREKA_ENABLED", "true").lower() == "true"
-    eureka_server_url: str = os.getenv("EUREKA_SERVER_URL", "http://localhost:8761/eureka/")
-    eureka_instance_hostname: str = os.getenv("EUREKA_INSTANCE_HOSTNAME", "127.0.0.1")
+    service_name: str = "recommendation-service"
+    service_version: str = "0.1.0"
+    port: int = 8095
+    log_level: str = "INFO"
+    request_id_header: str = "X-Request-Id"
 
-    product_service_api_key: str = os.getenv("PRODUCT_SERVICE_API_KEY", "")
+    eureka_enabled: bool = True
+    eureka_server_url: str = "http://localhost:8761/eureka/"
+    eureka_instance_hostname: str = "127.0.0.1"
+
+    mongo_uri: str = "mongodb://nexatech:nexatech123@localhost:27017/recommendation?authSource=admin"
+    mongo_database: str = "recommendation"
+
+    redis_url: str = "redis://localhost:6379/0"
+
+    kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_behavior_topic: str = "user-behavior-events"
+    kafka_product_topic: str = "product-events"
+
+    product_service_base_url: str = "http://localhost:8083"
+    product_service_api_key: str = "change-me"
+
+    cf_alpha: float = 0.6
+    training_cron_hour: int = 2
+    training_cron_minute: int = 0
 
 
+@lru_cache
 def get_settings() -> Settings:
     return Settings()
