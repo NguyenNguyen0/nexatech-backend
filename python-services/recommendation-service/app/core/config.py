@@ -34,6 +34,7 @@ class Settings(BaseSettings):
 
     product_service_base_url: str = "http://localhost:8090"
     product_service_catalog_path: str = "/api/v1/internal/products/all"
+    product_service_lookup_path: str = "/api/v1/internal/products/lookup"
     product_service_api_key_header: str = "X-Internal-Api-Key"
     product_service_api_key: str = "change-me"
 

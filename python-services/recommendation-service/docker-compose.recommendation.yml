@@ -16,6 +16,7 @@ services:
       PRODUCT_SERVICE_BASE_URL: http://product-service:8090
       PRODUCT_SERVICE_CATALOG_PATH: /api/v1/internal/products/all
       PRODUCT_SERVICE_API_KEY: change-me
+      PRODUCT_SERVICE_LOOKUP_PATH: /api/v1/internal/products/lookup
       MODELS_DIR: /models
       OPENBLAS_NUM_THREADS: "1"
     ports:

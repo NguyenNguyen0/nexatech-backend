@@ -14,6 +14,7 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.repositories.mongo_repo import MongoRepository
 from app.repositories.redis_repo import RedisRepository
+from app.services.product_enrichment import ProductRecommendationEnricher
 from app.sync.product_catalog_sync import ProductCatalogSync
 from app.training.pipeline import TrainingPipeline
 from app.training.pipeline import TrainingSettings
@@ -38,9 +39,11 @@ async def lifespan(app: FastAPI):
     product_service_client = ProductServiceClient(
         base_url=settings.product_service_base_url,
         catalog_path=settings.product_service_catalog_path,
+        lookup_path=settings.product_service_lookup_path,
         api_key=settings.product_service_api_key,
         api_key_header=settings.product_service_api_key_header,
     )
+    recommendation_enricher = ProductRecommendationEnricher(product_service_client)
     product_catalog_sync = ProductCatalogSync(mongo_repo, product_service_client)
     product_event_consumer = ProductEventConsumer(
         bootstrap_servers=settings.kafka_bootstrap_servers,
@@ -72,6 +75,7 @@ async def lifespan(app: FastAPI):
     app.state.redis_repo = redis_repo
     app.state.kafka_client = kafka_client
     app.state.product_service_client = product_service_client
+    app.state.recommendation_enricher = recommendation_enricher
     app.state.product_catalog_sync = product_catalog_sync
     app.state.product_event_consumer = product_event_consumer
     app.state.behavior_consumer = behavior_consumer

@@ -38,9 +38,25 @@ class FakeTrainingPipeline:
         }
 
 
+class FakeRecommendationEnricher:
+    async def enrich_ranked_items(self, items):
+        return [
+            {
+                **item,
+                "product": {
+                    "id": item["productId"],
+                    "name": f"Product {item['productId']}",
+                    "slug": f"slug-{item['productId']}",
+                },
+            }
+            for item in items
+        ]
+
+
 def _build_test_app() -> FastAPI:
     app = FastAPI()
     app.state.training_pipeline = FakeTrainingPipeline()
+    app.state.recommendation_enricher = FakeRecommendationEnricher()
     app.include_router(recommend_router)
     return app
 
@@ -53,6 +69,7 @@ def test_recommend_user_endpoint_returns_ranked_payload():
     assert payload["userId"] == "u-1"
     assert payload["source"] == "hybrid"
     assert len(payload["recommendations"]) == 2
+    assert payload["recommendations"][0]["product"]["id"] == "p1"
 
 
 def test_recommend_similar_endpoint_returns_ranked_payload():
@@ -63,6 +80,7 @@ def test_recommend_similar_endpoint_returns_ranked_payload():
     assert payload["productId"] == "p-root"
     assert payload["source"] == "content-based"
     assert len(payload["similar"]) == 2
+    assert payload["similar"][0]["product"]["id"] == "p10"
 
 
 def test_recommend_popular_endpoint_returns_ranked_payload():
@@ -72,3 +90,4 @@ def test_recommend_popular_endpoint_returns_ranked_payload():
     payload = response.json()
     assert payload["source"] == "popular"
     assert len(payload["popular"]) == 2
+    assert payload["popular"][0]["product"]["id"] == "p100"
