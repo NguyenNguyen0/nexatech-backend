@@ -612,11 +612,122 @@ Các API này vẫn tồn tại để storefront dùng, frontend admin thường
 
 ---
 
-## 8. Frontend Implementation Notes
+## 8. Wishlist APIs For Storefront
+
+Các API này phục vụ storefront/user profile cho chức năng wishlist.
+
+### 8.1 Add Product To Wishlist
+
+- `POST /api/v1/products/wishlist/{productId}`
+
+### Headers
+
+- `Authorization: Bearer <token>`
+- `X-User-Id` (gateway inject từ JWT)
+
+### Behavior
+
+- Idempotent: nếu product đã có trong wishlist thì vẫn trả success.
+- Chỉ add được product đang `active=true`.
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "productId": "6650e3d3c16d7e38e6f7a001",
+    "wishlisted": true
+  },
+  "timestamp": "2026-05-25T10:00:00Z"
+}
+```
+
+### 8.2 Remove Product From Wishlist
+
+- `DELETE /api/v1/products/wishlist/{productId}`
+
+### Behavior
+
+- Idempotent: nếu product chưa có trong wishlist thì vẫn trả success.
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "productId": "6650e3d3c16d7e38e6f7a001",
+    "wishlisted": false
+  },
+  "timestamp": "2026-05-25T10:00:00Z"
+}
+```
+
+### 8.3 Get Wishlist (Paginated)
+
+- `GET /api/v1/products/wishlist`
+
+### Query Params
+
+- `page`, `size`, `sort`
+- Mặc định sort theo `createdAt,desc` của wishlist item.
+
+### Behavior
+
+- Chỉ trả các product hiện đang `active=true`.
+- Product đã bị inactive sẽ bị ẩn khỏi kết quả.
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": [
+      {
+        "id": "6650e3d3c16d7e38e6f7a001",
+        "name": "iPhone 15 Pro",
+        "slug": "iphone-15-pro",
+        "thumbnail": "https://.../thumb.jpg",
+        "price": 29990000,
+        "compareAtPrice": 31990000,
+        "originalPrice": 31990000,
+        "brandId": "6650e3d3c16d7e38e6f7a200",
+        "brandName": "Apple",
+        "primaryCategoryId": "6650e3d3c16d7e38e6f7a100",
+        "primaryCategoryName": "Smartphones",
+        "averageRating": 4.7,
+        "reviewCount": 128,
+        "stockStatus": "IN_STOCK"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1,
+    "last": true
+  },
+  "timestamp": "2026-05-25T10:00:00Z"
+}
+```
+
+### 8.4 FE State Integration Rules
+
+- Heart state phải lấy từ wishlist APIs (không phụ thuộc field `wishlisted` trong product list/detail APIs).
+- Card/detail page:
+  - Khi mount, đồng bộ state bằng dữ liệu wishlist hiện có của user.
+  - Click heart:
+    - Nếu đang off: gọi `POST /api/v1/products/wishlist/{productId}`.
+    - Nếu đang on: gọi `DELETE /api/v1/products/wishlist/{productId}`.
+- Wishlist page hiển thị trực tiếp dữ liệu từ `GET /api/v1/products/wishlist`.
+
+## 9. Frontend Implementation Notes
 
 - Product admin table nên dùng `GET /api/v1/products` với `active` hoặc `includeDeleted` để chuyển tab active/deleted.
 - Category và brand admin tabs nên dùng `GET /api/v1/categories` và `GET /api/v1/brands` với `includeDeleted=true` khi cần render trạng thái restore.
 - Review admin table có thể render trực tiếp `productName`, `productThumbnail`, `rating`, `createdAt` từ `GET /api/v1/reviews` mà không cần join thêm.
 - Inventory table nên lấy từ `GET /api/v1/inventory/list`; không cần gọi thêm product API để lấy tên, slug, thumbnail.
+- Heart state cho product card/detail phải dùng bộ API wishlist ở mục 8.
 - Movement timeline nên lấy từ `GET /api/v1/inventory/{productId}/movements`.
 - Khi upload ảnh sản phẩm, nên upload xong rồi cập nhật `thumbnail` hoặc reorder nếu muốn thay ảnh đại diện.

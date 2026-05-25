@@ -5,6 +5,7 @@ import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.nexatech.product.model.Product;
+import com.nexatech.product.model.Wishlist;
 import org.bson.UuidRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,10 +13,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
+import org.springframework.data.mongodb.core.index.Index;
 import org.springframework.data.mongodb.core.index.TextIndexDefinition;
 
 @Configuration
@@ -65,6 +68,26 @@ public class MongoConfig {
                 log.info("[MongoConfig] Product text index ensured successfully.");
             } catch (Exception ex) {
                 log.error("[MongoConfig] Failed to ensure text index: {}", ex.getMessage());
+            }
+
+            try {
+                log.info("[MongoConfig] Ensuring indexes for Wishlist collection...");
+                mongoTemplate.indexOps(Wishlist.class).createIndex(
+                        new Index()
+                                .on("userId", Sort.Direction.ASC)
+                                .on("productId", Sort.Direction.ASC)
+                                .named("wishlist_user_product_unique")
+                                .unique()
+                );
+                mongoTemplate.indexOps(Wishlist.class).createIndex(
+                        new Index()
+                                .on("userId", Sort.Direction.ASC)
+                                .on("createdAt", Sort.Direction.DESC)
+                                .named("wishlist_user_created_desc")
+                );
+                log.info("[MongoConfig] Wishlist indexes ensured successfully.");
+            } catch (Exception ex) {
+                log.error("[MongoConfig] Failed to ensure wishlist indexes: {}", ex.getMessage());
             }
         };
     }
