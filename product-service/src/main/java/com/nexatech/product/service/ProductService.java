@@ -3,7 +3,6 @@ package com.nexatech.product.service;
 import com.nexatech.product.dto.request.ProductRequest;
 import com.nexatech.product.dto.response.ProductMinimalResponse;
 import com.nexatech.product.dto.response.ProductResponse;
-import com.nexatech.product.dto.response.ProductSuggestResponse;
 import com.nexatech.product.event.ProductCatalogEvent;
 import com.nexatech.product.event.ProductEventProducer;
 import com.nexatech.product.exception.BadRequestException;
@@ -101,6 +100,30 @@ public class ProductService {
                 .filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "slug", slug));
         return enrichProductResponse(productMapper.toResponse(product));
+    }
+
+    public Page<ProductMinimalResponse> getActiveProductsForInternalSync(Pageable pageable) {
+        Pageable safePageable = sanitizePageable(pageable, Sort.by(Sort.Direction.DESC, "updatedAt"));
+        return productRepository.findByActiveTrue(safePageable).map(this::toMinimalSyncResponse);
+    }
+
+    public List<ProductMinimalResponse> getActiveProductsByIdsForInternalSync(List<String> ids) {
+        List<String> normalizedIds = TextUtils.normalizeDistinct(ids);
+        if (normalizedIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Product> byId = productRepository.findByIdInAndActiveTrue(normalizedIds).stream()
+                .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p));
+
+        List<ProductMinimalResponse> responses = new ArrayList<>();
+        for (String id : normalizedIds) {
+            Product product = byId.get(id);
+            if (product != null) {
+                responses.add(toMinimalCatalogResponse(product));
+            }
+        }
+        return responses;
     }
 
     public Page<ProductMinimalResponse> getProducts(String keyword,
@@ -318,29 +341,6 @@ public class ProductService {
         return new PageImpl<>(content, pageable, total);
     }
 
-    public List<ProductSuggestResponse> suggestProducts(String q) {
-        if (!StringUtils.hasText(q) || q.trim().length() < 1) {
-            return List.of();
-        }
-        String escaped = Pattern.quote(q.trim());
-        Pattern regex = Pattern.compile(escaped, Pattern.CASE_INSENSITIVE);
-        Query query = Query.query(new Criteria().andOperator(
-                Criteria.where("active").is(true),
-                Criteria.where("name").regex(regex)
-        ));
-        query.fields().include("name").include("slug").include("thumbnail").include("price");
-        query.limit(5);
-        return mongoTemplate.find(query, Product.class).stream()
-                .map(p -> ProductSuggestResponse.builder()
-                        .id(p.getId())
-                        .name(p.getName())
-                        .slug(p.getSlug())
-                        .thumbnail(p.getThumbnail())
-                        .price(p.getPrice())
-                        .build())
-                .toList();
-    }
-
     public Page<ProductMinimalResponse> getProductsByTags(List<String> tags, Pageable pageable) {
         List<String> normalizedTags = TextUtils.normalizeDistinct(tags);
         if (normalizedTags.isEmpty()) {
@@ -555,6 +555,14 @@ public class ProductService {
             response.setOriginalPrice(response.getCompareAtPrice());
         }
         return productResponseEnricher.enrichMinimalCatalogResponse(response);
+    }
+
+    private ProductMinimalResponse toMinimalSyncResponse(Product product) {
+        ProductMinimalResponse response = productMapper.toMinimalResponse(product);
+        if (response.getOriginalPrice() == null) {
+            response.setOriginalPrice(response.getCompareAtPrice());
+        }
+        return response;
     }
 
     private void appendActiveCriteria(List<Criteria> criteriaList, Boolean active, boolean includeDeleted) {
