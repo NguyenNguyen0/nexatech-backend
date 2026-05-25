@@ -5,7 +5,6 @@ import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.PageResponse;
 import com.nexatech.product.dto.response.ProductMinimalResponse;
 import com.nexatech.product.dto.response.ProductResponse;
-import com.nexatech.product.dto.response.ProductSuggestResponse;
 import com.nexatech.product.dto.response.ReviewResponse;
 import com.nexatech.product.service.ProductService;
 import com.nexatech.product.service.ReviewService;
@@ -119,11 +118,6 @@ public class ProductController {
                         maxRating,
                         specsFilters,
                         pageable)));
-    }
-
-    @GetMapping("/suggest")
-    public ApiResponse<List<ProductSuggestResponse>> suggestProducts(@RequestParam String q) {
-        return ApiResponse.ok(productService.suggestProducts(q));
     }
 
     @GetMapping("/tags")

@@ -6,6 +6,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -15,6 +16,7 @@ public class ProductMinimalResponse {
     private String name;
     private String slug;
     private String sku;
+    private String description;
 
     private BigDecimal price;
     private BigDecimal compareAtPrice;
@@ -31,6 +33,7 @@ public class ProductMinimalResponse {
     private String primaryCategoryName;
     private List<String> categoryIds;
     private List<String> categorySlugs;
+    private Map<String, String> specs;
 
     private List<String> tags;
     private Boolean featured;
