@@ -130,6 +130,30 @@ services:
           - /api/v1/internal/promotions
         strip_path: false
 
+  - name: agent-service
+    url: http://agent-service:8093
+    routes:
+      - name: agent-route
+        paths:
+          - /api/v1/agent
+        strip_path: false
+
+  - name: mcp-server
+    url: http://mcp-server:8094
+    routes:
+      - name: mcp-route
+        paths:
+          - /api/v1/mcp
+        strip_path: false
+
+  - name: recommendation-service
+    url: http://recommendation-service:8095
+    routes:
+      - name: recommendation-route
+        paths:
+          - /api/v1/recommendations
+        strip_path: false
+
 plugins:
   - name: cors
     config:
