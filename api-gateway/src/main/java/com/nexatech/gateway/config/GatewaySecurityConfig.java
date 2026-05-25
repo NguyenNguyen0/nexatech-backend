@@ -26,6 +26,19 @@ public class GatewaySecurityConfig {
     }
 
     @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE + 1)
+    public SecurityFilterChain publicRecommendationRoutes(HttpSecurity http) throws Exception {
+        stateless(http);
+        http.securityMatcher(
+                        "/api/v1/recommend/health",
+                        "/api/v1/recommend/popular",
+                        "/api/v1/recommend/popular/**",
+                        "/api/v1/recommend/similar/**")
+                .authorizeHttpRequests(a -> a.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
     @Order(Ordered.LOWEST_PRECEDENCE)
     public SecurityFilterChain jwtRoutes(HttpSecurity http) throws Exception {
         stateless(http);
@@ -40,12 +53,7 @@ public class GatewaySecurityConfig {
                 .permitAll()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/agent/health",
-                    "/api/v1/mcp/health",
-                    "/api/v1/recommendations/health")
-                .permitAll()
-                .requestMatchers(HttpMethod.GET,
-                    "/api/v1/recommendations/recommend/popular",
-                    "/api/v1/recommendations/recommend/similar/**")
+                    "/api/v1/mcp/health")
                 .permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/checkout").permitAll()
                 // VNPay callbacks — server-to-server IPN and browser return (no auth token)

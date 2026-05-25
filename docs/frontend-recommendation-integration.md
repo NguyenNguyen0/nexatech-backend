@@ -11,12 +11,13 @@ This guide describes how frontend should integrate with recommendation and produ
 
 ## 2) Recommendation APIs for frontend
 
-Base URL (through gateway/Kong): your deployed recommendation route.
+Base URL (through gateway/Kong): `http://<gateway-host>/api/v1/recommend`.
 Local direct URL (service): `http://localhost:8095`.
 
 ### 2.1 Get user recommendations
 
-`GET /recommend/user/{userId}?top_k=10&enrich=true`
+Gateway: `GET /api/v1/recommend/user/{userId}?top_k=10&enrich=true`
+Service direct: `GET /recommend/user/{userId}?top_k=10&enrich=true`
 
 Sample response:
 
@@ -47,11 +48,13 @@ Sample response:
 
 ### 2.2 Get similar products
 
-`GET /recommend/similar/{productId}?top_k=10&enrich=true`
+Gateway: `GET /api/v1/recommend/similar/{productId}?top_k=10&enrich=true`
+Service direct: `GET /recommend/similar/{productId}?top_k=10&enrich=true`
 
 ### 2.3 Get popular fallback
 
-`GET /recommend/popular?top_k=10&enrich=true`
+Gateway: `GET /api/v1/recommend/popular?top_k=10&enrich=true`
+Service direct: `GET /recommend/popular?top_k=10&enrich=true`
 
 ### 2.4 Optional raw ranking mode
 
@@ -68,9 +71,9 @@ For each recommendation item:
 
 Recommended fallback priority:
 
-1. `recommend/user`
-2. `recommend/similar` (for PDP)
-3. `recommend/popular`
+1. `/api/v1/recommend/user` (authenticated)
+2. `/api/v1/recommend/similar` (for PDP)
+3. `/api/v1/recommend/popular`
 
 ## 4) Behavior events to improve recommendations
 
@@ -131,8 +134,8 @@ Verified in this update:
 
 ## 7) Frontend quick-start flow
 
-1. On home page load: call `GET /recommend/popular?top_k=10&enrich=true`.
-2. On authenticated sessions: call `GET /recommend/user/{userId}?top_k=10&enrich=true`.
-3. On product detail page: call `GET /recommend/similar/{productId}?top_k=10&enrich=true`.
+1. On home page load: call `GET /api/v1/recommend/popular?top_k=10&enrich=true`.
+2. On authenticated sessions: call `GET /api/v1/recommend/user/{userId}?top_k=10&enrich=true`.
+3. On product detail page: call `GET /api/v1/recommend/similar/{productId}?top_k=10&enrich=true`.
 4. Track interactions (view/click/cart/purchase/rate) and send to `POST /api/v1/behaviors`.
 5. When throughput is high, buffer client-side and send bulk events to `POST /api/v1/behaviors/batch`.
