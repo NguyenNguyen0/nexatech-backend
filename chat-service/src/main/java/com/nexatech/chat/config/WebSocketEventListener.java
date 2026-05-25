@@ -1,7 +1,6 @@
 package com.nexatech.chat.config;
 
 import com.nexatech.chat.service.OnlineStatusService;
-import com.nexatech.chat.service.ConversationAssignmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,7 +22,6 @@ import java.util.stream.Collectors;
 public class WebSocketEventListener {
 
     private final OnlineStatusService onlineStatusService;
-    private final ConversationAssignmentService conversationAssignmentService;
 
     @Value("${app.assignment-agent-roles:STAFF}")
     private String assignmentAgentRoles;
@@ -37,7 +35,6 @@ public class WebSocketEventListener {
         if (userId != null) {
             if (isAssignableAgent(roleHeader)) {
                 onlineStatusService.markAgentOnline(userId);
-                conversationAssignmentService.assignWaitingConversations();
             } else {
                 onlineStatusService.markOnline(userId);
             }

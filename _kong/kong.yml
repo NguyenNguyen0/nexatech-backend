@@ -1,98 +1,17 @@
 _format_version: "3.0"
 
 services:
-  - name: identity-service
-    url: http://identity-service:8081
+  - name: api-gateway
+    url: http://api-gateway:8080
     routes:
-      - name: identity-route
+      - name: api-gateway-route
         paths:
-          - /api/v1/auth
-        strip_path: false
-
-  - name: user-service
-    url: http://user-service:8082
-    routes:
-      - name: user-route
-        paths:
-          - /api/v1/users
-        strip_path: false
-
-  - name: product-service
-    url: http://product-service:8090
-    routes:
-      - name: product-route
-        paths:
-          - /api/v1/products
-          - /api/v1/categories
-          - /api/v1/brands
-          - /api/v1/reviews
-          - /api/v1/admin/products
-        strip_path: false
-
-  - name: order-service
-    url: http://order-service:8084
-    connect_timeout: 10000
-    read_timeout: 60000
-    write_timeout: 10000
-    retries: 3
-    routes:
-      - name: order-route
-        paths:
-          - /api/v1/orders
-          - /api/v1/cart
-          - /api/v1/checkout
-          - /api/v1/returns
-          - /api/v1/admin/orders
-        strip_path: false
-
-  - name: inventory-service
-    url: http://inventory-service:8085
-    routes:
-      - name: inventory-route
-        paths:
-          - /api/v1/inventory
-        strip_path: false
-
-  - name: payment-service
-    url: http://payment-service:8086
-    connect_timeout: 10000
-    read_timeout: 60000
-    write_timeout: 10000
-    retries: 3
-    routes:
-      - name: payment-route
-        paths:
-          - /api/v1/payments
-          - /api/v1/admin/payments
-        strip_path: false
-
-  - name: shipping-service
-    url: http://shipping-service:8091
-    connect_timeout: 10000
-    read_timeout: 60000
-    write_timeout: 10000
-    retries: 3
-    routes:
-      - name: shipping-route
-        paths:
-          - /api/v1/shipping
-        strip_path: false
-
-  - name: notification-service
-    url: http://notification-service:8087
-    routes:
-      - name: notification-route
-        paths:
-          - /api/v1/notifications
+          - /api/v1
         strip_path: false
 
   - name: chat-service
     url: http://chat-service:8089
     routes:
-      - name: chat-route
-        paths:
-          - /api/v1/conversations
-        strip_path: false
       - name: chat-ws-route
         paths:
           - /ws/chat
