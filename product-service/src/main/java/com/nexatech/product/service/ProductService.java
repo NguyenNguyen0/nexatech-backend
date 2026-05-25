@@ -103,6 +103,11 @@ public class ProductService {
         return enrichProductResponse(productMapper.toResponse(product));
     }
 
+    public Page<Product> getActiveProductsForInternalSync(Pageable pageable) {
+        Pageable safePageable = sanitizePageable(pageable, Sort.by(Sort.Direction.DESC, "updatedAt"));
+        return productRepository.findByActiveTrue(safePageable);
+    }
+
     public Page<ProductMinimalResponse> getProducts(String keyword,
                                                     String categoryId,
                                                     String categorySlug,

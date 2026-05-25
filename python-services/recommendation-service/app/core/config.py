@@ -28,9 +28,12 @@ class Settings(BaseSettings):
 
     kafka_bootstrap_servers: str = "localhost:9092"
     kafka_behavior_topic: str = "user-behavior-events"
-    kafka_product_topic: str = "product-events"
+    kafka_product_topic: str = "product.events"
+    kafka_product_consumer_group: str = "rec-product-catalog-sync"
 
-    product_service_base_url: str = "http://localhost:8083"
+    product_service_base_url: str = "http://localhost:8090"
+    product_service_catalog_path: str = "/api/v1/internal/products/all"
+    product_service_api_key_header: str = "X-Internal-Api-Key"
     product_service_api_key: str = "change-me"
 
     cf_alpha: float = 0.6
