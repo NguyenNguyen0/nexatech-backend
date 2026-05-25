@@ -10,6 +10,8 @@ MVN = mvn
 
 # Load .env.ec2 và set env vars trong cùng một PowerShell process
 LOAD_EC2 = Get-Content .env.ec2 | Where-Object { $$_ -notmatch '^\s*\#' -and $$_ -match '=' } | ForEach-Object { $$p = $$_ -split '=',2; [Environment]::SetEnvironmentVariable($$p[0].Trim(),$$p[1].Trim(),'Process') }
+# Load .env (service credentials: GHN, VNPay, MinIO, v.v.)
+LOAD_ENV = if (Test-Path .env) { Get-Content .env | Where-Object { $$_ -notmatch '^\s*\#' -and $$_ -match '=' } | ForEach-Object { $$p = $$_ -split '=',2; [Environment]::SetEnvironmentVariable($$p[0].Trim(),$$p[1].Trim(),'Process') } }
 
 .PHONY: help build clean compile dev-up dev-down full-up full-down infra-reset logs-infra logs-full prune \
 	core-up core-down core-build core-logs \
@@ -167,10 +169,10 @@ run-order-ec2:
 	powershell -NoProfile -Command "$(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_orders'; mvn -pl order-service spring-boot:run"
 
 run-payment-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_payments'; mvn -pl payment-service spring-boot:run"
+	powershell -NoProfile -Command "$(LOAD_ENV); $(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_payments'; mvn -pl payment-service spring-boot:run"
 
 run-shipping-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_shipping'; mvn -pl shipping-service spring-boot:run"
+	powershell -NoProfile -Command "$(LOAD_ENV); $(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_shipping'; mvn -pl shipping-service spring-boot:run"
 
 run-notification-ec2:
 	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DB_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_notifications'; mvn -pl notification-service spring-boot:run"

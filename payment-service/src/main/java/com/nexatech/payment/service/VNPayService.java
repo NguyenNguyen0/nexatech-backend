@@ -6,6 +6,7 @@ import com.nexatech.payment.dto.VNPayResponse;
 import com.nexatech.payment.enums.PaymentMethod;
 import com.nexatech.payment.enums.PaymentStatus;
 import com.nexatech.payment.event.PaymentEvent;
+import com.nexatech.payment.event.PaymentEventProducer;
 import com.nexatech.payment.exception.BadRequestException;
 import com.nexatech.payment.model.Payment;
 import com.nexatech.payment.repository.PaymentRepository;
@@ -14,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -30,6 +33,7 @@ public class VNPayService {
     private final PaymentRepository paymentRepository;
     private final OutboxEventService outboxEventService;
     private final AuditLogService auditLogService;
+    private final PaymentEventProducer paymentEventProducer;
 
     /**
      * Tạo URL thanh toán VNPay và lưu giao dịch với trạng thái PENDING.
@@ -140,20 +144,58 @@ public class VNPayService {
 
     /**
      * Xử lý return URL — VNPay redirect trình duyệt sau khi thanh toán xong.
-     * Trả về JSON để frontend hiển thị kết quả (thành công / thất bại).
+     * Cũng cập nhật trạng thái payment nếu IPN chưa được xử lý (fallback cho môi trường dev/local).
      */
+    @Transactional
     public Map<String, String> processReturn(Map<String, String> params) {
-        // Clone để không làm thay đổi params gốc
-        Map<String, String> result = new LinkedHashMap<>(params);
+        // Clone để không làm thay đổi params gốc (processIpn cần params nguyên bản)
+        Map<String, String> cloned = new LinkedHashMap<>(params);
 
-        String receivedHash = params.remove("vnp_SecureHash");
-        params.remove("vnp_SecureHashType");
-        String hashData = VNPayUtil.buildHashData(params);
+        String receivedHash = cloned.remove("vnp_SecureHash");
+        cloned.remove("vnp_SecureHashType");
+        String hashData = VNPayUtil.buildHashData(cloned);
         String expectedHash = VNPayUtil.hmacSha512(vnPayConfig.getHashSecret(), hashData);
 
         boolean valid = expectedHash.equalsIgnoreCase(receivedHash);
+
+        Map<String, String> result = new LinkedHashMap<>(cloned);
         result.put("signatureValid", String.valueOf(valid));
-        result.put("success", valid && "00".equals(params.get("vnp_ResponseCode")) ? "true" : "false");
+        result.put("success", valid && "00".equals(cloned.get("vnp_ResponseCode")) ? "true" : "false");
+
+        // Fallback: cập nhật DB nếu IPN chưa xử lý (status vẫn PENDING)
+        if (valid) {
+            String txnRef = cloned.get("vnp_TxnRef");
+            String responseCode = cloned.get("vnp_ResponseCode");
+            paymentRepository.findByTransactionId(txnRef).ifPresent(payment -> {
+                if (payment.getStatus() == PaymentStatus.PENDING) {
+                    if ("00".equals(responseCode)) {
+                        payment.setStatus(PaymentStatus.COMPLETED);
+                        paymentRepository.save(payment);
+                        savePaymentEventToOutbox(payment, "PAYMENT_COMPLETED");
+                        log.info("Return URL fallback: thanh toán VNPay thành công — orderId={}", payment.getOrderId());
+                        // Publish ngay lập tức sau khi transaction commit — không chờ outbox scheduler
+                        PaymentEvent immediateEvent = buildPaymentEvent(payment, "PAYMENT_COMPLETED");
+                        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                            @Override
+                            public void afterCommit() {
+                                try {
+                                    paymentEventProducer.publishPaymentEvent(immediateEvent);
+                                    log.info("Return fallback: đã publish PAYMENT_COMPLETED ngay tức thì — orderId={}", payment.getOrderId());
+                                } catch (Exception ex) {
+                                    log.warn("Return fallback: immediate Kafka publish thất bại (outbox sẽ retry) — orderId={} error={}", payment.getOrderId(), ex.getMessage());
+                                }
+                            }
+                        });
+                    } else {
+                        payment.setStatus(PaymentStatus.FAILED);
+                        payment.setFailureReason("VNPay return code: " + responseCode);
+                        paymentRepository.save(payment);
+                        savePaymentEventToOutbox(payment, "PAYMENT_FAILED");
+                        log.warn("Return URL fallback: thanh toán VNPay thất bại — responseCode={}, orderId={}", responseCode, payment.getOrderId());
+                    }
+                }
+            });
+        }
 
         return result;
     }
@@ -206,7 +248,12 @@ public class VNPayService {
     }
 
     private void savePaymentEventToOutbox(Payment payment, String eventType) {
-        PaymentEvent event = PaymentEvent.builder()
+        PaymentEvent event = buildPaymentEvent(payment, eventType);
+        outboxEventService.saveEvent("Payment", payment.getId().toString(), eventType, event);
+    }
+
+    private PaymentEvent buildPaymentEvent(Payment payment, String eventType) {
+        return PaymentEvent.builder()
                 .eventId(UUID.randomUUID())
                 .eventType(eventType)
                 .timestamp(Instant.now())
@@ -216,6 +263,5 @@ public class VNPayService {
                 .amount(payment.getAmount())
                 .status(payment.getStatus())
                 .build();
-        outboxEventService.saveEvent("Payment", payment.getId().toString(), eventType, event);
     }
 }
