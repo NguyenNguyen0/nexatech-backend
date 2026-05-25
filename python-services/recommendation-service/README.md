@@ -63,11 +63,29 @@ uv run pytest tests/integration
 
 - Health: `GET /health`
 - Readiness: `GET /ready`
+- Behavior ingestion: `POST /behaviors` (`X-User-Id` header required)
 - User recommendations: `GET /recommend/user/{userId}` (default `enrich=true` includes `product` details)
 - Similar items: `GET /recommend/similar/{productId}` (default `enrich=true`)
 - Popular fallback: `GET /recommend/popular` (default `enrich=true`)
 
 To return raw ranking payload only (without product metadata), pass `enrich=false`.
+
+Behavior ingestion payload (example):
+
+```json
+{
+	"eventId": "evt-123",
+	"productId": "665f0e3cb9d9f63d40a7d111",
+	"eventType": "VIEW",
+	"rating": null,
+	"categoryIds": ["phone"],
+	"brandId": "apple",
+	"price": 27990000,
+	"timestamp": "2026-05-25T15:24:11Z"
+}
+```
+
+Gateway path for frontend: `POST /api/v1/behaviors`.
 
 Recommended runtime metrics to monitor:
 
@@ -92,6 +110,7 @@ Recommended runtime metrics to monitor:
 - KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 - KAFKA_BEHAVIOR_TOPIC=user-behavior-events
 - KAFKA_BEHAVIOR_CONSUMER_GROUP=rec-behavior-collector
+- BEHAVIOR_DEDUP_TTL_SECONDS=86400
 - KAFKA_PRODUCT_TOPIC=product.events
 - KAFKA_PRODUCT_CONSUMER_GROUP=rec-product-catalog-sync
 - PRODUCT_SERVICE_BASE_URL=http://localhost:8090

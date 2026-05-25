@@ -6,6 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
 
+from app.clients.behavior_producer import BehaviorProducer
 from app.clients.kafka_client import KafkaClient
 from app.clients.product_service_client import ProductServiceClient
 from app.collector.behavior_consumer import BehaviorConsumer
@@ -36,6 +37,10 @@ async def lifespan(app: FastAPI):
     mongo_repo = MongoRepository(settings.mongo_uri, settings.mongo_database)
     redis_repo = RedisRepository(settings.redis_url)
     kafka_client = KafkaClient(settings.kafka_bootstrap_servers)
+    behavior_producer = BehaviorProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers,
+        topic=settings.kafka_behavior_topic,
+    )
     product_service_client = ProductServiceClient(
         base_url=settings.product_service_base_url,
         catalog_path=settings.product_service_catalog_path,
@@ -74,6 +79,7 @@ async def lifespan(app: FastAPI):
     app.state.mongo_repo = mongo_repo
     app.state.redis_repo = redis_repo
     app.state.kafka_client = kafka_client
+    app.state.behavior_producer = None
     app.state.product_service_client = product_service_client
     app.state.recommendation_enricher = recommendation_enricher
     app.state.product_catalog_sync = product_catalog_sync
@@ -109,6 +115,12 @@ async def lifespan(app: FastAPI):
     except Exception as exc:  # pragma: no cover
         app.state.readiness_checks["kafka"] = f"error: {exc.__class__.__name__}"
         logger.warning("Kafka ping failed: %s", exc)
+
+    try:
+        await behavior_producer.start()
+        app.state.behavior_producer = behavior_producer
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Behavior producer startup failed: %s", exc)
 
     try:
         await product_catalog_sync.initial_sync_if_empty()
@@ -168,6 +180,8 @@ async def lifespan(app: FastAPI):
         await behavior_consumer.stop()
         if scheduler.running:
             scheduler.shutdown(wait=False)
+        if app.state.behavior_producer is not None:
+            await app.state.behavior_producer.stop()
         await product_service_client.close()
         await redis_repo.close()
         await mongo_repo.close()

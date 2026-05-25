@@ -94,3 +94,9 @@ spring:
                 - Path=/api/v1/recommendations/**
               filters:
                 - StripPrefix=3
+            - id: recommendation-behavior-ingestion
+              uri: lb://recommendation-service
+              predicates:
+                - Path=/api/v1/behaviors/**
+              filters:
+                - StripPrefix=2
