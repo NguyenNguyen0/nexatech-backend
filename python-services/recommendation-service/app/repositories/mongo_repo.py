@@ -136,5 +136,48 @@ class MongoRepository:
     async def count_user_interactions(self) -> int:
         return int(await self.db["user_interactions"].count_documents({}))
 
+    async def list_active_products(self) -> list[dict]:
+        cursor = self.db["product_catalog"].find(
+            {"active": True},
+            {
+                "_id": 1,
+                "name": 1,
+                "description": 1,
+                "primaryCategoryId": 1,
+                "primaryCategorySlug": 1,
+                "categoryIds": 1,
+                "categorySlugs": 1,
+                "brandId": 1,
+                "price": 1,
+                "specs": 1,
+                "active": 1,
+            },
+        )
+        products = await cursor.to_list(length=None)
+        for product in products:
+            product["_id"] = str(product.get("_id"))
+        return products
+
+    async def list_interactions(self) -> list[dict]:
+        cursor = self.db["user_interactions"].find(
+            {},
+            {"_id": 0, "userId": 1, "productId": 1, "score": 1, "lastTs": 1, "firstTs": 1},
+        )
+        return await cursor.to_list(length=None)
+
+    async def list_user_seen_products(self, user_id: str) -> set[str]:
+        cursor = self.db["user_interactions"].find({"userId": user_id}, {"_id": 0, "productId": 1})
+        rows = await cursor.to_list(length=None)
+        return {str(row.get("productId")) for row in rows if row.get("productId")}
+
+    async def get_top_popular_products(self, top_k: int) -> list[dict]:
+        pipeline = [
+            {"$group": {"_id": "$productId", "score": {"$sum": "$score"}}},
+            {"$sort": {"score": -1}},
+            {"$limit": int(top_k)},
+        ]
+        rows = await self.db["user_interactions"].aggregate(pipeline).to_list(length=int(top_k))
+        return [{"productId": str(row.get("_id")), "score": float(row.get("score") or 0)} for row in rows]
+
     async def close(self) -> None:
         self.client.close()

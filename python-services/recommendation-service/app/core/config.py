@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     product_service_api_key: str = "change-me"
 
     cf_alpha: float = 0.6
+    recommendation_model_refresh_seconds: int = 120
+    recommendation_cache_ttl_seconds: int = 60
     training_cron_hour: int = 2
     training_cron_minute: int = 0
 

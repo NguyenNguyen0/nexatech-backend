@@ -13,6 +13,8 @@ from app.core.logging import configure_logging
 from app.repositories.mongo_repo import MongoRepository
 from app.repositories.redis_repo import RedisRepository
 from app.sync.product_catalog_sync import ProductCatalogSync
+from app.training.pipeline import TrainingPipeline
+from app.training.pipeline import TrainingSettings
 
 try:
     import py_eureka_client.eureka_client as eureka_client
@@ -50,6 +52,15 @@ async def lifespan(app: FastAPI):
         group_id=settings.kafka_behavior_consumer_group,
         mongo_repo=mongo_repo,
     )
+    training_pipeline = TrainingPipeline(
+        mongo_repo=mongo_repo,
+        redis_repo=redis_repo,
+        settings=TrainingSettings(
+            alpha=settings.cf_alpha,
+            model_refresh_seconds=settings.recommendation_model_refresh_seconds,
+            cache_ttl_seconds=settings.recommendation_cache_ttl_seconds,
+        ),
+    )
     product_consumer_task = None
     behavior_consumer_task = None
 
@@ -60,6 +71,7 @@ async def lifespan(app: FastAPI):
     app.state.product_catalog_sync = product_catalog_sync
     app.state.product_event_consumer = product_event_consumer
     app.state.behavior_consumer = behavior_consumer
+    app.state.training_pipeline = training_pipeline
     app.state.settings = settings
     app.state.readiness_checks = {
         "mongo": "pending",
