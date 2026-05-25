@@ -59,6 +59,15 @@ spring:
               uri: lb://chat-service
               predicates:
                 - Path=/api/v1/conversations/**
+            - id: chat-service-websocket
+              uri: lb:ws://chat-service
+              predicates:
+                - Path=/ws/chat,/ws/chat/**
+                - Header=Upgrade, websocket
+            - id: chat-service-sockjs
+              uri: lb://chat-service
+              predicates:
+                - Path=/ws/chat,/ws/chat/**
             - id: storage-service
               uri: lb://storage-service
               predicates:
