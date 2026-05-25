@@ -3,13 +3,13 @@
 -- (mounted to /docker-entrypoint-initdb.d/)
 -- ============================================================
 
--- Keycloak IAM
-SELECT 'CREATE DATABASE keycloak'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak');
+-- -- Keycloak IAM
+-- SELECT 'CREATE DATABASE keycloak' => không có db
+-- WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak');
 
--- Identity Service
-SELECT 'CREATE DATABASE nexatech_identity'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_identity');
+-- -- Identity Service => không có db
+-- SELECT 'CREATE DATABASE nexatech_identity'
+-- WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'nexatech_identity');
 
 -- User Service
 SELECT 'CREATE DATABASE nexatech_users'
