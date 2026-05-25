@@ -37,6 +37,14 @@ public class GatewaySecurityConfig {
                     "/api/v1/brands/**",
                     "/api/v1/reviews/**")
                 .permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/checkout").permitAll()
+                // VNPay callbacks — server-to-server IPN and browser return (no auth token)
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/payments/vnpay/ipn",
+                    "/api/v1/payments/vnpay/return")
+                .permitAll()
+                // Guest order status polling after checkout
+                .requestMatchers(HttpMethod.GET, "/api/v1/orders/*").permitAll()
                 .requestMatchers("/api/v1/news/**").permitAll()
                 .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
