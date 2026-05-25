@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     kafka_behavior_topic: str = "user-behavior-events"
     kafka_behavior_consumer_group: str = "rec-behavior-collector"
     behavior_dedup_ttl_seconds: int = 24 * 60 * 60
+    behavior_batch_max_size: int = 100
     kafka_product_topic: str = "product.events"
     kafka_product_consumer_group: str = "rec-product-catalog-sync"
 

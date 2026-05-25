@@ -26,8 +26,11 @@ class FakeRedisRepo:
 class FakeBehaviorProducer:
     def __init__(self):
         self.events = []
+        self.fail_ids = set()
 
     async def send_behavior(self, event: dict):
+        if event.get("eventId") in self.fail_ids:
+            raise RuntimeError("producer failed")
         self.events.append(event)
 
 
@@ -38,6 +41,7 @@ def _build_app() -> FastAPI:
 
     class Settings:
         behavior_dedup_ttl_seconds = 86400
+        behavior_batch_max_size = 100
 
     app.state.settings = Settings()
     app.include_router(behavior_router)
@@ -87,3 +91,68 @@ def test_ingest_behavior_requires_user_header():
     response = client.post("/behaviors", json={"productId": "p-1", "eventType": "VIEW"})
 
     assert response.status_code == 401
+
+
+def test_ingest_behavior_batch_returns_summary():
+    app = _build_app()
+    client = TestClient(app)
+
+    payload = {
+        "events": [
+            {"eventId": "evt-b1", "productId": "p-1", "eventType": "VIEW"},
+            {"eventId": "evt-b2", "productId": "p-2", "eventType": "CART_ADD"},
+        ]
+    }
+    response = client.post("/behaviors/batch", headers={"X-User-Id": "u-1"}, json=payload)
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["status"] == "accepted"
+    assert body["summary"]["accepted"] == 2
+    assert body["summary"]["duplicate"] == 0
+    assert body["summary"]["failed"] == 0
+
+
+def test_ingest_behavior_batch_handles_duplicate_and_failure():
+    app = _build_app()
+    app.state.behavior_producer.fail_ids.add("evt-fail")
+    client = TestClient(app)
+
+    first = client.post(
+        "/behaviors",
+        headers={"X-User-Id": "u-1"},
+        json={"eventId": "evt-dup-batch", "productId": "p-1", "eventType": "VIEW"},
+    )
+    assert first.status_code == 202
+
+    batch_payload = {
+        "events": [
+            {"eventId": "evt-dup-batch", "productId": "p-1", "eventType": "VIEW"},
+            {"eventId": "evt-fail", "productId": "p-2", "eventType": "VIEW"},
+            {"eventId": "evt-ok", "productId": "p-3", "eventType": "VIEW"},
+        ]
+    }
+    response = client.post("/behaviors/batch", headers={"X-User-Id": "u-1"}, json=batch_payload)
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["status"] == "partial"
+    assert body["summary"]["duplicate"] == 1
+    assert body["summary"]["failed"] == 1
+    assert body["summary"]["accepted"] == 1
+
+
+def test_ingest_behavior_batch_rejects_oversize_payload():
+    app = _build_app()
+    app.state.settings.behavior_batch_max_size = 1
+    client = TestClient(app)
+
+    payload = {
+        "events": [
+            {"eventId": "evt-1", "productId": "p-1", "eventType": "VIEW"},
+            {"eventId": "evt-2", "productId": "p-2", "eventType": "VIEW"},
+        ]
+    }
+    response = client.post("/behaviors/batch", headers={"X-User-Id": "u-1"}, json=payload)
+
+    assert response.status_code == 400

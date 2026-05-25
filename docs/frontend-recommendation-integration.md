@@ -106,6 +106,8 @@ Backend now provides behavior ingestion API in recommendation-service:
 
 - Service route: `POST /behaviors`
 - Gateway route: `POST /api/v1/behaviors`
+- Service batch route: `POST /behaviors/batch`
+- Gateway batch route: `POST /api/v1/behaviors/batch`
 
 Requirements:
 
@@ -133,3 +135,4 @@ Verified in this update:
 2. On authenticated sessions: call `GET /recommend/user/{userId}?top_k=10&enrich=true`.
 3. On product detail page: call `GET /recommend/similar/{productId}?top_k=10&enrich=true`.
 4. Track interactions (view/click/cart/purchase/rate) and send to `POST /api/v1/behaviors`.
+5. When throughput is high, buffer client-side and send bulk events to `POST /api/v1/behaviors/batch`.

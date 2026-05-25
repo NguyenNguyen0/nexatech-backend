@@ -51,3 +51,7 @@ class BehaviorEventRequest(BaseModel):
         if self.event_type == EventType.RATE:
             return max(1.0, min(5.0, self.rating or 1.0))
         return DEFAULT_BEHAVIOR_WEIGHTS[self.event_type]
+
+
+class BehaviorBatchRequest(BaseModel):
+    events: list[BehaviorEventRequest] = Field(min_length=1, max_length=200)
