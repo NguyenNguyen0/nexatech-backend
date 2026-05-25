@@ -1,6 +1,10 @@
+from datetime import UTC, datetime
+
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import ASCENDING, DESCENDING
 from pymongo import UpdateOne
+
+from app.schemas.events import UserBehaviorEvent
 
 
 class MongoRepository:
@@ -15,6 +19,7 @@ class MongoRepository:
     async def init_indexes(self) -> None:
         product_catalog = self.db["product_catalog"]
         user_interactions = self.db["user_interactions"]
+        behavior_event_dedup = self.db["behavior_event_dedup"]
 
         await product_catalog.create_index([("active", ASCENDING)], name="idx_product_catalog_active")
         await user_interactions.create_index(
@@ -23,6 +28,11 @@ class MongoRepository:
             name="uq_user_product",
         )
         await user_interactions.create_index([("lastTs", DESCENDING)], name="idx_user_interactions_last_ts")
+        await behavior_event_dedup.create_index(
+            [("createdAt", ASCENDING)],
+            name="idx_behavior_event_dedup_ttl",
+            expireAfterSeconds=7 * 24 * 60 * 60,
+        )
 
     async def count_product_catalog(self) -> int:
         return int(await self.db["product_catalog"].count_documents({}))
@@ -88,6 +98,43 @@ class MongoRepository:
             {"$set": update_doc},
             upsert=True,
         )
+
+    async def apply_behavior_event(self, event: UserBehaviorEvent) -> bool:
+        dedup_result = await self.db["behavior_event_dedup"].update_one(
+            {"_id": event.event_id},
+            {"$setOnInsert": {"createdAt": event.timestamp}},
+            upsert=True,
+        )
+        if dedup_result.upserted_id is None:
+            return False
+
+        now = datetime.now(UTC)
+        set_fields = {
+            "lastTs": event.timestamp,
+            "updatedAt": now,
+            "lastEventType": event.event_type,
+        }
+        if event.category_ids:
+            set_fields["categoryIds"] = event.category_ids
+        if event.brand_id is not None:
+            set_fields["brandId"] = event.brand_id
+        if event.price is not None:
+            set_fields["price"] = event.price
+
+        await self.db["user_interactions"].update_one(
+            {"userId": event.user_id, "productId": event.product_id},
+            {
+                "$inc": {"score": event.weight, f"eventCounts.{event.event_type}": 1},
+                "$set": set_fields,
+                "$min": {"firstTs": event.timestamp},
+                "$setOnInsert": {"createdAt": now},
+            },
+            upsert=True,
+        )
+        return True
+
+    async def count_user_interactions(self) -> int:
+        return int(await self.db["user_interactions"].count_documents({}))
 
     async def close(self) -> None:
         self.client.close()

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.clients.kafka_client import KafkaClient
 from app.clients.product_service_client import ProductServiceClient
+from app.collector.behavior_consumer import BehaviorConsumer
 from app.collector.product_event_consumer import ProductEventConsumer
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -43,7 +44,14 @@ async def lifespan(app: FastAPI):
         group_id=settings.kafka_product_consumer_group,
         catalog_sync=product_catalog_sync,
     )
+    behavior_consumer = BehaviorConsumer(
+        bootstrap_servers=settings.kafka_bootstrap_servers,
+        topic=settings.kafka_behavior_topic,
+        group_id=settings.kafka_behavior_consumer_group,
+        mongo_repo=mongo_repo,
+    )
     product_consumer_task = None
+    behavior_consumer_task = None
 
     app.state.mongo_repo = mongo_repo
     app.state.redis_repo = redis_repo
@@ -51,6 +59,7 @@ async def lifespan(app: FastAPI):
     app.state.product_service_client = product_service_client
     app.state.product_catalog_sync = product_catalog_sync
     app.state.product_event_consumer = product_event_consumer
+    app.state.behavior_consumer = behavior_consumer
     app.state.settings = settings
     app.state.readiness_checks = {
         "mongo": "pending",
@@ -86,6 +95,7 @@ async def lifespan(app: FastAPI):
         logger.warning("Initial product catalog sync failed: %s", exc)
 
     product_consumer_task = asyncio.create_task(product_event_consumer.start())
+    behavior_consumer_task = asyncio.create_task(behavior_consumer.start())
 
     if settings.eureka_enabled and eureka_client is not None:
         try:
@@ -110,7 +120,12 @@ async def lifespan(app: FastAPI):
             product_consumer_task.cancel()
             with suppress(asyncio.CancelledError):
                 await product_consumer_task
+        if behavior_consumer_task is not None:
+            behavior_consumer_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await behavior_consumer_task
         await product_event_consumer.stop()
+        await behavior_consumer.stop()
         await product_service_client.close()
         await redis_repo.close()
         await mongo_repo.close()

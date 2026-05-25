@@ -28,6 +28,7 @@ class Settings(BaseSettings):
 
     kafka_bootstrap_servers: str = "localhost:9092"
     kafka_behavior_topic: str = "user-behavior-events"
+    kafka_behavior_consumer_group: str = "rec-behavior-collector"
     kafka_product_topic: str = "product.events"
     kafka_product_consumer_group: str = "rec-product-catalog-sync"
 
