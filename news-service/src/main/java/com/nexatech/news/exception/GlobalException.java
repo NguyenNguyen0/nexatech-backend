@@ -1,6 +1,6 @@
 package com.nexatech.news.exception;
 
-import com.nexatech.news.dto.response.ApiResponse;
+import com.nexatech.news.query.model.ApiResponse;
 import com.nexatech.news.enums.ErrorCode;
 
 import org.springframework.http.ResponseEntity;
