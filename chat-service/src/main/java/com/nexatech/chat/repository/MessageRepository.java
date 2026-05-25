@@ -23,4 +23,6 @@ public interface MessageRepository extends MongoRepository<ChatMessage, UUID> {
             Pageable pageable);
 
     java.util.Optional<ChatMessage> findByIdAndConversationId(UUID messageId, UUID conversationId);
+
+    void deleteByConversationId(UUID conversationId);
 }
