@@ -138,6 +138,9 @@
 | `payment-service` | 8086 | PostgreSQL | Payment processing |
 | `notification-service` | 8087 | PostgreSQL | Email/notification consumer from Kafka events |
 | `storage-service` | 8088 | MinIO | File upload & retrieval (product images) |
+| `agent-service` | 8093 | — | Python FastAPI agent service |
+| `mcp-server` | 8094 | — | Python FastAPI MCP service |
+| `recommendation-service` | 8095 | — | Python FastAPI recommendation service |
 | `kong` | 8000 (proxy) / 8001 (admin) | — | API Gateway |
 
 ---
@@ -282,6 +285,9 @@ mvn spring-boot:run
 | Payment Service | `http://localhost:8086` | `GET /actuator/health` |
 | Notification Service | `http://localhost:8087` | `GET /actuator/health` |
 | Storage Service | `http://localhost:8088` | `GET /actuator/health` |
+| Agent Service | `http://localhost:8091` | `GET /health` |
+| MCP Server | `http://localhost:8092` | `GET /health` |
+| Recommendation Service | `http://localhost:8093` | `GET /health` |
 
 ### Infrastructure
 

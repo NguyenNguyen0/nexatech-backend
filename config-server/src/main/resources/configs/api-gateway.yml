@@ -76,3 +76,21 @@ spring:
               uri: lb://news-service
               predicates:
                 - Path=/api/v1/news/**
+            - id: agent-service
+              uri: lb://agent-service
+              predicates:
+                - Path=/api/v1/agent/**
+              filters:
+                - StripPrefix=3
+            - id: mcp-server
+              uri: lb://mcp-server
+              predicates:
+                - Path=/api/v1/mcp/**
+              filters:
+                - StripPrefix=3
+            - id: recommendation-service
+              uri: lb://recommendation-service
+              predicates:
+                - Path=/api/v1/recommendations/**
+              filters:
+                - StripPrefix=3
