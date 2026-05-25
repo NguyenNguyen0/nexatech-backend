@@ -3,6 +3,10 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+
+import joblib
 
 from app.repositories.mongo_repo import MongoRepository
 from app.repositories.redis_repo import RedisRepository
@@ -26,6 +30,7 @@ class TrainingSettings:
     alpha: float = 0.6
     model_refresh_seconds: int = 120
     cache_ttl_seconds: int = 60
+    models_dir: str = "models"
 
 
 class TrainingPipeline:
@@ -43,6 +48,9 @@ class TrainingPipeline:
         self._active_products: set[str] = set()
         self._last_trained_at = 0.0
         self._train_lock = asyncio.Lock()
+        self._current_model_meta: dict | None = None
+        self._models_dir = Path(self._settings.models_dir)
+        self._models_dir.mkdir(parents=True, exist_ok=True)
 
     async def _ensure_fresh_models(self) -> None:
         now = time.time()
@@ -55,14 +63,78 @@ class TrainingPipeline:
                 return
             await self.run()
 
-    async def run(self) -> None:
+    async def run(self, trigger: str = "manual") -> dict:
         products = await self._mongo_repo.list_active_products()
         interactions = await self._mongo_repo.list_interactions()
+        data_window = await self._mongo_repo.get_interaction_data_window()
 
-        self._cb.train(products)
-        self._cf.train(interactions)
-        self._active_products = {str(product.get("_id")) for product in products if product.get("_id")}
+        next_cb = ContentBasedFilter()
+        next_cf = CollaborativeFilter()
+
+        next_cb.train(products)
+        next_cf.train(interactions)
+        next_active_products = {str(product.get("_id")) for product in products if product.get("_id")}
+
+        model_version = datetime.now(UTC).strftime("model-%Y%m%d%H%M%S")
+        trained_at = datetime.now(UTC).isoformat()
+
+        model_meta = {
+            "version": model_version,
+            "trainedAt": trained_at,
+            "trigger": trigger,
+            "dataWindow": data_window,
+            "stats": {
+                "activeProductCount": len(next_active_products),
+                "interactionCount": len(interactions),
+            },
+            "algorithm": {
+                "type": "hybrid",
+                "alpha": self._settings.alpha,
+                "contentBasedReady": next_cb.is_ready,
+                "collaborativeReady": next_cf.is_ready,
+            },
+        }
+
+        artifact_path = self._persist_artifacts(
+            model_version=model_version,
+            model_meta=model_meta,
+            content_based=next_cb,
+            collaborative=next_cf,
+            active_products=next_active_products,
+        )
+        model_meta["artifactPath"] = str(artifact_path)
+
+        self._cb = next_cb
+        self._cf = next_cf
+        self._active_products = next_active_products
+        self._current_model_meta = model_meta
         self._last_trained_at = time.time()
+
+        await self._mongo_repo.upsert_model_meta(model_meta)
+        return model_meta
+
+    async def run_scheduled_training(self) -> dict:
+        async with self._train_lock:
+            return await self.run(trigger="scheduled")
+
+    def _persist_artifacts(
+        self,
+        model_version: str,
+        model_meta: dict,
+        content_based: ContentBasedFilter,
+        collaborative: CollaborativeFilter,
+        active_products: set[str],
+    ) -> Path:
+        artifact = {
+            "version": model_version,
+            "meta": model_meta,
+            "activeProducts": sorted(active_products),
+            "contentBased": content_based.export_state(),
+            "collaborative": collaborative.export_state(),
+        }
+        artifact_path = self._models_dir / f"{model_version}.joblib"
+        joblib.dump(artifact, artifact_path)
+        return artifact_path
 
     async def recommend_for_user(self, user_id: str, top_k: int) -> dict:
         cache_key = f"rec:user:{user_id}:{top_k}"

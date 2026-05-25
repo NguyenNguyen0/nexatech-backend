@@ -37,6 +37,22 @@ class ContentBasedFilter:
         self._matrix = self._vectorizer.fit_transform(corpus)
         self._trained = True
 
+    def export_state(self) -> dict:
+        return {
+            "product_ids": list(self._product_ids),
+            "product_index": dict(self._product_index),
+            "matrix": self._matrix,
+            "vectorizer": self._vectorizer,
+            "trained": self._trained,
+        }
+
+    def import_state(self, state: dict) -> None:
+        self._product_ids = list(state.get("product_ids") or [])
+        self._product_index = dict(state.get("product_index") or {})
+        self._matrix = state.get("matrix")
+        self._vectorizer = state.get("vectorizer") or self._vectorizer
+        self._trained = bool(state.get("trained"))
+
     def similar_products(self, product_id: str, top_k: int = 10) -> list[tuple[str, float]]:
         if not self.is_ready:
             return []

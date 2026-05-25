@@ -121,3 +121,30 @@ class CollaborativeFilter:
             if len(similar_map) >= top_k:
                 break
         return similar_map
+
+    def export_state(self) -> dict:
+        return {
+            "user_index": dict(self._user_index),
+            "item_index": dict(self._item_index),
+            "index_user": list(self._index_user),
+            "index_item": list(self._index_item),
+            "user_item_matrix": self._user_item_matrix,
+            "ready": self._ready,
+            "user_factors": getattr(self._model, "user_factors", None),
+            "item_factors": getattr(self._model, "item_factors", None),
+        }
+
+    def import_state(self, state: dict) -> None:
+        self._user_index = dict(state.get("user_index") or {})
+        self._item_index = dict(state.get("item_index") or {})
+        self._index_user = list(state.get("index_user") or [])
+        self._index_item = list(state.get("index_item") or [])
+        self._user_item_matrix = state.get("user_item_matrix")
+        self._ready = bool(state.get("ready"))
+
+        user_factors = state.get("user_factors")
+        item_factors = state.get("item_factors")
+        if user_factors is not None:
+            self._model.user_factors = user_factors
+        if item_factors is not None:
+            self._model.item_factors = item_factors

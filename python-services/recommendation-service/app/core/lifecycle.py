@@ -2,6 +2,8 @@ import logging
 import asyncio
 from contextlib import asynccontextmanager, suppress
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
 
 from app.clients.kafka_client import KafkaClient
@@ -59,8 +61,10 @@ async def lifespan(app: FastAPI):
             alpha=settings.cf_alpha,
             model_refresh_seconds=settings.recommendation_model_refresh_seconds,
             cache_ttl_seconds=settings.recommendation_cache_ttl_seconds,
+            models_dir=settings.models_dir,
         ),
     )
+    scheduler = AsyncIOScheduler(timezone=settings.training_timezone)
     product_consumer_task = None
     behavior_consumer_task = None
 
@@ -72,6 +76,7 @@ async def lifespan(app: FastAPI):
     app.state.product_event_consumer = product_event_consumer
     app.state.behavior_consumer = behavior_consumer
     app.state.training_pipeline = training_pipeline
+    app.state.scheduler = scheduler
     app.state.settings = settings
     app.state.readiness_checks = {
         "mongo": "pending",
@@ -109,6 +114,25 @@ async def lifespan(app: FastAPI):
     product_consumer_task = asyncio.create_task(product_event_consumer.start())
     behavior_consumer_task = asyncio.create_task(behavior_consumer.start())
 
+    try:
+        await training_pipeline.run(trigger="startup")
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Initial model training failed: %s", exc)
+
+    scheduler.add_job(
+        training_pipeline.run_scheduled_training,
+        CronTrigger(
+            hour=settings.training_cron_hour,
+            minute=settings.training_cron_minute,
+            timezone=settings.training_timezone,
+        ),
+        id="recommendation-nightly-training",
+        replace_existing=True,
+        coalesce=True,
+        max_instances=1,
+    )
+    scheduler.start()
+
     if settings.eureka_enabled and eureka_client is not None:
         try:
             await eureka_client.init_async(
@@ -138,6 +162,8 @@ async def lifespan(app: FastAPI):
                 await behavior_consumer_task
         await product_event_consumer.stop()
         await behavior_consumer.stop()
+        if scheduler.running:
+            scheduler.shutdown(wait=False)
         await product_service_client.close()
         await redis_repo.close()
         await mongo_repo.close()

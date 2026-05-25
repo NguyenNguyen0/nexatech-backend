@@ -179,5 +179,41 @@ class MongoRepository:
         rows = await self.db["user_interactions"].aggregate(pipeline).to_list(length=int(top_k))
         return [{"productId": str(row.get("_id")), "score": float(row.get("score") or 0)} for row in rows]
 
+    async def get_interaction_data_window(self) -> dict:
+        pipeline = [
+            {
+                "$group": {
+                    "_id": None,
+                    "minTs": {"$min": "$lastTs"},
+                    "maxTs": {"$max": "$lastTs"},
+                    "count": {"$sum": 1},
+                }
+            }
+        ]
+        rows = await self.db["user_interactions"].aggregate(pipeline).to_list(length=1)
+        if not rows:
+            return {"start": None, "end": None, "interactionCount": 0}
+        row = rows[0]
+        return {
+            "start": row.get("minTs").isoformat() if row.get("minTs") else None,
+            "end": row.get("maxTs").isoformat() if row.get("maxTs") else None,
+            "interactionCount": int(row.get("count") or 0),
+        }
+
+    async def upsert_model_meta(self, model_meta: dict) -> None:
+        now = datetime.now(UTC)
+        model_meta = dict(model_meta)
+        version = str(model_meta.get("version"))
+
+        set_payload = dict(model_meta)
+        set_payload.pop("createdAt", None)
+        set_payload["updatedAt"] = now
+
+        await self.db["model_meta"].update_one(
+            {"_id": version},
+            {"$set": set_payload, "$setOnInsert": {"createdAt": now}},
+            upsert=True,
+        )
+
     async def close(self) -> None:
         self.client.close()
