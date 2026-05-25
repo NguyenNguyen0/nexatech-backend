@@ -292,7 +292,11 @@ public class OrderService {
         try {
             ProductInfo product = productClient.getProduct(productId).getData();
             if (product != null && product.isActive()) {
-                price = product.getPrice();
+                // Prefer client-provided unitPrice (may be flash sale / discounted price);
+                // fall back to product-service price only when client sends nothing.
+                price = (itemReq.getUnitPrice() != null && itemReq.getUnitPrice().compareTo(BigDecimal.ZERO) > 0)
+                        ? itemReq.getUnitPrice()
+                        : product.getPrice();
                 productName = product.getName();
             } else if (product != null && !product.isActive()) {
                 throw new BadRequestException("Sản phẩm không tồn tại hoặc đã ngừng bán: " + productId);
