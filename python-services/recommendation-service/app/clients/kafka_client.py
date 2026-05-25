@@ -1,5 +1,14 @@
+from aiokafka import AIOKafkaProducer
+
+
 class KafkaClient:
-    """Placeholder Kafka client abstraction."""
+    def __init__(self, bootstrap_servers: str) -> None:
+        self.bootstrap_servers = bootstrap_servers
 
     async def ping(self) -> bool:
-        return False
+        producer = AIOKafkaProducer(bootstrap_servers=self.bootstrap_servers)
+        await producer.start()
+        try:
+            return True
+        finally:
+            await producer.stop()
