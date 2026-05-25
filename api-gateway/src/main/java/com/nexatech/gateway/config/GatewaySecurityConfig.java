@@ -31,6 +31,7 @@ public class GatewaySecurityConfig {
         stateless(http);
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/api/v1/products/wishlist/**").authenticated()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/products/**",
                     "/api/v1/categories/**",
