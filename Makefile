@@ -16,9 +16,9 @@ LOAD_ENV = if (Test-Path .env) { Get-Content .env | Where-Object { $$_ -notmatch
 .PHONY: help build clean compile dev-up dev-down full-up full-down infra-reset logs-infra logs-full prune \
 	core-up core-down core-build core-logs \
 	run-discovery run-config run-gateway \
-	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-storage \
+	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-storage run-promotion \
 	run-gateway-ec2 run-identity-ec2 run-user-ec2 run-product-ec2 run-inventory-ec2 \
-	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-storage-ec2 run-news-ec2
+	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-storage-ec2 run-news-ec2 run-promotion-ec2
 
 help:
 	@echo "Available commands:"
@@ -49,6 +49,7 @@ help:
 	@echo "  make run-notification   - Run notification-service"
 	@echo "  make run-chat           - Run chat-service"
 	@echo "  make run-storage        - Run storage-service"
+	@echo "  make run-promotion      - Run promotion-service (Node.js, requires .env in promotion-service/)"
 	@echo ""
 	@echo "Run with EC2 infra (loads .env.ec2):"
 	@echo "  make run-gateway-ec2      - Run api-gateway (EC2 infra)"
@@ -63,6 +64,7 @@ help:
 	@echo "  make run-chat-ec2         - Run chat-service (EC2 infra)"
 	@echo "  make run-storage-ec2      - Run storage-service (EC2 infra)"
 	@echo "  make run-news-ec2         - Run news-service (EC2 infra)"
+	@echo "  make run-promotion-ec2    - Run promotion-service (EC2 infra, Node.js)"
 
 # --- Maven Commands ---
 build:
@@ -149,6 +151,9 @@ run-chat:
 run-storage:
 	$(MVN) -pl storage-service spring-boot:run
 
+run-promotion:
+	powershell -NoProfile -Command "Set-Location promotion-service; npm run start:dev"
+
 # --- Run Individual Services with EC2 Infra (.env.ec2) ---
 run-gateway-ec2:
 	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl api-gateway spring-boot:run"
@@ -185,6 +190,15 @@ run-user-ec2:
 
 run-news-ec2:
 	powershell -NoProfile -Command "$(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_news'; $$env:SPRING_DATASOURCE_USERNAME=$$env:DB_USERNAME; $$env:SPRING_DATASOURCE_PASSWORD=$$env:DB_PASSWORD; mvn -pl news-service spring-boot:run"
+
+run-promotion-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DATABASE_URL='postgresql://'+$$env:DB_USERNAME+':'+$$env:DB_PASSWORD+'@'+$$env:EC2_HOST+':5432/nexatech_promotions'; $$env:KAFKA_BROKERS=$$env:KAFKA_BOOTSTRAP_SERVERS; Set-Location promotion-service; npm run start:dev"
+
+migrate-promotion-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DATABASE_URL='postgresql://'+$$env:DB_USERNAME+':'+$$env:DB_PASSWORD+'@'+$$env:EC2_HOST+':5432/nexatech_promotions'; Set-Location promotion-service; npx prisma migrate deploy"
+
+seed-promotion-ec2:
+	powershell -NoProfile -Command "$(LOAD_EC2); Get-Content promotion-service/prisma/seed.sql | ssh -i $$env:SSH_KEY ubuntu@$$env:EC2_HOST 'docker exec -i nexatech-infra-postgres psql -U nexatech -d nexatech_promotions'"
 
 # --- Utility ---
 # Lệnh clean container và image thừa (Dùng trong PowerShell)

@@ -32,3 +32,6 @@ CREATE DATABASE nexatech_chats WITH OWNER nexatech;
 
 -- News Service
 CREATE DATABASE nexatech_news WITH OWNER nexatech;
+
+-- Promotion Service
+CREATE DATABASE nexatech_promotions WITH OWNER nexatech;
