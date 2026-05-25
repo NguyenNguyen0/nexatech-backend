@@ -1,6 +1,5 @@
 package com.nexatech.product.util;
 
-import com.nexatech.product.dto.response.ProductResponse;
 import com.nexatech.product.exception.BadRequestException;
 import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -92,7 +91,7 @@ public final class ProductQueryUtils {
         return PageRequest.of(Math.max(page, 0), Math.max(size, 1), safeSort);
     }
 
-    public static Page<ProductResponse> pageSlice(List<ProductResponse> list, Pageable pageable) {
+    public static <T> Page<T> pageSlice(List<T> list, Pageable pageable) {
         int from = (int) pageable.getOffset();
         if (from >= list.size()) {
             return new PageImpl<>(List.of(), pageable, list.size());

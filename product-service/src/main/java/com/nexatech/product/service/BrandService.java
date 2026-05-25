@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -75,8 +76,15 @@ public class BrandService {
         return brandMapper.toResponse(brand);
     }
 
-    public List<BrandResponse> getAllBrands() {
-        return brandRepository.findByActiveTrue().stream()
+    public List<BrandResponse> getAllBrands(Boolean active, boolean includeDeleted) {
+        Query query = new Query().with(Sort.by(Sort.Order.asc("name")));
+        if (active != null) {
+            query.addCriteria(Criteria.where("active").is(active));
+        } else if (!includeDeleted) {
+            query.addCriteria(Criteria.where("active").is(true));
+        }
+
+        return mongoTemplate.find(query, Brand.class).stream()
                 .map(brandMapper::toResponse)
                 .toList();
     }
@@ -92,6 +100,18 @@ public class BrandService {
         brandRepository.save(brand);
     }
 
+    public BrandResponse restoreBrand(String id) {
+        Brand brand = getBrandById(id);
+        if (brand.isActive()) {
+            return brandMapper.toResponse(brand);
+        }
+
+        validateParentBrand(brand.getParentBrandId(), id);
+
+        brand.setActive(true);
+        return brandMapper.toResponse(brandRepository.save(brand));
+    }
+
     private Brand getActiveBrand(String id) {
         Query query = Query.query(new Criteria().andOperator(
                 MongoIdUtils.idEqualsCriteria("_id", id),
@@ -102,6 +122,11 @@ public class BrandService {
             throw new ResourceNotFoundException("Brand", "id", id);
         }
         return brand;
+    }
+
+    private Brand getBrandById(String id) {
+        return brandRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
     }
 
     private void validateParentBrand(String parentBrandId, String currentBrandId) {

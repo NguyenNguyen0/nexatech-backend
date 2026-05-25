@@ -42,13 +42,20 @@ public class BrandController {
     }
 
     @GetMapping
-    public ApiResponse<List<BrandResponse>> getAllBrands() {
-        return ApiResponse.ok(brandService.getAllBrands());
+    public ApiResponse<List<BrandResponse>> getAllBrands(
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeleted) {
+        return ApiResponse.ok(brandService.getAllBrands(active, includeDeleted));
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteBrand(@PathVariable String id) {
         brandService.deleteBrand(id);
         return ApiResponse.ok(null);
+    }
+
+    @PatchMapping("/{id}/restore")
+    public ApiResponse<BrandResponse> restoreBrand(@PathVariable String id) {
+        return ApiResponse.ok(brandService.restoreBrand(id));
     }
 }

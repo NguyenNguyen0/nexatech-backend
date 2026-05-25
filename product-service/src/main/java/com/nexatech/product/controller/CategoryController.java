@@ -44,8 +44,10 @@ public class CategoryController {
     }
 
     @GetMapping
-    public ApiResponse<List<CategoryResponse>> getAllCategories() {
-        return ApiResponse.ok(categoryService.getAllCategories());
+    public ApiResponse<List<CategoryResponse>> getAllCategories(
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDeleted) {
+        return ApiResponse.ok(categoryService.getAllCategories(active, includeDeleted));
     }
 
     @GetMapping("/menu")
@@ -72,5 +74,10 @@ public class CategoryController {
     public ApiResponse<Void> deleteCategory(@PathVariable String id) {
         categoryService.deleteCategory(id);
         return ApiResponse.ok(null);
+    }
+
+    @PatchMapping("/{id}/restore")
+    public ApiResponse<CategoryResponse> restoreCategory(@PathVariable String id) {
+        return ApiResponse.ok(categoryService.restoreCategory(id));
     }
 }
