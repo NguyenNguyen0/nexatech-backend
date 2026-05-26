@@ -5,10 +5,11 @@ spring:
   threads:
     virtual:
       enabled: true
+  mongodb:
+    uri: ${MONGO_AUDIT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_audit?authSource=admin&authMechanism=SCRAM-SHA-256}
+    uuid-representation: java_legacy
   data:
     mongodb:
-      uri: ${MONGO_AUDIT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_audit?authSource=admin&authMechanism=SCRAM-SHA-256}
-      uuid-representation: java_legacy
       auto-index-creation: true
     web:
       pageable:
