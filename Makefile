@@ -9,16 +9,16 @@ DOCKER_CORE = _realms/docker-compose-order-payment.yml
 MVN = mvn
 
 # Load .env.ec2 và set env vars trong cùng một PowerShell process
-LOAD_EC2 = Get-Content .env.ec2 | Where-Object { $$_ -notmatch '^\s*\#' -and $$_ -match '=' } | ForEach-Object { $$p = $$_ -split '=',2; [Environment]::SetEnvironmentVariable($$p[0].Trim(),$$p[1].Trim(),'Process') }
 # Load .env (service credentials: GHN, VNPay, MinIO, v.v.)
-LOAD_ENV = if (Test-Path .env) { Get-Content .env | Where-Object { $$_ -notmatch '^\s*\#' -and $$_ -match '=' } | ForEach-Object { $$p = $$_ -split '=',2; [Environment]::SetEnvironmentVariable($$p[0].Trim(),$$p[1].Trim(),'Process') } }
 
 .PHONY: help build clean compile dev-up dev-down full-up full-down infra-reset logs-infra logs-full prune \
 	core-up core-down core-build core-logs \
 	run-discovery run-config run-gateway \
 	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-storage run-promotion \
+	run-gateway-test run-chat-test \
 	run-gateway-ec2 run-identity-ec2 run-user-ec2 run-product-ec2 run-inventory-ec2 \
-	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-storage-ec2 run-news-ec2 run-promotion-ec2
+	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-storage-ec2 run-news-ec2 run-promotion-ec2 \
+	run-all-terminals run-all-ec2-terminals run-store-ec2-terminals run-chat-ec2-terminals run-order-ec2-terminals
 
 help:
 	@echo "Available commands:"
@@ -52,6 +52,8 @@ help:
 	@echo "  make run-promotion      - Run promotion-service (Node.js, requires .env in promotion-service/)"
 	@echo ""
 	@echo "Run with EC2 infra (loads .env.ec2):"
+	@echo "  make run-gateway-test    - Alias for run-gateway-ec2 (client REST uses this)"
+	@echo "  make run-chat-test       - Alias for run-chat-ec2 (client chat REST via gateway)"
 	@echo "  make run-gateway-ec2      - Run api-gateway (EC2 infra)"
 	@echo "  make run-product-ec2      - Run product-service (EC2 infra)"
 	@echo "  make run-inventory-ec2    - Run inventory-service (EC2 infra)"
@@ -65,6 +67,13 @@ help:
 	@echo "  make run-storage-ec2      - Run storage-service (EC2 infra)"
 	@echo "  make run-news-ec2         - Run news-service (EC2 infra)"
 	@echo "  make run-promotion-ec2    - Run promotion-service (EC2 infra, Node.js)"
+	@echo ""
+	@echo "Open services in separate PowerShell terminals:"
+	@echo "  make run-all-ec2-terminals   - Open all EC2-mode services, one terminal each"
+	@echo "  make run-all-terminals       - Open all local-mode services, one terminal each"
+	@echo "  make run-store-ec2-terminals - Open gateway/product/inventory/promotion, one terminal each"
+	@echo "  make run-chat-ec2-terminals  - Open gateway/chat/user/identity, one terminal each"
+	@echo "  make run-order-ec2-terminals - Open gateway/order/payment/shipping, one terminal each"
 
 # --- Maven Commands ---
 build:
@@ -154,51 +163,73 @@ run-storage:
 run-promotion:
 	powershell -NoProfile -Command "Set-Location promotion-service; npm run start:dev"
 
+# --- Chat test via local app + EC2 infra ---
+# Use these when the frontend points REST to localhost:8080 and infra/Eureka lives on EC2.
+run-gateway-test: run-gateway-ec2
+
+run-chat-test: run-chat-ec2
+
 # --- Run Individual Services with EC2 Infra (.env.ec2) ---
 run-gateway-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl api-gateway spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 api-gateway
 
 run-product-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl product-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 product-service
 
 run-inventory-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl inventory-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 inventory-service
 
 run-identity-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl identity-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 identity-service
 
 run-storage-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); mvn -pl storage-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 storage-service
 
 run-order-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_orders'; mvn -pl order-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 order-service
 
 run-payment-ec2:
-	powershell -NoProfile -Command "$(LOAD_ENV); $(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_payments'; mvn -pl payment-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 payment-service
 
 run-shipping-ec2:
-	powershell -NoProfile -Command "$(LOAD_ENV); $(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_shipping'; mvn -pl shipping-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 shipping-service
 
 run-notification-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DB_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_notifications'; mvn -pl notification-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 notification-service
 
 run-chat-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DB_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_chats'; mvn -pl chat-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 chat-service
 
 run-user-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_users'; $$env:DATASOURCE_USERNAME=$$env:DB_USERNAME; $$env:DATASOURCE_PASSWORD=$$env:DB_PASSWORD; $$env:KAFKA_GROUP_ID='user-service-group'; mvn -pl user-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 user-service
 
 run-news-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); $$env:SPRING_DATASOURCE_URL='jdbc:postgresql://'+$$env:EC2_HOST+':5432/nexatech_news'; $$env:SPRING_DATASOURCE_USERNAME=$$env:DB_USERNAME; $$env:SPRING_DATASOURCE_PASSWORD=$$env:DB_PASSWORD; mvn -pl news-service spring-boot:run"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 news-service
 
 run-promotion-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DATABASE_URL='postgresql://'+$$env:DB_USERNAME+':'+$$env:DB_PASSWORD+'@'+$$env:EC2_HOST+':5432/nexatech_promotions'; $$env:KAFKA_BROKERS=$$env:KAFKA_BOOTSTRAP_SERVERS; Set-Location promotion-service; npm run start:dev"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 promotion-service
 
 migrate-promotion-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); $$env:DATABASE_URL='postgresql://'+$$env:DB_USERNAME+':'+$$env:DB_PASSWORD+'@'+$$env:EC2_HOST+':5432/nexatech_promotions'; Set-Location promotion-service; npx prisma migrate deploy"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 promotion-migrate
 
 seed-promotion-ec2:
-	powershell -NoProfile -Command "$(LOAD_EC2); Get-Content promotion-service/prisma/seed.sql | ssh -i $$env:SSH_KEY ubuntu@$$env:EC2_HOST 'docker exec -i nexatech-infra-postgres psql -U nexatech -d nexatech_promotions'"
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 promotion-seed
+
+# --- Open Multiple Services In Separate Terminals ---
+run-all-ec2-terminals:
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-services.ps1 -Mode ec2
+
+run-all-terminals:
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-services.ps1 -Mode local
+
+run-store-ec2-terminals:
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-services.ps1 -Mode ec2 -Services api-gateway,product-service,inventory-service,promotion-service
+
+run-chat-ec2-terminals:
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-services.ps1 -Mode ec2 -Services api-gateway,chat-service,user-service,identity-service
+
+run-order-ec2-terminals:
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-services.ps1 -Mode ec2 -Services api-gateway,order-service,payment-service,shipping-service
 
 # --- Utility ---
 # Lệnh clean container và image thừa (Dùng trong PowerShell)
