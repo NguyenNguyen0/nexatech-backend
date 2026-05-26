@@ -1,0 +1,67 @@
+server:
+  port: 8096
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  data:
+    mongodb:
+      uri: ${MONGO_AUDIT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_audit?authSource=admin&authMechanism=SCRAM-SHA-256}
+      uuid-representation: java_legacy
+      auto-index-creation: true
+    web:
+      pageable:
+        one-indexed-parameters: true
+        max-page-size: 20
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:audit-service-group}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    topic:
+      audit-log: ${AUDIT_LOG_TOPIC:audit-topic}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9000/realms/nexatech}
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 30MB
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Ho_Chi_Minh
+
+springdoc:
+  api-docs:
+    enabled: false
+    version: OPENAPI_3_0
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      status:
+        http-mapping:
+          UP: 200
+          DOWN: 503
+  health:
+    mongodb:
+      enabled: false
+  info:
+    env:
+      enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.nexatech: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

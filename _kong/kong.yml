@@ -114,6 +114,14 @@ services:
           - /api/v1/news
         strip_path: false
 
+  - name: audit-service
+    url: http://audit-service:8096
+    routes:
+      - name: audit-route
+        paths:
+          - /api/v1/admin/audit
+        strip_path: false
+
   - name: promotion-service
     url: http://promotion-service:8093
     connect_timeout: 10000

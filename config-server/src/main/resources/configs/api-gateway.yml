@@ -76,6 +76,10 @@ spring:
               uri: lb://news-service
               predicates:
                 - Path=/api/v1/news/**
+            - id: audit-service
+              uri: lb://audit-service
+              predicates:
+                - Path=/api/v1/admin/audit/**
             - id: agent-service
               uri: lb://agent-service
               predicates:
