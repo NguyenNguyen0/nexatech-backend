@@ -1,6 +1,7 @@
 package com.nexatech.shipping.provider.ghn;
 
 import io.netty.channel.ChannelOption;
+import io.netty.resolver.DefaultAddressResolverGroup;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -16,7 +17,10 @@ public class GhnWebClientConfig {
 
     @Bean
     public WebClient ghnWebClient(GhnProperties properties) {
+        // Dùng JDK DNS resolver thay vì Netty async DNS để tránh lỗi
+        // "Failed to resolve ... after 3 queries" trên một số môi trường
         HttpClient httpClient = HttpClient.create()
+                .resolver(DefaultAddressResolverGroup.INSTANCE)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5_000)
                 .responseTimeout(Duration.ofSeconds(10));
 

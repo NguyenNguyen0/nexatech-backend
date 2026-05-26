@@ -120,7 +120,12 @@ public class CheckoutService {
 
         // 5. Xóa cart (chỉ khi đăng nhập — Redis cart)
         if (customerId != null) {
-            cartService.clearCart(customerId);
+            try {
+                cartService.clearCart(customerId);
+            } catch (Exception e) {
+                log.warn("Không thể xóa cart Redis sau checkout (order đã tạo thành công): userId={}, error={}",
+                        customerId, e.getMessage());
+            }
         }
 
         log.info("Checkout thành công: order={}, payment={}, method={}",
