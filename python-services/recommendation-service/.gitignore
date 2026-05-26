@@ -16,3 +16,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Job lib model
+/models/
+!/models/.gitkeep
