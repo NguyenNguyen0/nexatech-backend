@@ -1,30 +1,29 @@
-package com.nexatech.product.service;
+package com.nexatech.product.handler.category;
 
-import com.nexatech.product.dto.request.CategoryRequest;
 import com.nexatech.product.dto.response.CategoryMenuItemResponse;
 import com.nexatech.product.dto.response.CategoryMetaResponse;
 import com.nexatech.product.dto.response.CategoryResponse;
-import com.nexatech.product.exception.BadRequestException;
 import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.CategoryMapper;
 import com.nexatech.product.model.Category;
+import com.nexatech.product.query.category.*;
 import com.nexatech.product.repository.CategoryRepository;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.util.MongoIdUtils;
-import com.nexatech.product.util.TextUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
 
-@Service
+@Component
 @RequiredArgsConstructor
-public class CategoryService {
+public class CategoryQueryHandler {
 
     private static final String ROOT_PARENT_KEY = "__root__";
 
@@ -33,92 +32,50 @@ public class CategoryService {
     private final CategoryMapper categoryMapper;
     private final MongoTemplate mongoTemplate;
 
-    public CategoryResponse createCategory(CategoryRequest request) {
-        String normalizedName = TextUtils.normalizeName(request.getName());
-        if (categoryRepository.existsByNameIgnoreCase(normalizedName)) {
-            throw new BadRequestException("Category name already exists: " + normalizedName);
-        }
-
-        if (StringUtils.hasText(request.getParentId())) {
-            getActiveCategory(request.getParentId());
-        }
-
-        Category category = categoryMapper.toEntity(request);
-        category.setName(normalizedName);
-        category.setSlug(generateUniqueSlug(normalizedName, null));
-        category.setActive(true);
-        category.setMetadata(sanitizeMetadata(request.getMetadata()));
-
-        return categoryMapper.toResponse(categoryRepository.save(category));
+    public CategoryResponse handle(GetCategoryByIdQuery query) {
+        return categoryMapper.toResponse(getActiveCategory(query.id()));
     }
 
-    public CategoryResponse updateCategory(String id, CategoryRequest request) {
-        Category category = getActiveCategory(id);
-        String normalizedName = TextUtils.normalizeName(request.getName());
-
-        if (categoryRepository.existsByNameIgnoreCaseAndIdNot(normalizedName, id)) {
-            throw new BadRequestException("Category name already exists: " + normalizedName);
-        }
-
-        if (StringUtils.hasText(request.getParentId())) {
-            if (MongoIdUtils.equalsId(id, request.getParentId())) {
-                throw new BadRequestException("Category cannot be its own parent");
-            }
-            getActiveCategory(request.getParentId());
-        }
-
-        String oldName = category.getName();
-        categoryMapper.updateEntity(request, category);
-        category.setName(normalizedName);
-        category.setMetadata(sanitizeMetadata(request.getMetadata()));
-        if (!normalizedName.equalsIgnoreCase(oldName)) {
-            category.setSlug(generateUniqueSlug(normalizedName, id));
-        }
-
-        return categoryMapper.toResponse(categoryRepository.save(category));
+    @Cacheable(value = "categories", key = "'slug:' + #query.slug()")
+    public CategoryResponse handle(GetCategoryBySlugQuery query) {
+        return categoryMapper.toResponse(getActiveCategoryBySlug(query.slug()));
     }
 
-    public CategoryResponse getCategory(String id) {
-        return categoryMapper.toResponse(getActiveCategory(id));
-    }
-
-    public CategoryResponse getCategoryBySlug(String slug) {
-        return categoryMapper.toResponse(getActiveCategoryBySlug(slug));
-    }
-
-    public List<CategoryResponse> getAllCategories(Boolean active, boolean includeDeleted) {
-        Query query = new Query().with(Sort.by(Sort.Order.asc("sortOrder"), Sort.Order.asc("name")));
-        if (active != null) {
-            query.addCriteria(Criteria.where("active").is(active));
-        } else if (!includeDeleted) {
-            query.addCriteria(Criteria.where("active").is(true));
+    public List<CategoryResponse> handle(GetAllCategoriesQuery query) {
+        Query mongoQuery = new Query().with(Sort.by(Sort.Order.asc("sortOrder"), Sort.Order.asc("name")));
+        if (query.active() != null) {
+            mongoQuery.addCriteria(Criteria.where("active").is(query.active()));
+        } else if (!query.includeDeleted()) {
+            mongoQuery.addCriteria(Criteria.where("active").is(true));
         }
 
-        return mongoTemplate.find(query, Category.class).stream()
+        return mongoTemplate.find(mongoQuery, Category.class).stream()
                 .map(categoryMapper::toResponse)
                 .toList();
     }
 
-    public List<CategoryMenuItemResponse> getSubCategories(String parentId) {
-        getActiveCategory(parentId);
+    public List<CategoryMenuItemResponse> handle(GetSubCategoriesQuery query) {
+        getActiveCategory(query.parentId());
         List<Category> activeCategories = categoryRepository.findByActiveTrue();
         Map<String, List<Category>> childrenByParent = groupChildrenByParent(activeCategories);
-        return buildCategoryTree(parentId, childrenByParent);
+        return buildCategoryTree(query.parentId(), childrenByParent);
     }
 
-    public List<CategoryMenuItemResponse> getSubCategoriesBySlug(String slug) {
-        Category parentCategory = getActiveCategoryBySlug(slug);
-        return getSubCategories(parentCategory.getId());
+    public List<CategoryMenuItemResponse> handle(GetSubCategoriesBySlugQuery query) {
+        Category parentCategory = getActiveCategoryBySlug(query.slug());
+        return handle(new GetSubCategoriesQuery(parentCategory.getId()));
     }
 
-    public List<CategoryMenuItemResponse> getCategoryMenu() {
+    @Cacheable(value = "categories", key = "'menu'")
+    public List<CategoryMenuItemResponse> handle(GetCategoryMenuQuery query) {
         List<Category> activeCategories = categoryRepository.findByActiveTrue();
         Map<String, List<Category>> childrenByParent = groupChildrenByParent(activeCategories);
         return buildCategoryTree(ROOT_PARENT_KEY, childrenByParent);
     }
 
-    public CategoryMetaResponse getCategoryMetaBySlug(String slug) {
-        Category category = getActiveCategoryBySlug(slug);
+    @Cacheable(value = "categories", key = "'meta:slug:' + #query.slug()")
+    public CategoryMetaResponse handle(GetCategoryMetaBySlugQuery query) {
+        Category category = getActiveCategoryBySlug(query.slug());
         Map<String, Object> metadata = sanitizeMetadata(category.getMetadata());
         List<String> filterableSpecs = category.getFilter() == null || category.getFilter().getFilterableSpecs() == null
                 ? List.of()
@@ -138,35 +95,6 @@ public class CategoryService {
                 .build();
     }
 
-    public void deleteCategory(String id) {
-        Category category = getActiveCategory(id);
-
-        if (categoryRepository.existsByParentIdAndActiveTrue(id)) {
-            throw new BadRequestException("Cannot delete category with active subcategories");
-        }
-
-        if (productRepository.existsByCategoryIdsContainingAndActiveTrue(id)) {
-            throw new BadRequestException("Cannot delete category with active products");
-        }
-
-        category.setActive(false);
-        categoryRepository.save(category);
-    }
-
-    public CategoryResponse restoreCategory(String id) {
-        Category category = getCategoryById(id);
-        if (category.isActive()) {
-            return categoryMapper.toResponse(category);
-        }
-
-        if (StringUtils.hasText(category.getParentId())) {
-            getActiveCategory(category.getParentId());
-        }
-
-        category.setActive(true);
-        return categoryMapper.toResponse(categoryRepository.save(category));
-    }
-
     private Category getActiveCategory(String id) {
         Query query = Query.query(new Criteria().andOperator(
                 MongoIdUtils.idEqualsCriteria("_id", id),
@@ -177,11 +105,6 @@ public class CategoryService {
             throw new ResourceNotFoundException("Category", "id", id);
         }
         return category;
-    }
-
-    private Category getCategoryById(String id) {
-        return categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
     }
 
     private Category getActiveCategoryBySlug(String slug) {
@@ -238,23 +161,5 @@ public class CategoryService {
                 .metadata(sanitizeMetadata(category.getMetadata()))
                 .children(buildCategoryTree(category.getId(), childrenByParent))
                 .build();
-    }
-
-    private String generateUniqueSlug(String name, String currentCategoryId) {
-        String base = toSlug(name);
-        String candidate = base;
-        int suffix = 1;
-
-        while (true) {
-            Category existing = categoryRepository.findBySlug(candidate).orElse(null);
-            if (existing == null || MongoIdUtils.equalsId(currentCategoryId, existing.getId())) {
-                return candidate;
-            }
-            candidate = base + "-" + suffix++;
-        }
-    }
-
-    private String toSlug(String value) {
-        return TextUtils.toSlug(value, "category");
     }
 }
