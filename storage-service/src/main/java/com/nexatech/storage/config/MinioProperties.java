@@ -11,6 +11,9 @@ public class MinioProperties {
     private String accessKey;
     private String secretKey;
     private String bucket;
+    private String region = "ap-southeast-1";
+    /** true for MinIO/localstack, false for AWS S3 virtual-hosted style. */
+    private boolean pathStyleAccessEnabled = true;
     /** Base URL exposed to clients (via Kong gateway). Used to build file URLs in upload responses. */
     private String publicUrl = "http://localhost:8000";
 }
