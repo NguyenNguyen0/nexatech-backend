@@ -33,6 +33,7 @@ public class VNPayService {
     private final PaymentRepository paymentRepository;
     private final OutboxEventService outboxEventService;
     private final AuditLogService auditLogService;
+    private final SnapshotService snapshotService;
     private final PaymentEventProducer paymentEventProducer;
 
     /**
@@ -123,8 +124,19 @@ public class VNPayService {
             payment.setStatus(PaymentStatus.COMPLETED);
             paymentRepository.save(payment);
             savePaymentEventToOutbox(payment, "PAYMENT_COMPLETED");
-            auditLogService.log("VNPAY_PAYMENT_COMPLETED", "Payment", payment.getId().toString(),
-                    "orderId=" + payment.getOrderId(), "vnpay");
+            auditLogService.logEvent("VNPAY_PAYMENT_COMPLETED", "Payment", payment.getId().toString(),
+                    Map.of("paymentId", payment.getId().toString(),
+                            "orderId", payment.getOrderId().toString(),
+                            "txnRef", txnRef,
+                            "newStatus", "COMPLETED"),
+                    "vnpay");
+            snapshotService.takeSnapshot("Payment", payment.getId(),
+                    Map.of("paymentId", payment.getId().toString(),
+                            "orderId", payment.getOrderId().toString(),
+                            "status", "COMPLETED",
+                            "method", "VNPAY",
+                            "txnRef", txnRef,
+                            "snapshotReason", "vnpay_completed"));
             log.info("IPN: thanh toán VNPay thành công — orderId={}", payment.getOrderId());
         } else {
             // Thanh toán thất bại (user hủy / hết hạn / lỗi ngân hàng)
@@ -132,8 +144,12 @@ public class VNPayService {
             payment.setFailureReason("VNPay response code: " + responseCode);
             paymentRepository.save(payment);
             savePaymentEventToOutbox(payment, "PAYMENT_FAILED");
-            auditLogService.log("VNPAY_PAYMENT_FAILED", "Payment", payment.getId().toString(),
-                    "responseCode=" + responseCode, "vnpay");
+            auditLogService.logEvent("VNPAY_PAYMENT_FAILED", "Payment", payment.getId().toString(),
+                    Map.of("paymentId", payment.getId().toString(),
+                            "orderId", payment.getOrderId().toString(),
+                            "responseCode", responseCode,
+                            "reason", "vnpay_failure"),
+                    "vnpay");
             log.warn("IPN: thanh toán VNPay thất bại — responseCode={}, orderId={}", responseCode, payment.getOrderId());
         }
 

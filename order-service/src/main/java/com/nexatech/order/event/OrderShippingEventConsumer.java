@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -112,8 +113,12 @@ public class OrderShippingEventConsumer {
 
         orderService.updateShipping(orderId, request);
         orderService.publishShipmentCreatedEvent(orderId);
-        auditLogService.log("SHIPMENT_CREATED_RECEIVED", "Order", orderId.toString(),
-                "trackingNumber=" + event.getTrackingCode(), CONSUMER_NAME);
+        auditLogService.logEvent("SHIPMENT_CREATED_RECEIVED", "Order", orderId.toString(),
+                Map.of("orderId", orderId.toString(),
+                        "trackingNumber", event.getTrackingCode(),
+                        "carrier", request.getCarrierName() != null ? request.getCarrierName() : "",
+                        "triggeredBy", "kafka:shipping.events"),
+                CONSUMER_NAME);
         log.info("Cập nhật tracking cho order {}: carrier={}, code={}",
                 orderId, request.getCarrierName(), event.getTrackingCode());
     }
@@ -121,8 +126,11 @@ public class OrderShippingEventConsumer {
     private void handleShipmentStatusUpdated(UUID orderId, ShippingEventDto event) {
         if ("DELIVERED".equals(event.getStatus())) {
             orderService.updateOrderStatus(orderId, OrderStatus.DELIVERED);
-            auditLogService.log("SHIPMENT_DELIVERED_RECEIVED", "Order", orderId.toString(),
-                    "status=DELIVERED", CONSUMER_NAME);
+            auditLogService.logEvent("SHIPMENT_DELIVERED_RECEIVED", "Order", orderId.toString(),
+                    Map.of("orderId", orderId.toString(),
+                            "newStatus", "DELIVERED",
+                            "triggeredBy", "kafka:shipping.events"),
+                    CONSUMER_NAME);
             log.info("Order {} cập nhật sang DELIVERED từ shipping event", orderId);
         }
     }
