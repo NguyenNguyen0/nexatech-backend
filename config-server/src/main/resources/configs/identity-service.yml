@@ -22,6 +22,7 @@ spring:
     topics:
       user-registration: user-registration
       user-events: user.events
+      audit-log: ${AUDIT_LOG_TOPIC:audit-topic}
 
 openfeign:
   keycloak:

@@ -47,6 +47,7 @@ public class AuthService {
     private final RoleService roleService;
     private final UserServiceDependencyGuard userServiceDependencyGuard;
     private final KafkaService kafkaService;
+    private final AuditEventPublisher auditEventPublisher;
     private final UserClientMapper userClientMapper;
     private final com.nexatech.identity.client.UserServiceClient userServiceClient;
 
@@ -112,6 +113,21 @@ public class AuthService {
 
             UserClientRequest request = userClientMapper.toProvisionRequest(createdUserId, param);
             kafkaService.sendUserRegistered(request);
+
+            String registeredEmail = param != null ? param.getEmail() : null;
+            String registeredUsername = param != null ? param.getUsername() : null;
+            auditEventPublisher.publish(com.nexatech.identity.dto.event.AuditLogEvent.builder()
+                    .action("USER_REGISTERED")
+                    .entityType("User")
+                    .entityId(createdUserId)
+                    .entityLabel(registeredUsername != null ? registeredUsername : registeredEmail)
+                    .actor(registeredUsername != null ? registeredUsername : registeredEmail)
+                    .actorId(createdUserId)
+                    .newValue("{\"username\":\"" + safe(registeredUsername) + "\",\"email\":\"" + safe(registeredEmail)
+                            + "\",\"role\":\"" + resolvedRoleName + "\"}")
+                    .message("Đăng ký tài khoản mới (vai trò: " + resolvedRoleName + ")")
+                    .build());
+
             return createdUserId;
         } catch (AppException ex) {
             userService.deleteUser(createdUserId);
@@ -123,6 +139,10 @@ public class AuthService {
             userService.deleteUser(createdUserId);
             throw new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION);
         }
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value.replace("\"", "\\\"");
     }
 
     private static final String TOKEN_EXCHANGE_GRANT = "urn:ietf:params:oauth:grant-type:token-exchange";
@@ -211,7 +231,28 @@ public class AuthService {
         } else {
             enrichRequiresPasswordChange(response);
         }
+
+        auditEventPublisher.publishUserAction(
+                "USER_LOGIN_SOCIAL",
+                userId,
+                loginUsername,
+                email,
+                newUser
+                        ? "Đăng nhập lần đầu bằng " + humanProvider(request.getType())
+                        : "Đăng nhập bằng " + humanProvider(request.getType()),
+                java.util.Map.of("provider", request.getType(), "newUser", newUser));
+
         return response;
+    }
+
+    private static String humanProvider(String type) {
+        if (type == null) return "mạng xã hội";
+        return switch (type.toUpperCase()) {
+            case "GOOGLE" -> "Google";
+            case "FACEBOOK" -> "Facebook";
+            case "GITHUB" -> "GitHub";
+            default -> type;
+        };
     }
 
     private record TokenIssueResult(UserTokenExchangeResponse response, boolean passwordReset) {}
@@ -669,7 +710,44 @@ public class AuthService {
         assertUserAccountActive(userId);
 
         enrichRequiresPasswordChange(response);
+
+        String loginUsername = extractUsernameFromAccessToken(response.getAccessToken());
+        String loginEmail = extractEmailFromAccessToken(response.getAccessToken());
+        auditEventPublisher.publishUserAction(
+                "USER_LOGIN",
+                userId,
+                loginUsername != null ? loginUsername : identifier,
+                loginEmail,
+                "Đăng nhập tài khoản");
+
         return response;
+    }
+
+    private String extractUsernameFromAccessToken(String accessToken) {
+        return extractClaim(accessToken, "preferred_username");
+    }
+
+    private String extractEmailFromAccessToken(String accessToken) {
+        return extractClaim(accessToken, "email");
+    }
+
+    private String extractClaim(String accessToken, String claim) {
+        if (accessToken == null || accessToken.isBlank()) {
+            return null;
+        }
+        try {
+            String[] parts = accessToken.split("\\.");
+            if (parts.length < 2) {
+                return null;
+            }
+            String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readTree(payload);
+            String value = node.path(claim).asText(null);
+            return (value == null || value.isBlank()) ? null : value;
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     public UserTokenExchangeResponse refreshToken(RefreshTokenRequest request) {
@@ -694,11 +772,22 @@ public class AuthService {
             throw new IllegalArgumentException("Refresh token is required");
         }
 
+        String userId = extractClaim(request.getRefreshToken(), "sub");
+        String username = extractClaim(request.getRefreshToken(), "preferred_username");
+        String email = extractClaim(request.getRefreshToken(), "email");
+
         keycloakAuthClient.logout(realm, LogoutParam.builder()
                 .client_id(clientId)
                 .client_secret(clientSecret)
                 .refresh_token(request.getRefreshToken())
                 .build());
+
+        auditEventPublisher.publishUserAction(
+                "USER_LOGOUT",
+                userId,
+                username,
+                email,
+                "Đăng xuất khỏi hệ thống");
     }
 
     public Map<String, Object> getOpenIdConfiguration() {
@@ -789,6 +878,14 @@ public class AuthService {
                 .build());
 
         clearRequiresPasswordChange(userId);
+
+        String email = userInfo.get("email") != null ? userInfo.get("email").toString() : null;
+        auditEventPublisher.publishUserAction(
+                "USER_PASSWORD_CHANGED",
+                userId,
+                username,
+                email,
+                initialSetup ? "Thiết lập mật khẩu lần đầu" : "Đổi mật khẩu tài khoản");
     }
 
     private boolean resolveRequiresPasswordChange(String userId, Map<String, Object> userInfo) {
@@ -871,6 +968,13 @@ public class AuthService {
         } catch (Exception ex) {
             log.warn("Failed to set requiresPasswordChange for user {}: {}", userId, ex.getMessage());
         }
+
+        auditEventPublisher.publishUserAction(
+                "USER_FORGOT_PASSWORD",
+                userId,
+                username,
+                email,
+                "Yêu cầu cấp lại mật khẩu (gửi qua email)");
 
         log.info("Reset password and sent forgot password event for user: {}", identifier);
     }
