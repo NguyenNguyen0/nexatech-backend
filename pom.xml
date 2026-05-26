@@ -33,6 +33,7 @@
         <module>chat-service</module>
         <module>storage-service</module>
         <module>news-service</module>
+        <module>audit-service</module>
     </modules>
 
     <properties>
