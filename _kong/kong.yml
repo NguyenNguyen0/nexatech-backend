@@ -43,6 +43,8 @@ services:
           - /api/v1/checkout
           - /api/v1/returns
           - /api/v1/admin/orders
+          - /api/v1/admin/audit/orders
+          - /api/v1/admin/audit/trace
         strip_path: false
 
   - name: inventory-service
@@ -64,6 +66,7 @@ services:
         paths:
           - /api/v1/payments
           - /api/v1/admin/payments
+          - /api/v1/admin/audit/payments
         strip_path: false
 
   - name: shipping-service
