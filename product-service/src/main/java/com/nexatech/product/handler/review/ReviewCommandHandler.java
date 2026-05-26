@@ -1,6 +1,5 @@
 package com.nexatech.product.handler.review;
 
-import com.nexatech.product.client.OrderClient;
 import com.nexatech.product.command.review.CreateReviewCommand;
 import com.nexatech.product.command.review.DeleteReviewCommand;
 import com.nexatech.product.command.review.MarkHelpfulCommand;
@@ -14,6 +13,7 @@ import com.nexatech.product.model.Product;
 import com.nexatech.product.model.Review;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.ReviewRepository;
+import com.nexatech.product.service.ResilientDownstreamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Component;
@@ -25,7 +25,7 @@ public class ReviewCommandHandler {
     private final ReviewRepository reviewRepository;
     private final ProductRepository productRepository;
     private final ReviewMapper reviewMapper;
-    private final OrderClient orderClient;
+    private final ResilientDownstreamService resilientDownstreamService;
 
     @CacheEvict(value = "reviews", allEntries = true)
     public ReviewResponse handle(CreateReviewCommand command) {
@@ -36,7 +36,7 @@ public class ReviewCommandHandler {
                     throw new BadRequestException("You have already reviewed this product");
                 });
 
-        boolean purchased = Boolean.TRUE.equals(orderClient.checkPurchased(command.userId(), product.getId()).getData());
+        boolean purchased = Boolean.TRUE.equals(resilientDownstreamService.checkPurchased(command.userId(), product.getId()));
         if (!purchased) {
             throw new ForbiddenException("Only buyers can review this product");
         }
