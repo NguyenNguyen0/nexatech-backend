@@ -2,7 +2,9 @@ package com.nexatech.notification.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexatech.notification.event.dto.AuditLogEvent;
 import com.nexatech.notification.model.Notification;
+import com.nexatech.notification.service.audit.AuditEventPublisher;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
@@ -27,6 +30,7 @@ public class EmailService {
     private final JavaMailSender mailSender;
     private final SpringTemplateEngine templateEngine;
     private final ObjectMapper objectMapper;
+    private final AuditEventPublisher auditEventPublisher;
 
     @Value("${spring.mail.username}")
     private String fromAddress;
@@ -53,6 +57,20 @@ public class EmailService {
             log.info("Email sent to {} | subject: '{}'", to, subject);
         } catch (MessagingException | MailException e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage());
+            Map<String, Object> meta = new HashMap<>();
+            meta.put("subject", subject);
+            meta.put("template", templateName);
+            meta.put("error", e.getMessage());
+            auditEventPublisher.publish(AuditLogEvent.builder()
+                    .action("EMAIL_SEND_FAILED")
+                    .entityType("Email")
+                    .entityId(to)
+                    .entityLabel(subject)
+                    .actor("system")
+                    .reason(e.getMessage())
+                    .message("Email delivery failed for " + to)
+                    .metadata(meta)
+                    .build());
             throw new RuntimeException("Failed to send email to " + to, e);
         }
     }

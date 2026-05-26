@@ -25,11 +25,18 @@ spring:
       enabled: true
       max-file-size: 10MB
       max-request-size: 55MB
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    topics:
+      audit-log: ${AUDIT_LOG_TOPIC:audit-topic}
 
 aws:
   s3:
     region: ${AWS_REGION:ap-southeast-1}
-    bucket: ${AWS_S3_BUCKET:chatly}
+    bucket: ${AWS_S3_BUCKET:}
     access-key: ${AWS_ACCESS_KEY_ID:}
     secret-key: ${AWS_SECRET_ACCESS_KEY:}
     # Optional. Use CloudFront/custom CDN URL here. If empty, service builds the standard S3 public URL.

@@ -24,6 +24,7 @@ import com.nexatech.user.repository.UserRepository;
 import com.nexatech.user.service.AdminUserService;
 import com.nexatech.user.service.IdentityResilienceService;
 import com.nexatech.user.service.IdentityServiceDependencyGuard;
+import com.nexatech.user.service.audit.AuditEventPublisher;
 
 import feign.FeignException;
 import lombok.AccessLevel;
@@ -40,6 +41,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     IdentityResilienceService identityResilienceService;
     IdentityServiceDependencyGuard identityServiceDependencyGuard;
     IdentityIamClient identityIamClient;
+    AuditEventPublisher auditEventPublisher;
 
     @Override
     @Transactional
@@ -116,14 +118,59 @@ public class AdminUserServiceImpl implements AdminUserService {
         User saved = userRepository.save(user);
         UserResponse response = userMapper.toResponse(saved);
         response.setRole(assignedRole);
+
+        auditEventPublisher.publish(com.nexatech.user.dto.event.AuditLogEvent.builder()
+                .action("USER_CREATED")
+                .entityType("User")
+                .entityId(saved.getId())
+                .entityLabel(saved.getUsername())
+                .newValue("{\"username\":\"" + escape(saved.getUsername())
+                        + "\",\"email\":\"" + escape(saved.getEmail())
+                        + "\",\"role\":\"" + escape(assignedRole) + "\"}")
+                .message("Admin created user account (role: " + (assignedRole != null ? assignedRole : "—") + ")")
+                .build());
+
         return response;
+    }
+
+    private static String escape(String value) {
+        return value == null ? "" : value.replace("\"", "\\\"");
     }
 
     @Override
     @Transactional
     public void updateUserRole(String userId, String roleName) {
         validateUserExists(userId);
+        String previousRole = getPrimaryRole(userId);
         replaceAllRealmRoles(userId, roleName);
+
+        String username = userRepository.findById(userId).map(User::getUsername).orElse(null);
+        String normalized = normalizeRole(roleName);
+        auditEventPublisher.publish(com.nexatech.user.dto.event.AuditLogEvent.builder()
+                .action("USER_ROLE_CHANGED")
+                .entityType("User")
+                .entityId(userId)
+                .entityLabel(username)
+                .oldValue(previousRole)
+                .newValue(normalized)
+                .message("Changed user role from " + (previousRole != null ? previousRole : "—")
+                        + " to " + (normalized != null ? normalized : "—"))
+                .build());
+    }
+
+    private String getPrimaryRole(String userId) {
+        try {
+            List<RoleRefRequest> roles = getCurrentRealmRoles(userId);
+            return roles.stream()
+                    .map(RoleRefRequest::getName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .filter(name -> !name.startsWith("default-roles-"))
+                    .map(name -> name.toUpperCase(Locale.ROOT))
+                    .findFirst()
+                    .orElse(null);
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     @Override
@@ -149,6 +196,16 @@ public class AdminUserServiceImpl implements AdminUserService {
             }
             RoleRefRequest ref = resolveRoleRef(normalized);
             identityResilienceService.removeRealmRolesFromUser(userId, List.of(ref));
+
+            String username = userRepository.findById(userId).map(User::getUsername).orElse(null);
+            auditEventPublisher.publish(com.nexatech.user.dto.event.AuditLogEvent.builder()
+                    .action("USER_ROLE_REVOKED")
+                    .entityType("User")
+                    .entityId(userId)
+                    .entityLabel(username)
+                    .oldValue(normalized)
+                    .message("Revoked role " + normalized + " from user")
+                    .build());
         } catch (FeignException ex) {
             throw new AppException(ErrorCode.KEYCLOAK_ERROR);
         } catch (AppException ex) {

@@ -125,7 +125,7 @@ public class AuthService {
                     .actorId(createdUserId)
                     .newValue("{\"username\":\"" + safe(registeredUsername) + "\",\"email\":\"" + safe(registeredEmail)
                             + "\",\"role\":\"" + resolvedRoleName + "\"}")
-                    .message("Đăng ký tài khoản mới (vai trò: " + resolvedRoleName + ")")
+                    .message("New account registered (role: " + resolvedRoleName + ")")
                     .build());
 
             return createdUserId;
@@ -238,15 +238,15 @@ public class AuthService {
                 loginUsername,
                 email,
                 newUser
-                        ? "Đăng nhập lần đầu bằng " + humanProvider(request.getType())
-                        : "Đăng nhập bằng " + humanProvider(request.getType()),
+                        ? "First sign-in via " + humanProvider(request.getType())
+                        : "Signed in via " + humanProvider(request.getType()),
                 java.util.Map.of("provider", request.getType(), "newUser", newUser));
 
         return response;
     }
 
     private static String humanProvider(String type) {
-        if (type == null) return "mạng xã hội";
+        if (type == null) return "social provider";
         return switch (type.toUpperCase()) {
             case "GOOGLE" -> "Google";
             case "FACEBOOK" -> "Facebook";
@@ -718,7 +718,7 @@ public class AuthService {
                 userId,
                 loginUsername != null ? loginUsername : identifier,
                 loginEmail,
-                "Đăng nhập tài khoản");
+                "User signed in");
 
         return response;
     }
@@ -773,8 +773,11 @@ public class AuthService {
         }
 
         String userId = extractClaim(request.getRefreshToken(), "sub");
-        String username = extractClaim(request.getRefreshToken(), "preferred_username");
-        String email = extractClaim(request.getRefreshToken(), "email");
+        // Keycloak refresh tokens typically don't carry preferred_username / email,
+        // so resolve the display name via user-service before recording the audit.
+        UserDisplay display = resolveUserDisplay(userId,
+                extractClaim(request.getRefreshToken(), "preferred_username"),
+                extractClaim(request.getRefreshToken(), "email"));
 
         keycloakAuthClient.logout(realm, LogoutParam.builder()
                 .client_id(clientId)
@@ -785,10 +788,40 @@ public class AuthService {
         auditEventPublisher.publishUserAction(
                 "USER_LOGOUT",
                 userId,
-                username,
-                email,
-                "Đăng xuất khỏi hệ thống");
+                display.username(),
+                display.email(),
+                "User logged out");
     }
+
+    /**
+     * Best-effort enrichment of a user's display info (username + email) when only
+     * the user id is reliably available — e.g. logout, where refresh tokens carry
+     * only {@code sub}. Falls back to whatever Keycloak gave us, then to user-service.
+     */
+    private UserDisplay resolveUserDisplay(String userId, String knownUsername, String knownEmail) {
+        String username = blankToNull(knownUsername);
+        String email = blankToNull(knownEmail);
+
+        if ((username == null || email == null) && userId != null && !userId.isBlank()) {
+            try {
+                ApiResponse<Map<String, Object>> response = userServiceClient.getUserById(userId);
+                Map<String, Object> result = response != null ? response.getResult() : null;
+                if (result != null) {
+                    if (username == null && result.get("username") != null) {
+                        username = blankToNull(result.get("username").toString());
+                    }
+                    if (email == null && result.get("email") != null) {
+                        email = blankToNull(result.get("email").toString());
+                    }
+                }
+            } catch (Exception ex) {
+                log.debug("resolveUserDisplay: user-service lookup failed for {}: {}", userId, ex.getMessage());
+            }
+        }
+        return new UserDisplay(username, email);
+    }
+
+    private record UserDisplay(String username, String email) {}
 
     public Map<String, Object> getOpenIdConfiguration() {
         return keycloakAuthClient.getOpenIdConfiguration(realm);
@@ -885,7 +918,7 @@ public class AuthService {
                 userId,
                 username,
                 email,
-                initialSetup ? "Thiết lập mật khẩu lần đầu" : "Đổi mật khẩu tài khoản");
+                initialSetup ? "Initial password setup" : "Password changed");
     }
 
     private boolean resolveRequiresPasswordChange(String userId, Map<String, Object> userInfo) {
@@ -974,7 +1007,7 @@ public class AuthService {
                 userId,
                 username,
                 email,
-                "Yêu cầu cấp lại mật khẩu (gửi qua email)");
+                "Password reset requested (sent via email)");
 
         log.info("Reset password and sent forgot password event for user: {}", identifier);
     }

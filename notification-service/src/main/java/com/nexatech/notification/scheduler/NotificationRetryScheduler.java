@@ -1,15 +1,19 @@
 package com.nexatech.notification.scheduler;
 
+import com.nexatech.notification.event.dto.AuditLogEvent;
 import com.nexatech.notification.model.Notification;
 import com.nexatech.notification.repository.NotificationRepository;
 import com.nexatech.notification.service.EmailService;
+import com.nexatech.notification.service.audit.AuditEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -20,6 +24,7 @@ public class NotificationRetryScheduler {
 
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
+    private final AuditEventPublisher auditEventPublisher;
 
     /**
      * Every 5 minutes, query all FAILED notifications with retryCount < 3 and retry sending.
@@ -65,6 +70,21 @@ public class NotificationRetryScheduler {
                         notification.getType(),
                         notification.getSubject(),
                         e.getMessage());
+
+                Map<String, Object> meta = new HashMap<>();
+                meta.put("recipient", notification.getRecipientEmail());
+                meta.put("type", notification.getType() != null ? notification.getType().name() : null);
+                meta.put("retryCount", notification.getRetryCount());
+                auditEventPublisher.publish(AuditLogEvent.builder()
+                        .action("NOTIFICATION_RETRY_EXHAUSTED")
+                        .entityType("Notification")
+                        .entityId(notification.getId() != null ? notification.getId().toString() : null)
+                        .entityLabel(notification.getSubject())
+                        .actor("system")
+                        .reason(e.getMessage())
+                        .message("Notification delivery abandoned after " + MAX_RETRY_COUNT + " attempts")
+                        .metadata(meta)
+                        .build());
             } else {
                 log.info("Retry #{} failed for notificationId={}: {}",
                         notification.getRetryCount(), notification.getId(), e.getMessage());
