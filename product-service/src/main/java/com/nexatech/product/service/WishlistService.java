@@ -5,11 +5,9 @@ import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.ProductMapper;
 import com.nexatech.product.model.Product;
 import com.nexatech.product.model.Wishlist;
-import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.WishlistRepository;
 import com.nexatech.product.util.MongoIdUtils;
 import com.nexatech.product.util.ProductQueryUtils;
-import com.nexatech.product.util.TextUtils;
 import com.nexatech.product.util.TextUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -39,7 +37,6 @@ public class WishlistService {
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("createdAt");
 
     private final WishlistRepository wishlistRepository;
-    private final ProductRepository productRepository;
     private final ProductMapper productMapper;
     private final ProductResponseEnricher productResponseEnricher;
     private final MongoTemplate mongoTemplate;
@@ -129,18 +126,6 @@ public class WishlistService {
         }
 
         return countActiveProductsByIds(productIds);
-    }
-
-    private Sort.Direction resolveCreatedAtDirection(Sort sort) {
-        if (sort == null) {
-            return Sort.Direction.DESC;
-        }
-        for (Sort.Order order : sort) {
-            if ("createdAt".equals(order.getProperty())) {
-                return order.getDirection();
-            }
-        }
-        return Sort.Direction.DESC;
     }
 
     private ProductMinimalResponse toMinimalCatalogResponse(Product product) {

@@ -12,8 +12,9 @@ import com.nexatech.product.dto.response.ProductResponse;
 import com.nexatech.product.dto.response.ReviewResponse;
 import com.nexatech.product.handler.product.ProductCommandHandler;
 import com.nexatech.product.handler.product.ProductQueryHandler;
+import com.nexatech.product.handler.review.ReviewQueryHandler;
 import com.nexatech.product.query.product.*;
-import com.nexatech.product.service.ReviewService;
+import com.nexatech.product.query.review.GetReviewsByProductSlugQuery;
 import com.nexatech.product.util.TextUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +36,7 @@ public class ProductController {
 
     private final ProductCommandHandler productCommandHandler;
     private final ProductQueryHandler productQueryHandler;
-    private final ReviewService reviewService;
+    private final ReviewQueryHandler reviewQueryHandler;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -158,8 +159,8 @@ public class ProductController {
             @PathVariable String slug,
             @RequestParam(required = false) Integer rating,
             Pageable pageable) {
-        String productId = productQueryHandler.handle(new GetProductBySlugQuery(slug)).getId();
-        return ApiResponse.ok(PageResponse.of(reviewService.getAllReviews(productId, rating, pageable)));
+        return ApiResponse.ok(PageResponse.of(
+            reviewQueryHandler.handle(new GetReviewsByProductSlugQuery(slug, rating), pageable)));
     }
 
     @DeleteMapping("/{id}")
