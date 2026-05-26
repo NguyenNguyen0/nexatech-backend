@@ -11,6 +11,8 @@ import com.nexatech.shipping.provider.mock.MockShippingClient;
 import com.nexatech.shipping.repository.ShipmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -39,6 +41,13 @@ public class ShippingService {
 
     public CancelShipmentResponse cancelShipment(String trackingCode) {
         return providerFactory.getCurrentProviderClient().cancelShipment(trackingCode);
+    }
+
+    public Page<TrackingResponse> getShipments(ShipmentStatus status, Pageable pageable) {
+        Page<Shipment> shipments = status == null
+                ? shipmentRepository.findAll(pageable)
+                : shipmentRepository.findByStatus(status, pageable);
+        return shipments.map(shipmentMapper::toTrackingSummaryResponse);
     }
 
     public TrackingResponse getShipmentByOrderId(String orderId) {
