@@ -422,11 +422,14 @@ public class ChatService {
     }
 
     private java.util.Optional<ChatConversation> findCurrentConversation(UUID userId, String guestSessionId) {
+        Pageable latestOnly = PageRequest.of(0, 1);
         if (userId != null) {
-            return conversationRepository.findCurrentByCustomerId(userId);
+            return conversationRepository.findCurrentByCustomerId(userId, latestOnly).stream().findFirst();
         }
         String normalizedGuestSessionId = normalizeGuestSessionId(guestSessionId);
-        return conversationRepository.findCurrentByGuestSessionId(normalizedGuestSessionId, Instant.now());
+        return conversationRepository.findCurrentByGuestSessionId(normalizedGuestSessionId, Instant.now(), latestOnly)
+                .stream()
+                .findFirst();
     }
 
     private ChatConversation createConversation(UUID userId, String guestSessionId) {
