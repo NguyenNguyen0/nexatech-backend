@@ -2,8 +2,11 @@ package com.nexatech.payment.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -45,6 +48,21 @@ public class AuditLog {
 
     @Column(name = "source_service", length = 100)
     private String sourceService;
+
+    /**
+     * Payload JSONB: toàn bộ state của entity tại thời điểm event xảy ra.
+     * Dùng để point-in-time reconstruction — replay từng payload theo createdAt.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> payload;
+
+    /**
+     * Correlation ID (OpenTelemetry traceId) — liên kết audit log
+     * xuyên suốt các service trong cùng một luồng nghiệp vụ.
+     */
+    @Column(name = "correlation_id", length = 64)
+    private String correlationId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
