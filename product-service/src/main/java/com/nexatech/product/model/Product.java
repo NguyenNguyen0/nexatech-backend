@@ -8,9 +8,8 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.FieldType;
 import org.springframework.data.mongodb.core.mapping.MongoId;
-
+import org.springframework.data.mongodb.core.mapping.FieldType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -22,8 +21,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Product {
-
-    @MongoId(FieldType.STRING)
+    @MongoId(FieldType.OBJECT_ID)
     private String id;
 
     @TextIndexed(weight = 5)

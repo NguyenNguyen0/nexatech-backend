@@ -1,12 +1,18 @@
 package com.nexatech.product.controller;
 
+import com.nexatech.product.command.product.CreateProductCommand;
+import com.nexatech.product.command.product.DeleteProductCommand;
+import com.nexatech.product.command.product.RestoreProductCommand;
+import com.nexatech.product.command.product.UpdateProductCommand;
 import com.nexatech.product.dto.request.ProductRequest;
 import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.PageResponse;
 import com.nexatech.product.dto.response.ProductMinimalResponse;
 import com.nexatech.product.dto.response.ProductResponse;
 import com.nexatech.product.dto.response.ReviewResponse;
-import com.nexatech.product.service.ProductService;
+import com.nexatech.product.handler.product.ProductCommandHandler;
+import com.nexatech.product.handler.product.ProductQueryHandler;
+import com.nexatech.product.query.product.*;
 import com.nexatech.product.service.ReviewService;
 import com.nexatech.product.util.TextUtils;
 import jakarta.validation.Valid;
@@ -27,30 +33,31 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ProductController {
 
-    private final ProductService productService;
+    private final ProductCommandHandler productCommandHandler;
+    private final ProductQueryHandler productQueryHandler;
     private final ReviewService reviewService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<ProductResponse> createProduct(@Valid @RequestBody ProductRequest request) {
-        return ApiResponse.ok(productService.createProduct(request));
+        return ApiResponse.ok(productCommandHandler.handle(toCreateCommand(request)));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<ProductResponse> updateProduct(
             @PathVariable String id,
             @Valid @RequestBody ProductRequest request) {
-        return ApiResponse.ok(productService.updateProduct(id, request));
+        return ApiResponse.ok(productCommandHandler.handle(toUpdateCommand(id, request)));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<ProductResponse> getProduct(@PathVariable String id) {
-        return ApiResponse.ok(productService.getProduct(id));
+        return ApiResponse.ok(productQueryHandler.handle(new GetProductByIdQuery(id)));
     }
 
     @GetMapping("/slug/{slug}")
     public ApiResponse<ProductResponse> getProductBySlug(@PathVariable String slug) {
-        return ApiResponse.ok(productService.getProductBySlug(slug));
+        return ApiResponse.ok(productQueryHandler.handle(new GetProductBySlugQuery(slug)));
     }
 
     @GetMapping
@@ -70,27 +77,17 @@ public class ProductController {
             @RequestParam MultiValueMap<String, String> queryParams,
             Pageable pageable) {
         Map<String, List<String>> specsFilters = extractSpecsFilters(queryParams);
-        return ApiResponse.ok(PageResponse.of(
-                productService.getProducts(
-                keyword,
-                        categoryId,
-                        categorySlug,
-                        brandId,
-                sku,
-                        minPrice,
-                        maxPrice,
-                        minRating,
-                        maxRating,
-                        featured,
-                active,
-                includeDeleted,
-                        specsFilters,
-                        pageable)));
+        return ApiResponse.ok(PageResponse.of(productQueryHandler.handle(
+                new GetProductsQuery(keyword, categoryId, categorySlug, brandId, sku,
+                        minPrice, maxPrice, minRating, maxRating,
+                        featured, active, includeDeleted, specsFilters),
+                pageable)));
     }
 
     @GetMapping("/featured")
     public ApiResponse<PageResponse<ProductResponse>> getFeaturedProducts(Pageable pageable) {
-        return ApiResponse.ok(PageResponse.of(productService.getFeaturedProducts(pageable)));
+        return ApiResponse.ok(PageResponse.of(
+                productQueryHandler.handle(new GetFeaturedProductsQuery(), pageable)));
     }
 
     @GetMapping("/search")
@@ -106,32 +103,26 @@ public class ProductController {
             @RequestParam MultiValueMap<String, String> queryParams,
             Pageable pageable) {
         Map<String, List<String>> specsFilters = extractSpecsFilters(queryParams);
-        return ApiResponse.ok(PageResponse.of(
-                productService.searchProducts(
-                        keyword,
-                        categoryId,
-                        categorySlug,
-                        brandId,
-                        minPrice,
-                        maxPrice,
-                        minRating,
-                        maxRating,
-                        specsFilters,
-                        pageable)));
+        return ApiResponse.ok(PageResponse.of(productQueryHandler.handle(
+                new SearchProductsQuery(keyword, categoryId, categorySlug, brandId,
+                        minPrice, maxPrice, minRating, maxRating, specsFilters),
+                pageable)));
     }
 
     @GetMapping("/tags")
     public ApiResponse<PageResponse<ProductMinimalResponse>> getProductsByTags(
             @RequestParam List<String> tags,
             Pageable pageable) {
-        return ApiResponse.ok(PageResponse.of(productService.getProductsByTags(tags, pageable)));
+        return ApiResponse.ok(PageResponse.of(
+                productQueryHandler.handle(new GetProductsByTagsQuery(tags), pageable)));
     }
 
     @GetMapping("/category/{categoryId}")
     public ApiResponse<PageResponse<ProductResponse>> getProductsByCategory(
             @PathVariable String categoryId,
             Pageable pageable) {
-        return ApiResponse.ok(PageResponse.of(productService.getProductsByCategory(categoryId, pageable)));
+        return ApiResponse.ok(PageResponse.of(
+                productQueryHandler.handle(new GetProductsByCategoryQuery(categoryId), pageable)));
     }
 
     @GetMapping("/category/slug/{slug}")
@@ -146,27 +137,20 @@ public class ProductController {
             @RequestParam MultiValueMap<String, String> queryParams,
             Pageable pageable) {
         Map<String, List<String>> specsFilters = extractSpecsFilters(queryParams);
-        return ApiResponse.ok(PageResponse.of(
-                productService.getProductsByCategorySlug(
-                        slug,
-                        brandId,
-                        minPrice,
-                        maxPrice,
-                        minRating,
-                        maxRating,
-                        featured,
-                        specsFilters,
-                        pageable)));
+        return ApiResponse.ok(PageResponse.of(productQueryHandler.handle(
+                new GetProductsByCategorySlugQuery(slug, brandId, minPrice, maxPrice,
+                        minRating, maxRating, featured, specsFilters),
+                pageable)));
     }
 
     @GetMapping("/{id}/related")
     public ApiResponse<List<ProductMinimalResponse>> getRelatedProducts(@PathVariable String id) {
-        return ApiResponse.ok(productService.getRelatedProducts(id));
+        return ApiResponse.ok(productQueryHandler.handle(new GetRelatedProductsQuery(id)));
     }
 
     @GetMapping("/slug/{slug}/related")
     public ApiResponse<List<ProductMinimalResponse>> getRelatedProductsBySlug(@PathVariable String slug) {
-        return ApiResponse.ok(productService.getRelatedProductsBySlug(slug));
+        return ApiResponse.ok(productQueryHandler.handle(new GetRelatedProductsBySlugQuery(slug)));
     }
 
     @GetMapping("/slug/{slug}/reviews")
@@ -174,19 +158,39 @@ public class ProductController {
             @PathVariable String slug,
             @RequestParam(required = false) Integer rating,
             Pageable pageable) {
-        String productId = productService.getProductBySlug(slug).getId();
+        String productId = productQueryHandler.handle(new GetProductBySlugQuery(slug)).getId();
         return ApiResponse.ok(PageResponse.of(reviewService.getAllReviews(productId, rating, pageable)));
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteProduct(@PathVariable String id) {
-        productService.deleteProduct(id);
+        productCommandHandler.handle(new DeleteProductCommand(id));
         return ApiResponse.ok(null);
     }
 
     @PatchMapping("/{id}/restore")
     public ApiResponse<ProductResponse> restoreProduct(@PathVariable String id) {
-        return ApiResponse.ok(productService.restoreProduct(id));
+        return ApiResponse.ok(productCommandHandler.handle(new RestoreProductCommand(id)));
+    }
+
+    // ---------- private helpers ----------
+
+    private CreateProductCommand toCreateCommand(ProductRequest r) {
+        return new CreateProductCommand(
+                r.getName(), r.getDescription(), r.getDescriptionHtml(),
+                r.getPrice(), r.getCompareAtPrice(), r.getSku(), r.getThumbnail(),
+                r.getPrimaryCategoryId(), r.getPrimaryCategorySlug(),
+                r.getCategoryIds(), r.getCategorySlugs(), r.getBrandId(),
+                r.getImages(), r.getSpecs(), r.getTags(), r.getMetadata());
+    }
+
+    private UpdateProductCommand toUpdateCommand(String id, ProductRequest r) {
+        return new UpdateProductCommand(
+                id, r.getName(), r.getDescription(), r.getDescriptionHtml(),
+                r.getPrice(), r.getCompareAtPrice(), r.getSku(), r.getThumbnail(),
+                r.getPrimaryCategoryId(), r.getPrimaryCategorySlug(),
+                r.getCategoryIds(), r.getCategorySlugs(), r.getBrandId(),
+                r.getImages(), r.getSpecs(), r.getTags(), r.getMetadata());
     }
 
     private Map<String, List<String>> extractSpecsFilters(MultiValueMap<String, String> queryParams) {

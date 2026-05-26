@@ -25,8 +25,13 @@ public final class MongoIdUtils {
         if (normalized == null) {
             return Criteria.where(fieldName).is(idValue);
         }
-        // Always query as string value directly, don't convert to ObjectId.
-        // MongoDB stores IDs as strings; converting causes mismatch.
+        // Query as both String and ObjectId to handle IDs stored in either format.
+        if (ObjectId.isValid(normalized)) {
+            return new Criteria().orOperator(
+                    Criteria.where(fieldName).is(normalized),
+                    Criteria.where(fieldName).is(new ObjectId(normalized))
+            );
+        }
         return Criteria.where(fieldName).is(normalized);
     }
 
@@ -35,7 +40,13 @@ public final class MongoIdUtils {
         if (normalized == null) {
             return Criteria.where(fieldName).ne(idValue);
         }
-        // Always query as string value directly, don't convert to ObjectId.
+        // Exclude both String and ObjectId representations.
+        if (ObjectId.isValid(normalized)) {
+            return new Criteria().andOperator(
+                    Criteria.where(fieldName).ne(normalized),
+                    Criteria.where(fieldName).ne(new ObjectId(normalized))
+            );
+        }
         return Criteria.where(fieldName).ne(normalized);
     }
 
