@@ -21,7 +21,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Product {
-    @MongoId(FieldType.OBJECT_ID)
+    @MongoId(FieldType.STRING)
     private String id;
 
     @TextIndexed(weight = 5)

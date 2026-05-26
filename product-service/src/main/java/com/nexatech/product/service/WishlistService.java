@@ -11,8 +11,6 @@ import com.nexatech.product.util.ProductQueryUtils;
 import com.nexatech.product.util.TextUtils;
 
 import lombok.RequiredArgsConstructor;
-import org.bson.Document;
-import org.bson.types.ObjectId;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -142,64 +140,41 @@ public class WishlistService {
             throw new ResourceNotFoundException("Product", "id", productId);
         }
 
-        List<Document> idAlternatives = new ArrayList<>();
-        idAlternatives.add(new Document("_id", normalized));
-        if (ObjectId.isValid(normalized)) {
-            idAlternatives.add(new Document("_id", new ObjectId(normalized)));
-        }
-
-        Document filter = new Document("active", true)
-                .append("$or", idAlternatives);
-
-        Document raw = mongoTemplate.getCollection("products")
-                .find(filter)
-                .first();
-        if (raw == null) {
+        Query query = Query.query(new Criteria().andOperator(
+                Criteria.where("_id").is(normalized),
+                Criteria.where("active").is(true)
+        ));
+        Product product = mongoTemplate.findOne(query, Product.class);
+        if (product == null) {
             throw new ResourceNotFoundException("Product", "id", productId);
         }
-
-        return mongoTemplate.getConverter().read(Product.class, raw);
+        return product;
     }
 
     private List<Product> findActiveProductsByIds(List<String> ids) {
-        Document filter = buildActiveProductsFilter(ids);
-        if (filter == null) {
+        Query query = buildActiveProductsQuery(ids);
+        if (query == null) {
             return List.of();
         }
-
-        List<Product> products = new ArrayList<>();
-        mongoTemplate.getCollection("products")
-                .find(filter)
-                .forEach(doc -> products.add(mongoTemplate.getConverter().read(Product.class, doc)));
-        return products;
+        return mongoTemplate.find(query, Product.class);
     }
 
     private long countActiveProductsByIds(List<String> ids) {
-        Document filter = buildActiveProductsFilter(ids);
-        if (filter == null) {
+        Query query = buildActiveProductsQuery(ids);
+        if (query == null) {
             return 0;
         }
-        return mongoTemplate.getCollection("products").countDocuments(filter);
+        return mongoTemplate.count(query, Product.class);
     }
 
-    private Document buildActiveProductsFilter(List<String> ids) {
+    private Query buildActiveProductsQuery(List<String> ids) {
         List<String> normalizedIds = TextUtils.normalizeDistinct(ids);
         if (normalizedIds.isEmpty()) {
             return null;
         }
-
-        List<ObjectId> objectIds = normalizedIds.stream()
-                .filter(ObjectId::isValid)
-                .map(ObjectId::new)
-                .toList();
-
-        List<Document> idAlternatives = new ArrayList<>();
-        idAlternatives.add(new Document("_id", new Document("$in", normalizedIds)));
-        if (!objectIds.isEmpty()) {
-            idAlternatives.add(new Document("_id", new Document("$in", objectIds)));
-        }
-
-        return new Document("active", true)
-                .append("$or", idAlternatives);
+        return Query.query(new Criteria().andOperator(
+                Criteria.where("active").is(true),
+                Criteria.where("_id").in(normalizedIds)
+        ));
     }
 }

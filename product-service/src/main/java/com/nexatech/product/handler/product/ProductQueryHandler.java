@@ -435,6 +435,7 @@ public class ProductQueryHandler {
     }
 
     private Criteria categoryArrayCriteria(String categoryId) {
+        // categoryIds is stored as plain string IDs across product-service.
         return MongoIdUtils.arrayContainsIdCriteria("categoryIds", categoryId);
     }
 
