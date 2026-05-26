@@ -24,6 +24,7 @@
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
+- [Architecture Diagram](ARCHITECTURE.md)
 - [Tech Stack](#tech-stack)
 - [Services](#services)
 - [Infrastructure](#infrastructure)
@@ -57,7 +58,8 @@
        product, order,       (NestJS + Prisma)   mcp-server,
        inventory, payment,                       recommendation-service
        shipping, notification,
-       chat, storage, news
+       chat, storage, news,
+       audit
               |                   |                   |
               +-------------------+-------------------+
                                   |
@@ -135,12 +137,13 @@
 | `product-service` | 8090 | MongoDB | Catalog, categories, brands, images, reviews, wishlist |
 | `shipping-service` | 8091 | PostgreSQL | Shipping quote/order flow, mock or GHN provider |
 | `news-service` | 8092 | PostgreSQL + S3-compatible storage | News/blog content command and query APIs |
+| `audit-service` | 8096 | MongoDB | Central audit log ingestion and admin audit search |
 
 ### Node.js Service
 
 | Service | Port | Main Store | Responsibility |
 |---|---:|---|---|
-| `promotion-service` | 8096 recommended | PostgreSQL + Redis + Kafka | Promotions, coupons, flash sales, Redis stock reservation and outbox publishing |
+| `promotion-service` | 8093 default / configurable | PostgreSQL + Redis + Kafka | Promotions, coupons, flash sales, Redis stock reservation and outbox publishing |
 
 ### Python / FastAPI Services
 
@@ -259,7 +262,7 @@ Create `promotion-service/.env` with at least:
 
 ```env
 NODE_ENV=development
-PORT=8096
+PORT=8093
 DATABASE_URL=postgresql://nexatech:nexatech123@localhost:5432/nexatech_promotions
 REDIS_HOST=localhost
 REDIS_PORT=6379
@@ -267,6 +270,8 @@ KAFKA_BROKERS=localhost:9092
 KAFKA_GROUP_ID=promotion-service-group
 RESERVATION_TTL_SECONDS=300
 ```
+
+`promotion-service` defaults to port `8093` in the current code and Dockerfile. Use another `PORT` value, such as `8097`, when running it at the same time as `agent-service`, which also defaults to `8093`.
 
 Then:
 
@@ -328,10 +333,11 @@ EUREKA_INSTANCE_HOSTNAME=127.0.0.1
 | Product Service | `http://localhost:8090` | `GET /actuator/health` |
 | Shipping Service | `http://localhost:8091` | `GET /actuator/health` |
 | News Service | `http://localhost:8092` | `GET /actuator/health` |
+| Audit Service | `http://localhost:8096` | `GET /actuator/health` |
 | Agent Service | `http://localhost:8093` | `GET /health` |
 | MCP Server | `http://localhost:8094` | `GET /health` |
 | Recommendation Service | `http://localhost:8095` | `GET /health`, `GET /ready` |
-| Promotion Service | `http://localhost:8096` | `GET /health` |
+| Promotion Service | `http://localhost:8093` by default, or custom `PORT` | `GET /health` |
 
 Infrastructure endpoints:
 
@@ -348,7 +354,7 @@ Infrastructure endpoints:
 
 ## API Overview
 
-Most client traffic should go through `api-gateway` at `http://localhost:8080`. Services not yet present in the gateway route config, such as `promotion-service`, can be called directly during local development or added to [`api-gateway.yml`](config-server/src/main/resources/configs/api-gateway.yml).
+Most client traffic should go through `api-gateway` at `http://localhost:8080`. Services not yet present in the Spring Cloud Gateway route config, such as `promotion-service`, can be called directly during local development or added to [`api-gateway.yml`](config-server/src/main/resources/configs/api-gateway.yml). A Kong declarative config also exists at [`_kong/kong.yml`](_kong/kong.yml), but there is no current root Compose file wiring Kong into the local stack.
 
 | Domain | Main Paths | Service |
 |---|---|---|
@@ -365,7 +371,8 @@ Most client traffic should go through `api-gateway` at `http://localhost:8080`. 
 | Chat and typing | chat REST paths and WebSocket routes | `chat-service` |
 | News | news command/query paths | `news-service` |
 | Promotions and flash sales | `/api/v1/flash-sales/**` | `promotion-service` |
-| Recommendations | `/recommend/user/{userId}`, `/recommend/similar/{productId}`, `/recommend/popular` | `recommendation-service` |
+| Audit search | `/api/v1/admin/audit/**` | `audit-service` |
+| Recommendations | `/api/v1/recommend/**`, `/api/v1/behaviors/**` through gateway; direct paths include `/recommend/user/{userId}`, `/recommend/similar/{productId}`, `/recommend/popular` | `recommendation-service` |
 | Agent / MCP | service-specific FastAPI routes | `agent-service`, `mcp-server` |
 
 Gateway routes are configured in [`config-server/src/main/resources/configs/api-gateway.yml`](config-server/src/main/resources/configs/api-gateway.yml).
@@ -390,7 +397,7 @@ PostgreSQL databases created by [`_postgres/init-databases.sql`](_postgres/init-
 | `nexatech_news` | News service |
 | `nexatech_promotions` | Promotion service |
 
-MongoDB databases/collections are used primarily for product catalog data, chat document data and recommendation features. MinIO stores uploaded media; the infra compose auto-creates `nexatech-products`.
+MongoDB databases/collections are used primarily for product catalog data, chat document data, audit logs and recommendation features. MinIO stores uploaded media; the infra compose auto-creates `nexatech-products`.
 
 Promotion service tables are managed by Prisma:
 
@@ -456,7 +463,8 @@ config-server/src/main/resources/configs/
 ├── notification-service.yml
 ├── chat-service.yml
 ├── storage-service.yml
-└── news-service.yml
+├── news-service.yml
+└── audit-service.yml
 ```
 
 Common local environment variables:
@@ -524,6 +532,7 @@ nexatech-backend/
 ├── chat-service/                        # Chat/WebSocket domain
 ├── storage-service/                     # MinIO-backed file storage
 ├── news-service/                        # News/blog domain
+├── audit-service/                       # Mongo-backed audit log domain
 ├── promotion-service/                   # NestJS promotions and flash sales
 └── python-services/
     ├── agent-service/
