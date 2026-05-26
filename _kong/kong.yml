@@ -115,12 +115,12 @@ services:
         strip_path: false
 
   - name: audit-service
-    url: http://audit-service:8096
+    url: http://audit-service:8096/audit
     routes:
       - name: audit-route
         paths:
           - /api/v1/admin/audit
-        strip_path: false
+        strip_path: true
 
   - name: promotion-service
     url: http://promotion-service:8093

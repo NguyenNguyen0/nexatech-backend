@@ -80,6 +80,8 @@ spring:
               uri: lb://audit-service
               predicates:
                 - Path=/api/v1/admin/audit/**
+              filters:
+                - StripPrefix=3
             - id: agent-service
               uri: lb://agent-service
               predicates:
