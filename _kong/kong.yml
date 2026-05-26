@@ -43,6 +43,8 @@ services:
           - /api/v1/checkout
           - /api/v1/returns
           - /api/v1/admin/orders
+          - /api/v1/admin/audit/orders
+          - /api/v1/admin/audit/trace
         strip_path: false
 
   - name: inventory-service
@@ -64,6 +66,7 @@ services:
         paths:
           - /api/v1/payments
           - /api/v1/admin/payments
+          - /api/v1/admin/audit/payments
         strip_path: false
 
   - name: shipping-service
@@ -115,12 +118,12 @@ services:
         strip_path: false
 
   - name: audit-service
-    url: http://audit-service:8096
+    url: http://audit-service:8096/audit
     routes:
       - name: audit-route
         paths:
           - /api/v1/admin/audit
-        strip_path: false
+        strip_path: true
 
   - name: promotion-service
     url: http://promotion-service:8093
