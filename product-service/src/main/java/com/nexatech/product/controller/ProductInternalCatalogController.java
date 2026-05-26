@@ -4,16 +4,14 @@ import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.PageResponse;
 import com.nexatech.product.dto.response.ProductMinimalResponse;
 import com.nexatech.product.exception.ForbiddenException;
-import com.nexatech.product.service.ProductService;
+import com.nexatech.product.handler.product.ProductQueryHandler;
+import com.nexatech.product.query.product.GetActiveProductsForSyncQuery;
+import com.nexatech.product.query.product.LookupProductsByIdsQuery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -22,7 +20,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProductInternalCatalogController {
 
-    private final ProductService productService;
+    private final ProductQueryHandler productQueryHandler;
 
     @Value("${product.internal.api-key:change-me}")
     private String internalApiKey;
@@ -33,7 +31,7 @@ public class ProductInternalCatalogController {
             Pageable pageable) {
         verifyApiKey(apiKey);
 
-        Page<ProductMinimalResponse> page = productService.getActiveProductsForInternalSync(pageable);
+        Page<ProductMinimalResponse> page = productQueryHandler.handle(new GetActiveProductsForSyncQuery(), pageable);
         return ApiResponse.ok(PageResponse.of(page));
     }
 
@@ -42,7 +40,7 @@ public class ProductInternalCatalogController {
             @RequestHeader(value = "X-Internal-Api-Key", required = false) String apiKey,
             @RequestParam(name = "ids") List<String> ids) {
         verifyApiKey(apiKey);
-        return ApiResponse.ok(productService.getActiveProductsByIdsForInternalSync(ids));
+        return ApiResponse.ok(productQueryHandler.handle(new LookupProductsByIdsQuery(ids)));
     }
 
     private void verifyApiKey(String apiKey) {

@@ -1,6 +1,5 @@
 package com.nexatech.product.service;
 
-import com.nexatech.product.client.InventoryClient;
 import com.nexatech.product.client.dto.InventoryStockResponse;
 import com.nexatech.product.dto.response.ProductMinimalResponse;
 import com.nexatech.product.dto.response.ProductResponse;
@@ -21,7 +20,7 @@ public class ProductResponseEnricher {
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final ReviewRepository reviewRepository;
-    private final InventoryClient inventoryClient;
+    private final ResilientDownstreamService resilientDownstreamService;
 
     public ProductResponse enrichCatalogResponse(ProductResponse response) {
         enrichPrimaryCategoryName(response);
@@ -111,7 +110,7 @@ public class ProductResponseEnricher {
 
     private void enrichStock(ProductResponse response) {
         try {
-            InventoryStockResponse inv = inventoryClient.getStock(response.getId());
+            InventoryStockResponse inv = resilientDownstreamService.getStock(response.getId());
             if (inv != null && inv.getData() != null) {
                 int available = inv.getData().getAvailableQuantity();
                 int reorder = inv.getData().getReorderLevel();
@@ -131,7 +130,7 @@ public class ProductResponseEnricher {
 
     private void enrichStock(ProductMinimalResponse response) {
         try {
-            InventoryStockResponse inv = inventoryClient.getStock(response.getId());
+            InventoryStockResponse inv = resilientDownstreamService.getStock(response.getId());
             if (inv != null && inv.getData() != null) {
                 int available = inv.getData().getAvailableQuantity();
                 int reorder = inv.getData().getReorderLevel();
