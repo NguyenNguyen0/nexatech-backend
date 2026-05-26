@@ -29,7 +29,7 @@ variables:
         docker push "$IMAGE_NAMESPACE/$IMAGE_NAME:latest"
       fi
   rules:
-    - if: '$DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
 
 build:java-images:
   extends: .docker-build
