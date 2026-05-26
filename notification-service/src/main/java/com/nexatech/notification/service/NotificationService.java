@@ -1,8 +1,10 @@
 package com.nexatech.notification.service;
 
 import com.nexatech.notification.dto.NotificationResponse;
+import com.nexatech.notification.event.dto.AuditLogEvent;
 import com.nexatech.notification.model.Notification;
 import com.nexatech.notification.repository.NotificationRepository;
+import com.nexatech.notification.service.audit.AuditEventPublisher;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final SseEmitterService sseEmitterService;
     private final WebSocketNotificationService webSocketNotificationService;
+    private final AuditEventPublisher auditEventPublisher;
 
     public Page<NotificationResponse> getNotifications(UUID userId, Pageable pageable) {
         Pageable sorted = PageRequest.of(
@@ -115,6 +118,13 @@ public class NotificationService {
         } catch (Exception e) {
             log.debug("Failed to push unread count update: {}", e.getMessage());
         }
+
+        auditEventPublisher.publish(AuditLogEvent.builder()
+                .action("NOTIFICATION_MARK_ALL_READ")
+                .entityType("Notification")
+                .entityId(userId != null ? userId.toString() : null)
+                .message("Marked all notifications as read")
+                .build());
     }
 
     private NotificationResponse toResponse(Notification notification) {

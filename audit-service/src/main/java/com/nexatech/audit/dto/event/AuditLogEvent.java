@@ -26,9 +26,14 @@ public class AuditLogEvent {
     String action;
     String entityType;
     String entityId;
+    /** Friendly label of the entity (e.g. username of the target User). Optional. */
+    String entityLabel;
     String oldValue;
     String newValue;
+    /** Display name of the performer (username / email / "system"). */
     String actor;
+    /** Optional stable id of the performer (Keycloak sub / UUID). */
+    String actorId;
     String reason;
     String sourceService;
     String message;

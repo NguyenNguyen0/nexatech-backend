@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -29,6 +30,7 @@ public class PaymentService {
     private final PaymentMapper paymentMapper;
     private final OutboxEventService outboxEventService;
     private final AuditLogService auditLogService;
+    private final SnapshotService snapshotService;
 
     @Transactional
     public PaymentResponse createPayment(UUID customerId, CreatePaymentRequest request) {
@@ -47,8 +49,14 @@ public class PaymentService {
         Payment saved = paymentRepository.save(payment);
 
         savePaymentEventToOutbox(saved, "PAYMENT_INITIATED");
-        auditLogService.log("PAYMENT_CREATED", "Payment", saved.getId().toString(),
-                "status=PENDING", customerId != null ? customerId.toString() : "guest");
+        auditLogService.logEvent("PAYMENT_CREATED", "Payment", saved.getId().toString(),
+                Map.of("paymentId", saved.getId().toString(),
+                        "orderId", saved.getOrderId().toString(),
+                        "amount", saved.getAmount(),
+                        "method", saved.getMethod().name(),
+                        "status", "PENDING",
+                        "customerId", customerId != null ? customerId.toString() : "guest"),
+                customerId != null ? customerId.toString() : "guest");
         log.info("Tạo thanh toán thành công: {} | đơn hàng: {}", saved.getId(), saved.getOrderId());
 
         return paymentMapper.toResponse(saved);
@@ -96,8 +104,12 @@ public class PaymentService {
         Payment saved = paymentRepository.save(payment);
 
         savePaymentEventToOutbox(saved, "PAYMENT_REFUNDED");
-        auditLogService.log("PAYMENT_REFUNDED", "Payment", paymentId.toString(),
-                PaymentStatus.COMPLETED.name(), PaymentStatus.REFUNDED.name(), "admin", null);
+        auditLogService.logEvent("PAYMENT_REFUNDED", "Payment", paymentId.toString(),
+                Map.of("paymentId", paymentId.toString(),
+                        "orderId", saved.getOrderId().toString(),
+                        "previousStatus", "COMPLETED",
+                        "newStatus", "REFUNDED"),
+                "admin");
         log.info("Hoàn tiền thành công: {} | đơn hàng: {}", paymentId, saved.getOrderId());
 
         return paymentMapper.toResponse(saved);
@@ -116,8 +128,19 @@ public class PaymentService {
                 payment.setCompletedAt(Instant.now());
                 Payment saved = paymentRepository.save(payment);
                 savePaymentEventToOutbox(saved, "PAYMENT_COMPLETED");
-                auditLogService.log("PAYMENT_CONFIRMED", "Payment", payment.getId().toString(),
-                        "status=COMPLETED", "system");
+                auditLogService.logEvent("PAYMENT_CONFIRMED", "Payment", payment.getId().toString(),
+                        Map.of("paymentId", payment.getId().toString(),
+                                "orderId", orderId.toString(),
+                                "previousStatus", "PENDING_OR_PROCESSING",
+                                "newStatus", "COMPLETED"),
+                        "system");
+                snapshotService.takeSnapshot("Payment", payment.getId(),
+                        Map.of("paymentId", payment.getId().toString(),
+                                "orderId", orderId.toString(),
+                                "status", "COMPLETED",
+                                "method", payment.getMethod().name(),
+                                "amount", payment.getAmount(),
+                                "snapshotReason", "payment_confirmed"));
                 log.info("Xác nhận thanh toán thành công cho đơn hàng: {}", orderId);
             }
         });
@@ -132,8 +155,19 @@ public class PaymentService {
                 payment.setCompletedAt(Instant.now());
                 Payment saved = paymentRepository.save(payment);
                 savePaymentEventToOutbox(saved, "PAYMENT_COMPLETED");
-                auditLogService.log("PAYMENT_CONFIRMED_COD", "Payment", payment.getId().toString(),
-                        "status=COMPLETED", "system");
+                auditLogService.logEvent("PAYMENT_CONFIRMED_COD", "Payment", payment.getId().toString(),
+                        Map.of("paymentId", payment.getId().toString(),
+                                "orderId", orderId.toString(),
+                                "previousStatus", "PENDING",
+                                "newStatus", "COMPLETED",
+                                "method", "COD"),
+                        "system");
+                snapshotService.takeSnapshot("Payment", payment.getId(),
+                        Map.of("paymentId", payment.getId().toString(),
+                                "orderId", orderId.toString(),
+                                "status", "COMPLETED",
+                                "method", "COD",
+                                "snapshotReason", "cod_confirmed"));
                 log.info("Xác nhận thanh toán COD thành công khi giao hàng, orderId={}", orderId);
             }
         });
@@ -154,8 +188,13 @@ public class PaymentService {
                 payment.setStatus(PaymentStatus.REFUNDED);
                 Payment saved = paymentRepository.save(payment);
                 savePaymentEventToOutbox(saved, "PAYMENT_REFUNDED");
-                auditLogService.log("PAYMENT_REFUNDED_ON_CANCEL", "Payment", payment.getId().toString(),
-                        PaymentStatus.COMPLETED.name(), PaymentStatus.REFUNDED.name(), "system", "order_cancelled");
+                auditLogService.logEvent("PAYMENT_REFUNDED_ON_CANCEL", "Payment", payment.getId().toString(),
+                        Map.of("paymentId", payment.getId().toString(),
+                                "orderId", orderId.toString(),
+                                "reason", "order_cancelled",
+                                "previousStatus", "COMPLETED",
+                                "newStatus", "REFUNDED"),
+                        "system");
                 log.info("Hoàn tiền do hủy đơn: orderId={}, paymentId={}", orderId, payment.getId());
             } else {
                 log.debug("Payment không ở trạng thái COMPLETED, bỏ qua hoàn tiền: status={}, orderId={}",
@@ -171,8 +210,12 @@ public class PaymentService {
                 payment.setStatus(PaymentStatus.REFUNDED);
                 Payment saved = paymentRepository.save(payment);
                 savePaymentEventToOutbox(saved, "PAYMENT_REFUNDED");
-                auditLogService.log("PAYMENT_RETURN_REFUNDED", "Payment", payment.getId().toString(),
-                        "status=REFUNDED", "system");
+                auditLogService.logEvent("PAYMENT_RETURN_REFUNDED", "Payment", payment.getId().toString(),
+                        Map.of("paymentId", payment.getId().toString(),
+                                "orderId", orderId.toString(),
+                                "previousStatus", "COMPLETED",
+                                "newStatus", "REFUNDED"),
+                        "system");
                 log.info("Hoàn tiền thành công cho đơn trả hàng, orderId={}", orderId);
             } else {
                 log.warn("Không thể hoàn tiền — trạng thái hiện tại: {}, orderId={}",

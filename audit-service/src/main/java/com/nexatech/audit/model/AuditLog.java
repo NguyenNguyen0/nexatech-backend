@@ -61,10 +61,18 @@ public class AuditLog {
     @Field("new_value")
     String newValue;
 
-    /** Performer (userId / email / "system"). */
+    /** Display name of the performer — username / email / "system" (NEVER raw UUID). */
     @Field("actor")
     @Indexed
     String actor;
+
+    /** Stable id of the performer (e.g. Keycloak sub / UUID). Optional. */
+    @Field("actor_id")
+    String actorId;
+
+    /** Human-readable label of the affected entity (e.g. order code, username of the target user). */
+    @Field("entity_label")
+    String entityLabel;
 
     /** Short description of the operation context. */
     @Field("reason")

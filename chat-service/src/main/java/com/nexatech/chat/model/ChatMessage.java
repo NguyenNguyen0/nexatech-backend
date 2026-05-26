@@ -34,6 +34,8 @@ public class ChatMessage {
 
     private String content;
 
+    private ProductReference productReference;
+
     private Instant createdAt;
 
     private Instant deliveredAt;

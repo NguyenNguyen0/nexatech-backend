@@ -17,6 +17,7 @@ import com.nexatech.audit.dto.base.ApiResponse;
 import com.nexatech.audit.dto.base.PageResponse;
 import com.nexatech.audit.dto.response.AuditLogResponse;
 import com.nexatech.audit.security.RequiresPermission;
+import com.nexatech.audit.service.AuditFacets;
 import com.nexatech.audit.service.AuditLogService;
 
 import lombok.AccessLevel;
@@ -66,6 +67,20 @@ public class AuditController {
     public ApiResponse<AuditLogResponse> getById(@PathVariable String id) {
         return ApiResponse.<AuditLogResponse>builder()
                 .result(auditLogService.getById(id))
+                .build();
+    }
+
+    /**
+     * Distinct facets currently present in the collection.
+     * The admin UI uses this to build filter options dynamically —
+     * new services / actions show up in the filters automatically as soon as
+     * they emit their first audit event.
+     */
+    @GetMapping("/facets")
+//     @RequiresPermission(PermissionsAccept.Audit.READ)
+    public ApiResponse<AuditFacets> facets() {
+        return ApiResponse.<AuditFacets>builder()
+                .result(auditLogService.facets())
                 .build();
     }
 }

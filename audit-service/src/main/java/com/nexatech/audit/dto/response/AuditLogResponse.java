@@ -24,9 +24,11 @@ public class AuditLogResponse {
     String action;
     String entityType;
     String entityId;
+    String entityLabel;
     String oldValue;
     String newValue;
     String actor;
+    String actorId;
     String reason;
     String sourceService;
     String message;

@@ -23,4 +23,6 @@ public interface AuditLogService {
             Instant from,
             Instant to,
             Pageable pageable);
+
+    AuditFacets facets();
 }

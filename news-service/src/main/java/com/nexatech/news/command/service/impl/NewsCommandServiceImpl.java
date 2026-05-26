@@ -7,6 +7,7 @@ import com.nexatech.news.command.command.NewsUpdateRequest;
 import com.nexatech.news.command.command.NewsVisibilityRequest;
 import com.nexatech.news.command.aggregate.News;
 import com.nexatech.news.command.service.NewsCommandService;
+import com.nexatech.news.command.service.audit.AuditEventPublisher;
 import com.nexatech.news.enums.ErrorCode;
 import com.nexatech.news.enums.NewsStatus;
 import com.nexatech.news.exception.AppException;
@@ -24,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
@@ -35,6 +37,7 @@ public class NewsCommandServiceImpl implements NewsCommandService {
     private final NewsMapper newsMapper;
     private final MediaStorageService mediaStorageService;
     private final ObjectMapper objectMapper;
+    private final AuditEventPublisher auditEventPublisher;
 
     @Override
     @Transactional
@@ -97,8 +100,20 @@ public class NewsCommandServiceImpl implements NewsCommandService {
             news.setStatus(NewsStatus.PUBLISHED);
         }
 
+        boolean isUpdate = request.getId() != null && !request.getId().isEmpty();
         news = newsRepository.save(news);
         log.info("News saved successfully: id={}, slug={}", news.getId(), news.getSlug());
+
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("slug", news.getSlug());
+        meta.put("isPublic", news.getIsPublic());
+        meta.put("status", news.getStatus() != null ? news.getStatus().name() : null);
+        auditEventPublisher.publishNews(
+                isUpdate ? "NEWS_UPDATED" : "NEWS_CREATED",
+                news.getId(),
+                news.getTitle(),
+                isUpdate ? "Updated news article" : "Created news article",
+                meta);
 
         return newsMapper.toNewsResponse(news);
     }
@@ -144,6 +159,16 @@ public class NewsCommandServiceImpl implements NewsCommandService {
         news = newsRepository.save(news);
         log.info("News updated successfully: id={}", id);
 
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("slug", news.getSlug());
+        meta.put("isPublic", news.getIsPublic());
+        auditEventPublisher.publishNews(
+                "NEWS_UPDATED",
+                news.getId(),
+                news.getTitle(),
+                "Updated news article",
+                meta);
+
         return newsMapper.toNewsResponse(news);
     }
 
@@ -167,8 +192,16 @@ public class NewsCommandServiceImpl implements NewsCommandService {
             news.setStatus(NewsStatus.DRAFT);
         }
 
+        boolean published = Boolean.TRUE.equals(request.getIsPublic());
         news = newsRepository.save(news);
         log.info("News visibility updated successfully: id={}, isPublic={}", id, request.getIsPublic());
+
+        auditEventPublisher.publishNews(
+                published ? "NEWS_PUBLISHED" : "NEWS_UNPUBLISHED",
+                news.getId(),
+                news.getTitle(),
+                published ? "Published news article" : "Unpublished news article",
+                Map.of("isPublic", published));
 
         return newsMapper.toNewsResponse(news);
     }
@@ -182,8 +215,17 @@ public class NewsCommandServiceImpl implements NewsCommandService {
         News news = newsRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.NEWS_NOT_FOUND));
 
+        String title = news.getTitle();
+        String slug = news.getSlug();
         newsRepository.delete(news);
         log.info("News deleted successfully: id={}", id);
+
+        auditEventPublisher.publishNews(
+                "NEWS_DELETED",
+                id,
+                title,
+                "Deleted news article",
+                Map.of("slug", slug != null ? slug : ""));
     }
 
     private Map<String, Object> parseContentJson(String contentJson) {
