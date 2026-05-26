@@ -139,6 +139,7 @@ public class ChatService {
                 .senderId(senderId)
                 .recipientId(recipientId)
                 .content(request.getContent())
+                .productReference(request.getProductReference())
                 .createdAt(Instant.now())
                 .build();
 
@@ -309,6 +310,7 @@ public class ChatService {
                 .senderId(message.getSenderId())
                 .recipientId(message.getRecipientId())
                 .content(message.getContent())
+                .productReference(message.getProductReference())
                 .status(resolveStatus(message))
                 .deliveredAt(message.getDeliveredAt())
                 .seenAt(message.getSeenAt())
