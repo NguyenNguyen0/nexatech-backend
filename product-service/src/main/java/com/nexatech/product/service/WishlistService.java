@@ -7,17 +7,22 @@ import com.nexatech.product.model.Product;
 import com.nexatech.product.model.Wishlist;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.WishlistRepository;
+import com.nexatech.product.util.MongoIdUtils;
 import com.nexatech.product.util.ProductQueryUtils;
+import com.nexatech.product.util.TextUtils;
+import com.nexatech.product.util.TextUtils;
+
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.Aggregation;
-import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -41,18 +46,17 @@ public class WishlistService {
 
     public boolean addToWishlist(UUID userId, String productId) {
         String normalizedUserId = userId.toString();
-        Product product = productRepository.findById(productId)
-                .filter(Product::isActive)
-                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productId));
+        Product product = findActiveProductById(productId);
+        String normalizedProductId = MongoIdUtils.normalize(product.getId());
 
-        if (wishlistRepository.findByUserIdAndProductId(normalizedUserId, product.getId()).isPresent()) {
+        if (wishlistRepository.findByUserIdAndProductId(normalizedUserId, normalizedProductId).isPresent()) {
             return true;
         }
 
         try {
             wishlistRepository.save(Wishlist.builder()
                     .userId(normalizedUserId)
-                    .productId(product.getId())
+                    .productId(normalizedProductId)
                     .build());
             return true;
         } catch (DuplicateKeyException ex) {
@@ -62,7 +66,8 @@ public class WishlistService {
 
     public boolean removeFromWishlist(UUID userId, String productId) {
         String normalizedUserId = userId.toString();
-        wishlistRepository.deleteByUserIdAndProductId(normalizedUserId, productId);
+        String normalizedProductId = MongoIdUtils.normalize(productId);
+        wishlistRepository.deleteByUserIdAndProductId(normalizedUserId, normalizedProductId == null ? productId : normalizedProductId);
         return false;
     }
 
@@ -73,26 +78,34 @@ public class WishlistService {
                 Sort.by(Sort.Direction.DESC, "createdAt"),
                 ALLOWED_SORT_FIELDS);
 
-        Sort.Direction createdAtDirection = resolveCreatedAtDirection(safePageable.getSort());
+        Page<Wishlist> wishlistPage = wishlistRepository.findByUserId(normalizedUserId, safePageable);
+        List<String> pagedProductIds = wishlistPage.getContent().stream()
+                .map(Wishlist::getProductId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
         long total = countActiveWishlistProducts(normalizedUserId);
         if (total == 0) {
             return new PageImpl<>(List.of(), safePageable, 0);
         }
 
-        List<String> pagedProductIds = fetchPagedActiveProductIds(normalizedUserId, safePageable, createdAtDirection);
         if (pagedProductIds.isEmpty()) {
             return new PageImpl<>(List.of(), safePageable, total);
         }
 
-        List<Product> products = productRepository.findByIdInAndActiveTrue(pagedProductIds);
+        List<Product> products = findActiveProductsByIds(pagedProductIds);
         Map<String, Product> productById = new LinkedHashMap<>();
         for (Product product : products) {
-            productById.put(product.getId(), product);
+            String normalized = MongoIdUtils.normalize(product.getId());
+            if (normalized != null) {
+                productById.put(normalized, product);
+            }
         }
 
         List<ProductMinimalResponse> content = new ArrayList<>();
         for (String productId : pagedProductIds) {
-            Product product = productById.get(productId);
+            String normalized = MongoIdUtils.normalize(productId);
+            Product product = normalized == null ? null : productById.get(normalized);
             if (product == null) {
                 continue;
             }
@@ -102,45 +115,20 @@ public class WishlistService {
         return new PageImpl<>(content, safePageable, total);
     }
 
-    private List<String> fetchPagedActiveProductIds(String userId, Pageable pageable, Sort.Direction direction) {
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(org.springframework.data.mongodb.core.query.Criteria.where("userId").is(userId)),
-                Aggregation.lookup("products", "productId", "_id", "product"),
-                Aggregation.unwind("product"),
-                Aggregation.match(org.springframework.data.mongodb.core.query.Criteria.where("product.active").is(true)),
-                Aggregation.sort(direction, "createdAt"),
-                Aggregation.skip(pageable.getOffset()),
-                Aggregation.limit(pageable.getPageSize()),
-                Aggregation.project("productId")
-        );
-
-        AggregationResults<Document> result = mongoTemplate.aggregate(aggregation, Wishlist.class, Document.class);
-        List<String> productIds = new ArrayList<>();
-        for (Document document : result.getMappedResults()) {
-            String productId = document.getString("productId");
-            if (productId != null) {
-                productIds.add(productId);
-            }
-        }
-        return productIds;
-    }
-
     private long countActiveWishlistProducts(String userId) {
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(org.springframework.data.mongodb.core.query.Criteria.where("userId").is(userId)),
-                Aggregation.lookup("products", "productId", "_id", "product"),
-                Aggregation.unwind("product"),
-                Aggregation.match(org.springframework.data.mongodb.core.query.Criteria.where("product.active").is(true)),
-                Aggregation.count().as("total")
-        );
+        Query query = Query.query(Criteria.where("userId").is(userId));
+        query.fields().include("productId");
 
-        AggregationResults<Document> result = mongoTemplate.aggregate(aggregation, Wishlist.class, Document.class);
-        Document countDoc = result.getUniqueMappedResult();
-        if (countDoc == null) {
+        List<String> productIds = mongoTemplate.find(query, Wishlist.class).stream()
+                .map(Wishlist::getProductId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        if (productIds.isEmpty()) {
             return 0;
         }
-        Number total = countDoc.get("total", Number.class);
-        return total == null ? 0 : total.longValue();
+
+        return countActiveProductsByIds(productIds);
     }
 
     private Sort.Direction resolveCreatedAtDirection(Sort sort) {
@@ -161,5 +149,72 @@ public class WishlistService {
             response.setOriginalPrice(response.getCompareAtPrice());
         }
         return productResponseEnricher.enrichMinimalCatalogResponse(response);
+    }
+
+    private Product findActiveProductById(String productId) {
+        String normalized = MongoIdUtils.normalize(productId);
+        if (normalized == null) {
+            throw new ResourceNotFoundException("Product", "id", productId);
+        }
+
+        List<Document> idAlternatives = new ArrayList<>();
+        idAlternatives.add(new Document("_id", normalized));
+        if (ObjectId.isValid(normalized)) {
+            idAlternatives.add(new Document("_id", new ObjectId(normalized)));
+        }
+
+        Document filter = new Document("active", true)
+                .append("$or", idAlternatives);
+
+        Document raw = mongoTemplate.getCollection("products")
+                .find(filter)
+                .first();
+        if (raw == null) {
+            throw new ResourceNotFoundException("Product", "id", productId);
+        }
+
+        return mongoTemplate.getConverter().read(Product.class, raw);
+    }
+
+    private List<Product> findActiveProductsByIds(List<String> ids) {
+        Document filter = buildActiveProductsFilter(ids);
+        if (filter == null) {
+            return List.of();
+        }
+
+        List<Product> products = new ArrayList<>();
+        mongoTemplate.getCollection("products")
+                .find(filter)
+                .forEach(doc -> products.add(mongoTemplate.getConverter().read(Product.class, doc)));
+        return products;
+    }
+
+    private long countActiveProductsByIds(List<String> ids) {
+        Document filter = buildActiveProductsFilter(ids);
+        if (filter == null) {
+            return 0;
+        }
+        return mongoTemplate.getCollection("products").countDocuments(filter);
+    }
+
+    private Document buildActiveProductsFilter(List<String> ids) {
+        List<String> normalizedIds = TextUtils.normalizeDistinct(ids);
+        if (normalizedIds.isEmpty()) {
+            return null;
+        }
+
+        List<ObjectId> objectIds = normalizedIds.stream()
+                .filter(ObjectId::isValid)
+                .map(ObjectId::new)
+                .toList();
+
+        List<Document> idAlternatives = new ArrayList<>();
+        idAlternatives.add(new Document("_id", new Document("$in", normalizedIds)));
+        if (!objectIds.isEmpty()) {
+            idAlternatives.add(new Document("_id", new Document("$in", objectIds)));
+        }
+
+        return new Document("active", true)
+                .append("$or", idAlternatives);
     }
 }
