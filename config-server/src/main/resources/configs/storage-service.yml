@@ -8,6 +8,7 @@ minio:
   bucket: ${MINIO_BUCKET:nexatech-products}
   region: ${MINIO_REGION:ap-southeast-1}
   path-style-access-enabled: ${MINIO_PATH_STYLE_ACCESS_ENABLED:true}
+  use-direct-s3-url: ${MINIO_USE_DIRECT_S3_URL:false}
   # Base URL accessible by clients (via Kong gateway). Override in production with your public domain.
   public-url: ${MINIO_PUBLIC_URL:http://localhost:8000}
 

@@ -11,11 +11,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.Set;
 import java.util.UUID;
 
@@ -55,12 +57,15 @@ public class StorageService {
         } catch (IOException e) {
             throw new StorageException("Failed to read uploaded file: " + e.getMessage());
         } catch (S3Exception e) {
-            log.error("MinIO upload error [bucket={}, key={}]: {}", targetBucket, key,
-                    e.awsErrorDetails().errorMessage());
+            logS3Error("upload", targetBucket, key, e);
+            throw new StorageException(buildStorageErrorMessage("upload", e));
+        } catch (SdkClientException e) {
+            log.error("S3 client error during upload [bucket={}, key={}]: {}", targetBucket, key,
+                    e.getMessage(), e);
             throw new StorageException("Failed to upload file to storage");
         }
 
-        String url = minioProperties.getPublicUrl() + "/api/v1/files/" + targetBucket + "/" + key;
+        String url = buildFileUrl(targetBucket, key);
         log.info("Uploaded file [bucket={}, key={}, size={}]", targetBucket, key, file.getSize());
 
         return FileUploadResponse.builder()
@@ -84,8 +89,11 @@ public class StorageService {
                     .build());
             log.info("Deleted file [bucket={}, key={}]", bucket, key);
         } catch (S3Exception e) {
-            log.error("MinIO delete error [bucket={}, key={}]: {}", bucket, key,
-                    e.awsErrorDetails().errorMessage());
+            logS3Error("delete", bucket, key, e);
+            throw new StorageException(buildStorageErrorMessage("delete", e));
+        } catch (SdkClientException e) {
+            log.error("S3 client error during delete [bucket={}, key={}]: {}", bucket, key,
+                    e.getMessage(), e);
             throw new StorageException("Failed to delete file from storage");
         }
     }
@@ -111,8 +119,11 @@ public class StorageService {
         } catch (NoSuchKeyException e) {
             throw new ResourceNotFoundException("File not found: " + key);
         } catch (S3Exception e) {
-            log.error("MinIO stream error [bucket={}, key={}]: {}", bucket, key,
-                    e.awsErrorDetails().errorMessage());
+            logS3Error("stream", bucket, key, e);
+            throw new StorageException(buildStorageErrorMessage("retrieve", e));
+        } catch (SdkClientException e) {
+            log.error("S3 client error during stream [bucket={}, key={}]: {}", bucket, key,
+                    e.getMessage(), e);
             throw new StorageException("Failed to retrieve file from storage");
         } catch (IOException e) {
             throw new StorageException("Failed to stream file: " + e.getMessage());
@@ -139,5 +150,63 @@ public class StorageService {
             ext = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
         }
         return UUID.randomUUID() + ext;
+    }
+
+    private void logS3Error(String operation, String bucket, String key, S3Exception e) {
+        String errorCode = null;
+        String errorMessage = e.getMessage();
+        if (e.awsErrorDetails() != null) {
+            errorCode = e.awsErrorDetails().errorCode();
+            if (e.awsErrorDetails().errorMessage() != null && !e.awsErrorDetails().errorMessage().isBlank()) {
+                errorMessage = e.awsErrorDetails().errorMessage();
+            }
+        }
+
+        log.error(
+                "S3 {} error [bucket={}, key={}, statusCode={}, errorCode={}, requestId={}]: {}",
+                operation,
+                bucket,
+                key,
+                e.statusCode(),
+                errorCode,
+                e.requestId(),
+                errorMessage,
+                e
+        );
+    }
+
+    private String buildStorageErrorMessage(String operation, S3Exception e) {
+        String errorCode = e.awsErrorDetails() != null ? e.awsErrorDetails().errorCode() : null;
+
+        if ("NoSuchBucket".equals(errorCode)) {
+            return "Failed to " + operation + " file: bucket does not exist";
+        }
+        if ("AccessDenied".equals(errorCode) || "InvalidAccessKeyId".equals(errorCode)
+                || "SignatureDoesNotMatch".equals(errorCode)) {
+            return "Failed to " + operation + " file: invalid S3 credentials or permission denied";
+        }
+        if ("AuthorizationHeaderMalformed".equals(errorCode) || "PermanentRedirect".equals(errorCode)) {
+            return "Failed to " + operation + " file: S3 region/endpoint configuration is incorrect";
+        }
+
+        return "Failed to " + operation + " file to storage";
+    }
+
+    private String buildFileUrl(String bucket, String key) {
+        if (!minioProperties.isUseDirectS3Url()) {
+            return minioProperties.getPublicUrl() + "/api/v1/files/" + bucket + "/" + key;
+        }
+
+        URI endpointUri = URI.create(minioProperties.getEndpoint());
+        String scheme = endpointUri.getScheme() == null ? "https" : endpointUri.getScheme();
+        String host = endpointUri.getHost();
+        if (host == null || host.isBlank()) {
+            return minioProperties.getPublicUrl() + "/api/v1/files/" + bucket + "/" + key;
+        }
+
+        if (minioProperties.isPathStyleAccessEnabled()) {
+            return scheme + "://" + host + "/" + bucket + "/" + key;
+        }
+        return scheme + "://" + bucket + "." + host + "/" + key;
     }
 }
