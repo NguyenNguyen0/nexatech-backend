@@ -82,14 +82,15 @@ build:node-python-images:
 
 trigger:infra-deploy:
   stage: deploy
-  inherit:
-    variables: false
-  trigger:
-    project: software-architecture264301/nexatech-infra
-    branch: main
-    strategy: depend
-    inputs:
-      backend_image_tag: $CI_COMMIT_SHORT_SHA
-      image_tag: $CI_COMMIT_SHORT_SHA
+  image: curlimages/curl:8.10.1
+  script:
+    - 'echo "Triggering infra pipeline with backend image tag: $CI_COMMIT_SHORT_SHA"'
+    - >-
+      curl --fail --request POST
+      --form "token=$CI_JOB_TOKEN"
+      --form "ref=main"
+      --form "inputs[backend_image_tag]=$CI_COMMIT_SHORT_SHA"
+      --form "inputs[image_tag]=$CI_COMMIT_SHORT_SHA"
+      "$CI_API_V4_URL/projects/software-architecture264301%2Fnexatech-infra/trigger/pipeline"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"'
