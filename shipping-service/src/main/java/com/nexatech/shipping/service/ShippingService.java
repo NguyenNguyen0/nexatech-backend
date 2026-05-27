@@ -36,11 +36,15 @@ public class ShippingService {
     }
 
     public TrackingResponse getTracking(String trackingCode) {
-        return providerFactory.getCurrentProviderClient().getTracking(trackingCode);
+        return shipmentRepository.findByTrackingCode(trackingCode)
+                .map(shipment -> providerFactory.getProviderClient(shipment.getProvider()).getTracking(trackingCode))
+                .orElseGet(() -> providerFactory.getCurrentProviderClient().getTracking(trackingCode));
     }
 
     public CancelShipmentResponse cancelShipment(String trackingCode) {
-        return providerFactory.getCurrentProviderClient().cancelShipment(trackingCode);
+        return shipmentRepository.findByTrackingCode(trackingCode)
+                .map(shipment -> providerFactory.getProviderClient(shipment.getProvider()).cancelShipment(trackingCode))
+                .orElseGet(() -> providerFactory.getCurrentProviderClient().cancelShipment(trackingCode));
     }
 
     public Page<TrackingResponse> getShipments(ShipmentStatus status, Pageable pageable) {
