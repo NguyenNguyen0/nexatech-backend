@@ -2,6 +2,7 @@ package com.nexatech.order.repository;
 
 import com.nexatech.order.enums.OrderStatus;
 import com.nexatech.order.model.Order;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,11 +20,21 @@ import java.util.UUID;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, UUID> {
 
+       @Override
+       @EntityGraph(attributePaths = "items")
+       Optional<Order> findById(UUID id);
+
        Optional<Order> findByOrderNumber(String orderNumber);
 
+       @EntityGraph(attributePaths = "items")
        Page<Order> findByCustomerId(UUID customerId, Pageable pageable);
 
+       @EntityGraph(attributePaths = "items")
        Page<Order> findByStatus(OrderStatus status, Pageable pageable);
+
+       @Override
+       @EntityGraph(attributePaths = "items")
+       Page<Order> findAll(Pageable pageable);
 
        long countByCreatedAtBetween(Instant from, Instant to);
 
