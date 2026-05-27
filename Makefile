@@ -14,10 +14,10 @@ MVN = mvn
 .PHONY: help build clean compile dev-up dev-down full-up full-down infra-reset logs-infra logs-full prune \
 	core-up core-down core-build core-logs \
 	run-discovery run-config run-gateway \
-	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-storage run-promotion \
+	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-audit run-storage run-promotion \
 	run-gateway-test run-chat-test \
 	run-gateway-ec2 run-identity-ec2 run-user-ec2 run-product-ec2 run-inventory-ec2 \
-	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-storage-ec2 run-news-ec2 run-promotion-ec2 \
+	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-audit-ec2 run-storage-ec2 run-news-ec2 run-promotion-ec2 \
 	run-all-terminals run-all-ec2-terminals run-store-ec2-terminals run-chat-ec2-terminals run-order-ec2-terminals
 
 help:
@@ -48,6 +48,7 @@ help:
 	@echo "  make run-payment        - Run payment-service"
 	@echo "  make run-notification   - Run notification-service"
 	@echo "  make run-chat           - Run chat-service"
+	@echo "  make run-audit          - Run audit-service"
 	@echo "  make run-storage        - Run storage-service"
 	@echo "  make run-promotion      - Run promotion-service (Node.js, requires .env in promotion-service/)"
 	@echo ""
@@ -65,8 +66,10 @@ help:
 	@echo "  make run-notification-ec2 - Run notification-service (EC2 infra)"
 	@echo "  make run-chat-ec2         - Run chat-service (EC2 infra)"
 	@echo "  make run-storage-ec2      - Run storage-service (EC2 infra)"
+	@echo "  make run-audit-ec2        - Run audit-service (EC2 infra)"
 	@echo "  make run-news-ec2         - Run news-service (EC2 infra)"
 	@echo "  make run-promotion-ec2    - Run promotion-service (EC2 infra, Node.js)"
+
 	@echo ""
 	@echo "Open services in separate PowerShell terminals:"
 	@echo "  make run-all-ec2-terminals   - Open all EC2-mode services, one terminal each"
@@ -157,6 +160,9 @@ run-notification:
 run-chat:
 	$(MVN) -pl chat-service spring-boot:run
 
+run-audit:
+	$(MVN) -pl audit-service spring-boot:run
+
 run-storage:
 	$(MVN) -pl storage-service spring-boot:run
 
@@ -199,6 +205,9 @@ run-notification-ec2:
 
 run-chat-ec2:
 	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 chat-service
+
+run-audit-ec2:
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 audit-service
 
 run-user-ec2:
 	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 user-service

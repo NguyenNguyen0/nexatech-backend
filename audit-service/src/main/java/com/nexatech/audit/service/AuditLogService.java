@@ -1,6 +1,7 @@
 package com.nexatech.audit.service;
 
 import java.time.Instant;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +24,8 @@ public interface AuditLogService {
             Instant from,
             Instant to,
             Pageable pageable);
+
+    List<AuditLogResponse> trace(String lookupId);
 
     AuditFacets facets();
 }

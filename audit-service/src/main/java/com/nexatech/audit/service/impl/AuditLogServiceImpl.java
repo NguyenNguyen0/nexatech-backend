@@ -130,6 +130,28 @@ public class AuditLogServiceImpl implements AuditLogService {
         return new PageImpl<>(mapped, pageable, total);
     }
 
+    @Override
+    public List<AuditLogResponse> trace(String lookupId) {
+        String value = lookupId == null ? "" : lookupId.trim();
+        if (!StringUtils.hasText(value)) {
+            return List.of();
+        }
+
+        Query query = new Query()
+                .addCriteria(new Criteria().orOperator(
+                        Criteria.where("entity_id").is(value),
+                        Criteria.where("metadata.correlationId").is(value),
+                        Criteria.where("metadata.traceId").is(value),
+                        Criteria.where("metadata.orderId").is(value),
+                        Criteria.where("metadata.paymentId").is(value)))
+                .with(org.springframework.data.domain.Sort.by("timestamp").ascending());
+
+        return mongoTemplate.find(query, AuditLog.class)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     private AuditLogResponse toResponse(AuditLog entity) {
         return AuditLogResponse.builder()
                 .id(entity.getId())
