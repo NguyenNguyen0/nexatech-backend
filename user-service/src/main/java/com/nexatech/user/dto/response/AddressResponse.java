@@ -27,6 +27,7 @@ public class AddressResponse {
     String receiverName;
     String phone;
     String province;
+    String district;
     String ward;
     String detail;
     Double latitude;

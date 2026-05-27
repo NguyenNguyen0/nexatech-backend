@@ -33,6 +33,8 @@ public class AddressRequest {
     @NotBlank(message = "PROVINCE_REQUIRED")
     String province;
 
+    String district;
+
     String ward;
 
     @NotBlank(message = "DETAIL_REQUIRED")

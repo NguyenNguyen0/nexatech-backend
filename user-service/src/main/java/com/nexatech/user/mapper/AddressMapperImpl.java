@@ -18,6 +18,7 @@ public class AddressMapperImpl implements AddressMapper {
                 .receiverName(request.getReceiverName())
                 .phone(request.getPhone())
                 .province(request.getProvince())
+                .district(request.getDistrict())
                 .ward(request.getWard())
                 .detail(request.getDetail())
                 .latitude(request.getLatitude())
@@ -38,6 +39,7 @@ public class AddressMapperImpl implements AddressMapper {
                 .receiverName(address.getReceiverName())
                 .phone(address.getPhone())
                 .province(address.getProvince())
+                .district(address.getDistrict())
                 .ward(address.getWard())
                 .detail(address.getDetail())
                 .latitude(address.getLatitude())
@@ -64,6 +66,9 @@ public class AddressMapperImpl implements AddressMapper {
         }
         if (request.getProvince() != null) {
             address.setProvince(request.getProvince());
+        }
+        if (request.getDistrict() != null) {
+            address.setDistrict(request.getDistrict());
         }
         if (request.getWard() != null) {
             address.setWard(request.getWard());
