@@ -1,0 +1,80 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
+
+stages:
+  - build
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+
+.docker-build:
+  image: docker:27.5.1
+  services:
+    - name: docker:27.5.1-dind
+      command: ["--tls=false"]
+  before_script:
+    - test -n "$DOCKERHUB_USERNAME"
+    - test -n "$DOCKERHUB_TOKEN"
+    - export IMAGE_NAMESPACE="${DOCKERHUB_NAMESPACE:-$DOCKERHUB_USERNAME}"
+    - export IMAGE_TAG="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
+    - export IMAGE_NAME="${IMAGE_NAME:-$SERVICE_NAME}"
+    - export DOCKERFILE="${DOCKERFILE:-$SERVICE_NAME/Dockerfile}"
+    - export DOCKERFILE_PATH="${DOCKERFILE_PATH:-$CONTEXT/$DOCKERFILE}"
+    - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  script:
+    - docker build --pull -f "$DOCKERFILE_PATH" -t "$IMAGE_NAMESPACE/$IMAGE_NAME:$IMAGE_TAG" "$CONTEXT"
+    - docker push "$IMAGE_NAMESPACE/$IMAGE_NAME:$IMAGE_TAG"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        docker tag "$IMAGE_NAMESPACE/$IMAGE_NAME:$IMAGE_TAG" "$IMAGE_NAMESPACE/$IMAGE_NAME:latest"
+        docker push "$IMAGE_NAMESPACE/$IMAGE_NAME:latest"
+      fi
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+
+build:java-images:
+  extends: .docker-build
+  stage: build
+  parallel:
+    matrix:
+      - SERVICE_NAME:
+          - api-gateway
+          - discovery-server
+          - config-server
+          - identity-service
+          - user-service
+          - product-service
+          - order-service
+          - inventory-service
+          - payment-service
+          - shipping-service
+          - notification-service
+          - chat-service
+          - storage-service
+          - news-service
+          - audit-service
+  variables:
+    CONTEXT: .
+
+build:node-python-images:
+  extends: .docker-build
+  stage: build
+  parallel:
+    matrix:
+      - IMAGE_NAME: promotion-service
+        CONTEXT: promotion-service
+        DOCKERFILE: Dockerfile
+      - IMAGE_NAME: agent-service
+        CONTEXT: python-services/agent-service
+        DOCKERFILE: Dockerfile
+      - IMAGE_NAME: mcp-server
+        CONTEXT: python-services/mcp-server
+        DOCKERFILE: Dockerfile
+      - IMAGE_NAME: recommendation-service
+        CONTEXT: python-services/recommendation-service
+        DOCKERFILE: Dockerfile
