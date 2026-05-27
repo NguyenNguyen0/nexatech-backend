@@ -5,12 +5,37 @@ import { PrismaService } from '../database/prisma.service';
 export class FlashSaleService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async decrementStockById(id: string, quantity: number = 1) {
+    const now = new Date();
+    const result = await this.prisma.flashSale.updateMany({
+      where: {
+        id,
+        remainingStock: { gte: quantity },
+        promotion: {
+          status: 'ACTIVE',
+          startTime: { lte: now },
+          endTime: { gte: now },
+        },
+      },
+      data: {
+        remainingStock: { decrement: quantity },
+        soldCount: { increment: quantity },
+      },
+    });
+    return { updated: result.count };
+  }
+
   async decrementStock(productId: string, quantity: number = 1) {
+    const now = new Date();
     const result = await this.prisma.flashSale.updateMany({
       where: {
         productId,
         remainingStock: { gte: quantity },
-        promotion: { status: 'ACTIVE' },
+        promotion: {
+          status: 'ACTIVE',
+          startTime: { lte: now },
+          endTime: { gte: now },
+        },
       },
       data: {
         remainingStock: { decrement: quantity },
