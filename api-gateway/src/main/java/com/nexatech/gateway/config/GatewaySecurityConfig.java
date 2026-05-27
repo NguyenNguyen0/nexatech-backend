@@ -67,6 +67,10 @@ public class GatewaySecurityConfig {
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.GET,
+                    "/api/v1/promotions/**",
+                    "/api/v1/flash-sales/**")
+                .permitAll()
+                .requestMatchers(HttpMethod.GET,
                     "/api/v1/agent/health",
                     "/api/v1/mcp/health")
                 .permitAll()

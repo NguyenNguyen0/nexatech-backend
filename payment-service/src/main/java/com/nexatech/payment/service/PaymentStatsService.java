@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,9 +42,9 @@ public class PaymentStatsService {
         List<DailyRevenue> daily = paymentRepository.revenueByDay(start, end)
                 .stream()
                 .map(row -> DailyRevenue.builder()
-                        .date(((java.sql.Date) row[0]).toLocalDate())
+                        .date(toLocalDate(row[0]))
                         .count(((Number) row[1]).longValue())
-                        .revenue(new BigDecimal(row[2].toString()))
+                        .revenue(toBigDecimal(row[2]))
                         .build())
                 .toList();
 
@@ -56,5 +57,31 @@ public class PaymentStatsService {
                 .byMethod(byMethod)
                 .dailyRevenue(daily)
                 .build();
+    }
+
+    private LocalDate toLocalDate(Object value) {
+        if (value instanceof LocalDate localDate) {
+            return localDate;
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime.toLocalDate();
+        }
+        if (value instanceof java.sql.Date date) {
+            return date.toLocalDate();
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toLocalDateTime().toLocalDate();
+        }
+        return LocalDate.parse(value.toString());
+    }
+
+    private BigDecimal toBigDecimal(Object value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        if (value instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        return new BigDecimal(value.toString());
     }
 }
