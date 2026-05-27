@@ -1,7 +1,7 @@
 package com.nexatech.product.service;
 
-import com.nexatech.product.client.InventoryClient;
 import com.nexatech.product.client.dto.InventoryStockResponse;
+import com.nexatech.product.dto.response.ProductMinimalResponse;
 import com.nexatech.product.dto.response.ProductResponse;
 import com.nexatech.product.model.Brand;
 import com.nexatech.product.repository.BrandRepository;
@@ -20,16 +20,24 @@ public class ProductResponseEnricher {
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final ReviewRepository reviewRepository;
-    private final InventoryClient inventoryClient;
+    private final ResilientDownstreamService resilientDownstreamService;
 
     public ProductResponse enrichCatalogResponse(ProductResponse response) {
         enrichPrimaryCategoryName(response);
         enrichBrandNameAndSlug(response);
 
-        Double avg = enrichAverageRating(response);
-        if (avg != null) {
-            enrichStock(response);
-        }
+        enrichAverageRating(response);
+        enrichStock(response);
+        return response;
+    }
+
+    public ProductMinimalResponse enrichMinimalCatalogResponse(ProductMinimalResponse response) {
+        enrichPrimaryCategoryName(response);
+        enrichBrandNameAndSlug(response);
+
+        enrichAverageRating(response);
+        enrichReviewCount(response);
+        enrichStock(response);
         return response;
     }
 
@@ -46,7 +54,23 @@ public class ProductResponseEnricher {
         }
     }
 
+    private void enrichPrimaryCategoryName(ProductMinimalResponse response) {
+        if (StringUtils.hasText(response.getPrimaryCategoryId())) {
+            categoryRepository.findById(response.getPrimaryCategoryId())
+                    .ifPresent(category -> response.setPrimaryCategoryName(category.getName()));
+        }
+    }
+
     private void enrichBrandNameAndSlug(ProductResponse response) {
+        if (StringUtils.hasText(response.getBrandId())) {
+            brandRepository.findById(response.getBrandId()).ifPresent(brand -> {
+                response.setBrandName(brand.getName());
+                response.setBrandSlug(brand.getSlug());
+            });
+        }
+    }
+
+    private void enrichBrandNameAndSlug(ProductMinimalResponse response) {
         if (StringUtils.hasText(response.getBrandId())) {
             brandRepository.findById(response.getBrandId()).ifPresent(brand -> {
                 response.setBrandName(brand.getName());
@@ -72,9 +96,41 @@ public class ProductResponseEnricher {
         return avg;
     }
 
+    private Double enrichAverageRating(ProductMinimalResponse response) {
+        Double avg = reviewRepository.getAverageRatingByProductId(response.getId());
+        if (avg != null) {
+            response.setAverageRating(Math.round(avg * 10.0) / 10.0);
+        }
+        return avg;
+    }
+
+    private void enrichReviewCount(ProductMinimalResponse response) {
+        response.setReviewCount(reviewRepository.countByProductId(response.getId()));
+    }
+
     private void enrichStock(ProductResponse response) {
         try {
-            InventoryStockResponse inv = inventoryClient.getStock(response.getId());
+            InventoryStockResponse inv = resilientDownstreamService.getStock(response.getId());
+            if (inv != null && inv.getData() != null) {
+                int available = inv.getData().getAvailableQuantity();
+                int reorder = inv.getData().getReorderLevel();
+                response.setStockQuantity(available);
+                if (available <= 0) {
+                    response.setStockStatus("OUT_OF_STOCK");
+                } else if (available <= reorder) {
+                    response.setStockStatus("LOW_STOCK");
+                } else {
+                    response.setStockStatus("IN_STOCK");
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not fetch inventory for product {}: {}", response.getId(), e.getMessage());
+        }
+    }
+
+    private void enrichStock(ProductMinimalResponse response) {
+        try {
+            InventoryStockResponse inv = resilientDownstreamService.getStock(response.getId());
             if (inv != null && inv.getData() != null) {
                 int available = inv.getData().getAvailableQuantity();
                 int reorder = inv.getData().getReorderLevel();

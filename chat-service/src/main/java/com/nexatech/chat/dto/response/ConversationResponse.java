@@ -23,7 +23,9 @@ public class ConversationResponse {
     private ConversationStatus status;
     private UUID currentParticipantId;
     private UUID otherUserId;
+    private ParticipantResponse participant;
     private boolean otherUserOnline;
+    private long unreadCount;
     private LastMessagePreview lastMessage;
     private Instant expiresAt;
     private Instant createdAt;

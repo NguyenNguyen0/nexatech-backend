@@ -1,6 +1,7 @@
 package com.nexatech.product.mapper;
 
 import com.nexatech.product.dto.request.ProductRequest;
+import com.nexatech.product.dto.response.ProductMinimalResponse;
 import com.nexatech.product.dto.response.ProductResponse;
 import com.nexatech.product.model.Product;
 import org.mapstruct.Mapper;
@@ -10,6 +11,8 @@ import org.mapstruct.MappingTarget;
 public interface ProductMapper {
 
     ProductResponse toResponse(Product entity);
+
+    ProductMinimalResponse toMinimalResponse(Product entity);
 
     Product toEntity(ProductRequest request);
 

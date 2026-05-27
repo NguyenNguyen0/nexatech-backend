@@ -43,6 +43,8 @@ services:
           - /api/v1/checkout
           - /api/v1/returns
           - /api/v1/admin/orders
+          - /api/v1/admin/audit/orders
+          - /api/v1/admin/audit/trace
         strip_path: false
 
   - name: inventory-service
@@ -64,6 +66,7 @@ services:
         paths:
           - /api/v1/payments
           - /api/v1/admin/payments
+          - /api/v1/admin/audit/payments
         strip_path: false
 
   - name: shipping-service
@@ -112,6 +115,54 @@ services:
       - name: news-route
         paths:
           - /api/v1/news
+        strip_path: false
+
+  - name: audit-service
+    url: http://audit-service:8096/audit
+    routes:
+      - name: audit-route
+        paths:
+          - /api/v1/admin/audit
+        strip_path: true
+
+  - name: promotion-service
+    url: http://promotion-service:8093
+    connect_timeout: 10000
+    read_timeout: 30000
+    write_timeout: 10000
+    retries: 3
+    routes:
+      - name: promotion-route
+        paths:
+          - /api/v1/promotions
+          - /api/v1/flash-sales
+          - /api/v1/admin/promotions
+          - /api/v1/admin/flash-sales
+          - /api/v1/internal/promotions
+        strip_path: false
+
+  - name: agent-service
+    url: http://agent-service:8093
+    routes:
+      - name: agent-route
+        paths:
+          - /api/v1/agent
+        strip_path: false
+
+  - name: mcp-server
+    url: http://mcp-server:8094
+    routes:
+      - name: mcp-route
+        paths:
+          - /api/v1/mcp
+        strip_path: false
+
+  - name: recommendation-service
+    url: http://recommendation-service:8095
+    routes:
+      - name: recommendation-route
+        paths:
+          - /api/v1/recommendations
         strip_path: false
 
 plugins:

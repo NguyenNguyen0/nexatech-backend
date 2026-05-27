@@ -13,6 +13,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -67,13 +68,21 @@ public class OrderPaymentEventConsumer {
             switch (event.getEventType() != null ? event.getEventType() : "") {
                 case "PAYMENT_COMPLETED" -> {
                     orderService.updateOrderStatus(event.getOrderId(), OrderStatus.CONFIRMED);
-                    auditLogService.log("PAYMENT_COMPLETED_RECEIVED", "Order", event.getOrderId().toString(),
-                            "status=CONFIRMED", CONSUMER_NAME);
+                    auditLogService.logEvent("PAYMENT_COMPLETED_RECEIVED", "Order",
+                            event.getOrderId().toString(),
+                            Map.of("orderId", event.getOrderId().toString(),
+                                    "newStatus", "CONFIRMED",
+                                    "triggeredBy", "kafka:payment.events"),
+                            CONSUMER_NAME);
                 }
                 case "PAYMENT_REFUNDED" -> {
                     orderService.updateOrderStatus(event.getOrderId(), OrderStatus.REFUNDED);
-                    auditLogService.log("PAYMENT_REFUNDED_RECEIVED", "Order", event.getOrderId().toString(),
-                            "status=REFUNDED", CONSUMER_NAME);
+                    auditLogService.logEvent("PAYMENT_REFUNDED_RECEIVED", "Order",
+                            event.getOrderId().toString(),
+                            Map.of("orderId", event.getOrderId().toString(),
+                                    "newStatus", "REFUNDED",
+                                    "triggeredBy", "kafka:payment.events"),
+                            CONSUMER_NAME);
                 }
                 default -> log.debug("Bỏ qua PaymentEvent không xử lý: {}", event.getEventType());
             }

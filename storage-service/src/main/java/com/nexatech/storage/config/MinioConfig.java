@@ -22,9 +22,9 @@ public class MinioConfig {
                 .endpointOverride(URI.create(props.getEndpoint()))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(props.getAccessKey(), props.getSecretKey())))
-                .region(Region.US_EAST_1)
+                .region(Region.of(props.getRegion()))
                 .serviceConfiguration(S3Configuration.builder()
-                        .pathStyleAccessEnabled(true) // required for MinIO
+                        .pathStyleAccessEnabled(props.isPathStyleAccessEnabled())
                         .build())
                 .httpClientBuilder(UrlConnectionHttpClient.builder())
                 .build();

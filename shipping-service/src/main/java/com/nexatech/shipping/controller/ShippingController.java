@@ -2,10 +2,12 @@ package com.nexatech.shipping.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.shipping.dto.*;
+import com.nexatech.shipping.enums.ShipmentStatus;
 import com.nexatech.shipping.service.IdempotencyService;
 import com.nexatech.shipping.service.ShippingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +25,16 @@ public class ShippingController {
     @PostMapping("/fee")
     public ApiResponse<ShippingFeeResponse> calculateFee(@Valid @RequestBody ShippingFeeRequest request) {
         return ApiResponse.ok("Shipping fee calculated successfully", shippingService.calculateFee(request));
+    }
+
+    @GetMapping("/shipments")
+    public ApiResponse<PageResponse<TrackingResponse>> getShipments(
+            @RequestParam(required = false) ShipmentStatus status,
+            Pageable pageable) {
+        return ApiResponse.ok(
+                "Shipments fetched successfully",
+                PageResponse.of(shippingService.getShipments(status, pageable))
+        );
     }
 
     @PostMapping("/shipments")

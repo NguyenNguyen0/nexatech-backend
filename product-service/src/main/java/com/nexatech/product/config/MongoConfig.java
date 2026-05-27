@@ -5,6 +5,7 @@ import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.nexatech.product.model.Product;
+import com.nexatech.product.model.Wishlist;
 import org.bson.UuidRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,10 +13,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory;
+import org.springframework.data.mongodb.core.index.Index;
 import org.springframework.data.mongodb.core.index.TextIndexDefinition;
 
 @Configuration
@@ -55,16 +58,77 @@ public class MongoConfig {
     public ApplicationRunner ensureProductTextIndex(MongoTemplate mongoTemplate) {
         return args -> {
             try {
-                log.info("[MongoConfig] Ensuring text index for Product collection...");
+                log.info("[MongoConfig] Ensuring indexes for Product collection...");
                 mongoTemplate.indexOps(Product.class).createIndex(new TextIndexDefinition.TextIndexDefinitionBuilder()
                         .named("Product_TextIndex")
                         .onField("name", 5F)
                         .onField("description", 2F)
                         .onField("sku", 3F)
                         .build());
-                log.info("[MongoConfig] Product text index ensured successfully.");
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("active", Sort.Direction.ASC)
+                                .on("updatedAt", Sort.Direction.DESC)
+                                .named("product_active_updated_desc")
+                );
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("active", Sort.Direction.ASC)
+                                .on("categoryIds", Sort.Direction.ASC)
+                                .on("updatedAt", Sort.Direction.DESC)
+                                .named("product_active_category_updated_desc")
+                );
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("active", Sort.Direction.ASC)
+                                .on("categoryIds", Sort.Direction.ASC)
+                                .on("price", Sort.Direction.ASC)
+                                .on("updatedAt", Sort.Direction.DESC)
+                                .named("product_active_category_price_updated_desc")
+                );
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("active", Sort.Direction.ASC)
+                                .on("price", Sort.Direction.ASC)
+                                .on("updatedAt", Sort.Direction.DESC)
+                                .named("product_active_price_updated_desc")
+                );
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("active", Sort.Direction.ASC)
+                                .on("brandId", Sort.Direction.ASC)
+                                .on("updatedAt", Sort.Direction.DESC)
+                                .named("product_active_brand_updated_desc")
+                );
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("slug", Sort.Direction.ASC)
+                                .named("product_slug")
+                                .unique()
+                );
+                log.info("[MongoConfig] Product indexes ensured successfully.");
             } catch (Exception ex) {
-                log.error("[MongoConfig] Failed to ensure text index: {}", ex.getMessage());
+                log.error("[MongoConfig] Failed to ensure product indexes: {}", ex.getMessage());
+            }
+
+            try {
+                log.info("[MongoConfig] Ensuring indexes for Wishlist collection...");
+                mongoTemplate.indexOps(Wishlist.class).createIndex(
+                        new Index()
+                                .on("userId", Sort.Direction.ASC)
+                                .on("productId", Sort.Direction.ASC)
+                                .named("wishlist_user_product_unique")
+                                .unique()
+                );
+                mongoTemplate.indexOps(Wishlist.class).createIndex(
+                        new Index()
+                                .on("userId", Sort.Direction.ASC)
+                                .on("createdAt", Sort.Direction.DESC)
+                                .named("wishlist_user_created_desc")
+                );
+                log.info("[MongoConfig] Wishlist indexes ensured successfully.");
+            } catch (Exception ex) {
+                log.error("[MongoConfig] Failed to ensure wishlist indexes: {}", ex.getMessage());
             }
         };
     }

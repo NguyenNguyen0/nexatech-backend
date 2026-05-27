@@ -1,12 +1,14 @@
 package com.nexatech.order.event;
 
 import com.nexatech.order.enums.ReturnStatus;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -36,4 +38,18 @@ public class ReturnEvent extends BaseEvent {
 
     /** Tổng tiền cần hoàn = totalAmount của đơn hàng (payment-service quyết định). */
     private BigDecimal refundAmount;
+
+    /**
+     * Danh sách sản phẩm cần hoàn kho (chỉ có khi ORDER_RETURN_APPROVED).
+     * inventory-service dùng để gọi restockReturn().
+     */
+    private List<ReturnItemEvent> items;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ReturnItemEvent {
+        private String productId;
+        private int quantity;
+    }
 }

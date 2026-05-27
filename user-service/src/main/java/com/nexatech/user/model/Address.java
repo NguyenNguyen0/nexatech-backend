@@ -33,6 +33,7 @@ public class Address extends BaseEntity {
     String phone;
 
     String province;
+    String district;
     String ward;
     String detail;
 
