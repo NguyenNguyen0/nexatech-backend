@@ -60,7 +60,7 @@ spring:
               predicates:
                 - Path=/api/v1/conversations/**
             - id: chat-service-websocket
-              uri: ${CHAT_SERVICE_WS_URI:lb:ws://chat-service}
+              uri: ${CHAT_SERVICE_WS_URI:lb://chat-service}
               predicates:
                 - Path=/ws/chat,/ws/chat/**
                 - Header=Upgrade, websocket

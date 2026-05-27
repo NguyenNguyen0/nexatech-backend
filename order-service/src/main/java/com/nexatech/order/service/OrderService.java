@@ -158,6 +158,7 @@ public class OrderService {
     /**
      * Lấy danh sách đơn hàng của customer (phân trang).
      */
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getMyOrders(UUID customerId, Pageable pageable) {
         return orderRepository.findByCustomerId(customerId, pageable)
                 .map(orderMapper::toResponse);
@@ -170,6 +171,7 @@ public class OrderService {
     /**
      * Lấy toàn bộ đơn hàng trong hệ thống — dùng bởi admin, delegate sang getAllOrders(status, pageable).
      */
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getAllOrders(Pageable pageable) {
         return getAllOrders(null, pageable);
     }
@@ -177,6 +179,7 @@ public class OrderService {
     /**
      * Lấy danh sách đơn hàng theo trạng thái (admin, có thể null để lấy tất cả).
      */
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getAllOrders(OrderStatus status, Pageable pageable) {
         if (status != null) {
             return orderRepository.findByStatus(status, pageable).map(orderMapper::toResponse);
