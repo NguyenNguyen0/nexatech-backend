@@ -1,6 +1,6 @@
 workflow:
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"'
       when: always
     - when: never
 
@@ -35,7 +35,7 @@ variables:
         docker push "$IMAGE_NAMESPACE/$IMAGE_NAME:latest"
       fi
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+    - if: '($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev") && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
 
 build:java-images:
   extends: .docker-build
