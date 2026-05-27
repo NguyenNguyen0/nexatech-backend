@@ -4,7 +4,7 @@ param(
 
     [string[]]$Services = @(),
 
-    [int]$DelaySeconds = 2
+    [int]$DelaySeconds = 8
 )
 
 $ErrorActionPreference = "Stop"
