@@ -49,7 +49,9 @@ public class GatewaySecurityConfig {
                     "/api/v1/products/**",
                     "/api/v1/categories/**",
                     "/api/v1/brands/**",
-                    "/api/v1/reviews/**")
+                    "/api/v1/reviews/**",
+                    "/api/v1/promotions/**",
+                    "/api/v1/flash-sales/**")
                 .permitAll()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/agent/health",

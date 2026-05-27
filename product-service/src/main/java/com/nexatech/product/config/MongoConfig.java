@@ -58,16 +58,57 @@ public class MongoConfig {
     public ApplicationRunner ensureProductTextIndex(MongoTemplate mongoTemplate) {
         return args -> {
             try {
-                log.info("[MongoConfig] Ensuring text index for Product collection...");
+                log.info("[MongoConfig] Ensuring indexes for Product collection...");
                 mongoTemplate.indexOps(Product.class).createIndex(new TextIndexDefinition.TextIndexDefinitionBuilder()
                         .named("Product_TextIndex")
                         .onField("name", 5F)
                         .onField("description", 2F)
                         .onField("sku", 3F)
                         .build());
-                log.info("[MongoConfig] Product text index ensured successfully.");
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("active", Sort.Direction.ASC)
+                                .on("updatedAt", Sort.Direction.DESC)
+                                .named("product_active_updated_desc")
+                );
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("active", Sort.Direction.ASC)
+                                .on("categoryIds", Sort.Direction.ASC)
+                                .on("updatedAt", Sort.Direction.DESC)
+                                .named("product_active_category_updated_desc")
+                );
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("active", Sort.Direction.ASC)
+                                .on("categoryIds", Sort.Direction.ASC)
+                                .on("price", Sort.Direction.ASC)
+                                .on("updatedAt", Sort.Direction.DESC)
+                                .named("product_active_category_price_updated_desc")
+                );
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("active", Sort.Direction.ASC)
+                                .on("price", Sort.Direction.ASC)
+                                .on("updatedAt", Sort.Direction.DESC)
+                                .named("product_active_price_updated_desc")
+                );
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("active", Sort.Direction.ASC)
+                                .on("brandId", Sort.Direction.ASC)
+                                .on("updatedAt", Sort.Direction.DESC)
+                                .named("product_active_brand_updated_desc")
+                );
+                mongoTemplate.indexOps(Product.class).createIndex(
+                        new Index()
+                                .on("slug", Sort.Direction.ASC)
+                                .named("product_slug")
+                                .unique()
+                );
+                log.info("[MongoConfig] Product indexes ensured successfully.");
             } catch (Exception ex) {
-                log.error("[MongoConfig] Failed to ensure text index: {}", ex.getMessage());
+                log.error("[MongoConfig] Failed to ensure product indexes: {}", ex.getMessage());
             }
 
             try {
