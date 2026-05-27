@@ -176,7 +176,7 @@ EUREKA_INSTANCE_HOSTNAME=localhost
 EUREKA_ENABLED=true
 EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://localhost:8761/eureka
 
-MONGO_AUDIT_URL=mongodb://nexatech:nexatech123@localhost:27017/nexatech_audit?authSource=admin&authMechanism=SCRAM-SHA-256
+SPRING_MONGODB_URI=mongodb://nexatech:nexatech123@localhost:27017/nexatech_audit?authSource=admin&authMechanism=SCRAM-SHA-256
 
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 KAFKA_GROUP_ID=audit-service-group

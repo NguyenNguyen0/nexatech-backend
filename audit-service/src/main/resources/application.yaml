@@ -2,4 +2,25 @@ spring:
   application:
     name: audit-service
   config:
-    import: "configserver:${CONFIG_SERVER_URI}/"
+    import: "optional:file:../.env[.properties],optional:file:./.env[.properties],optional:file:./audit-service/.env[.properties],optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
+  mongodb:
+    uri: "${SPRING_MONGODB_URI:mongodb://nexatech:nexatech123@localhost:27017/nexatech_audit?authSource=admin&authMechanism=SCRAM-SHA-256}"
+    representation:
+      uuid: JAVA_LEGACY
+  data:
+    mongodb:
+      auto-index-creation: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:audit-service-group}
+    topic:
+      audit-log: ${AUDIT_LOG_TOPIC:audit-topic}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9000/realms/nexatech}
+
+server:
+  port: 8096
