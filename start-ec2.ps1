@@ -33,6 +33,22 @@ function Import-DotEnvFile {
 Import-DotEnvFile -Path (Join-Path $PSScriptRoot ".env")
 Import-DotEnvFile -Path (Join-Path $PSScriptRoot ".env.ec2") -Required
 
+if (-not $env:SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE) {
+    $env:SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE = "2"
+}
+if (-not $env:SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE) {
+    $env:SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE = "0"
+}
+if (-not $env:SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT) {
+    $env:SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT = "5000"
+}
+if (-not $env:SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT) {
+    $env:SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT = "30000"
+}
+if (-not $env:SPRING_JPA_OPEN_IN_VIEW) {
+    $env:SPRING_JPA_OPEN_IN_VIEW = "false"
+}
+
 switch ($ServiceName) {
     "api-gateway" {}
     "product-service" {}
