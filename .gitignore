@@ -36,7 +36,6 @@ desktop.ini
 
 ### Environment ###
 .env
-*.env.local
 .env.ec2
 
 ### Logs ###
@@ -52,4 +51,4 @@ plans.md
 plan.md
 realm-export.json
 
-.env.*
+node_modules
