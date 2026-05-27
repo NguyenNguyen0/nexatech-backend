@@ -3,6 +3,7 @@ package com.nexatech.audit.event;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.audit.dto.event.AuditLogEvent;
 import com.nexatech.audit.service.AuditLogService;
@@ -14,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Listens to audit envelopes from Kafka and persists them into MongoDB.
- * The topic and consumer group are declared in the config-server's {@code application.yml}.
  */
 @Slf4j
 @Component
@@ -26,11 +26,11 @@ public class AuditLogConsumer {
     AuditLogService auditLogService;
 
     @KafkaListener(
-            topics = "${spring.kafka.topic.audit-log}",
-            groupId = "${spring.kafka.consumer.group-id}")
+            topics = "${spring.kafka.topic.audit-log:${AUDIT_LOG_TOPIC:audit-topic}}",
+            groupId = "${spring.kafka.consumer.group-id:${KAFKA_GROUP_ID:audit-service-group}}")
     public void onMessage(String payload) {
         if (payload == null || payload.isBlank()) {
-            log.warn("Received empty audit payload — skipping.");
+            log.warn("Received empty audit payload - skipping.");
             return;
         }
 
@@ -44,13 +44,13 @@ public class AuditLogConsumer {
     }
 
     /**
-     * Some producers publish a JSON string wrapped in extra double quotes (double-encoded).
-     * This method strips that escape layer so we get a valid JSON object before deserialization.
+     * Decode only the outer JSON string layer, preserving escaped nested JSON
+     * in fields like oldValue/newValue.
      */
-    private String unwrapJsonString(String payload) {
+    private String unwrapJsonString(String payload) throws JsonProcessingException {
         String trimmed = payload.trim();
         if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
-            return trimmed.substring(1, trimmed.length() - 1).replace("\\\"", "\"");
+            return objectMapper.readValue(trimmed, String.class);
         }
         return trimmed;
     }
