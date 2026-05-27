@@ -54,6 +54,19 @@ switch ($ServiceName) {
     "chat-service" {
         $env:DB_URL = "jdbc:postgresql://$($env:EC2_HOST):5432/nexatech_chats"
     }
+    "audit-service" {
+        $env:SPRING_MONGODB_URI = if ($env:MONGO_AUDIT_URL) {
+            $env:MONGO_AUDIT_URL
+        } else {
+            "mongodb://nexatech:nexatech123@$($env:EC2_HOST):27017/nexatech_audit?authSource=admin&authMechanism=SCRAM-SHA-256"
+        }
+        $env:KAFKA_GROUP_ID = if ($env:AUDIT_KAFKA_GROUP_ID) { $env:AUDIT_KAFKA_GROUP_ID } else { "audit-service-group" }
+        $env:AUDIT_LOG_TOPIC = if ($env:AUDIT_LOG_TOPIC) { $env:AUDIT_LOG_TOPIC } else { "audit-topic" }
+        $env:SPRING_KAFKA_CONSUMER_GROUP_ID = $env:KAFKA_GROUP_ID
+        $env:SPRING_KAFKA_CONSUMER_GROUPID = $env:KAFKA_GROUP_ID
+        $env:SPRING_KAFKA_TOPIC_AUDIT_LOG = $env:AUDIT_LOG_TOPIC
+        $env:SPRING_KAFKA_TOPIC_AUDITLOG = $env:AUDIT_LOG_TOPIC
+    }
     "user-service" {
         $env:DATASOURCE_URL = "jdbc:postgresql://$($env:EC2_HOST):5432/nexatech_users"
         $env:DATASOURCE_USERNAME = $env:DB_USERNAME

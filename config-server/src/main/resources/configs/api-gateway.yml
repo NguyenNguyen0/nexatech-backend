@@ -19,7 +19,7 @@ spring:
           routes:
             # Identity — AuthController /auth/**
             - id: identity-auth
-              uri: lb://identity-service
+              uri: ${IDENTITY_SERVICE_URI:lb://identity-service}
               predicates:
                 - Path=/api/v1/auth/**
               filters:
@@ -38,7 +38,7 @@ spring:
             - id: order-service
               uri: lb://order-service
               predicates:
-                - Path=/api/v1/orders/**,/api/v1/admin/orders/**,/api/v1/returns/**,/api/v1/checkout/**,/api/v1/cart/**,/api/v1/admin/audit/orders/**,/api/v1/admin/audit/trace/**
+                - Path=/api/v1/orders/**,/api/v1/admin/orders/**,/api/v1/returns/**,/api/v1/checkout/**,/api/v1/cart/**,/api/v1/admin/audit/orders/**
             - id: inventory-service
               uri: lb://inventory-service
               predicates:
@@ -56,16 +56,16 @@ spring:
               predicates:
                 - Path=/api/v1/notifications/**
             - id: chat-service
-              uri: lb://chat-service
+              uri: ${CHAT_SERVICE_URI:lb://chat-service}
               predicates:
                 - Path=/api/v1/conversations/**
             - id: chat-service-websocket
-              uri: lb:ws://chat-service
+              uri: ${CHAT_SERVICE_WS_URI:lb:ws://chat-service}
               predicates:
                 - Path=/ws/chat,/ws/chat/**
                 - Header=Upgrade, websocket
             - id: chat-service-sockjs
-              uri: lb://chat-service
+              uri: ${CHAT_SERVICE_URI:lb://chat-service}
               predicates:
                 - Path=/ws/chat,/ws/chat/**
             - id: storage-service
