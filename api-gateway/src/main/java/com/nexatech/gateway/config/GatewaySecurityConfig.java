@@ -39,17 +39,34 @@ public class GatewaySecurityConfig {
     }
 
     @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE + 2)
+    public SecurityFilterChain publicCatalogRoutes(HttpSecurity http) throws Exception {
+        stateless(http);
+        http.securityMatcher(
+                        "/api/v1/products/**",
+                        "/api/v1/categories/**",
+                        "/api/v1/brands/**",
+                        "/api/v1/reviews/**")
+                .authorizeHttpRequests(a -> a
+                        .requestMatchers("/api/v1/products/wishlist/**").authenticated()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/products/**",
+                                "/api/v1/categories/**",
+                                "/api/v1/brands/**",
+                                "/api/v1/reviews/**")
+                        .permitAll()
+                        .anyRequest().authenticated())
+                .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
+        return http.build();
+    }
+
+    @Bean
     @Order(Ordered.LOWEST_PRECEDENCE)
     public SecurityFilterChain jwtRoutes(HttpSecurity http) throws Exception {
         stateless(http);
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/v1/products/wishlist/**").authenticated()
                 .requestMatchers(HttpMethod.GET,
-                    "/api/v1/products/**",
-                    "/api/v1/categories/**",
-                    "/api/v1/brands/**",
-                    "/api/v1/reviews/**",
                     "/api/v1/promotions/**",
                     "/api/v1/flash-sales/**")
                 .permitAll()
