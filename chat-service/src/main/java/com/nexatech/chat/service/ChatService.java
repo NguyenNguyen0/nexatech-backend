@@ -2,8 +2,10 @@ package com.nexatech.chat.service;
 
 import com.nexatech.chat.dto.request.SendMessageRequest;
 import com.nexatech.chat.dto.response.ConversationResponse;
+import com.nexatech.chat.dto.response.ConversationDeletedResponse;
 import com.nexatech.chat.dto.response.CursorPageResponse;
 import com.nexatech.chat.dto.response.LastMessagePreview;
+import com.nexatech.chat.dto.response.MessageDeletedResponse;
 import com.nexatech.chat.dto.response.MessageResponse;
 import com.nexatech.chat.exception.BadRequestException;
 import com.nexatech.chat.exception.ForbiddenException;
@@ -41,7 +43,7 @@ public class ChatService {
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final OnlineStatusService onlineStatusService;
-    private final ConversationAssignmentService conversationAssignmentService;
+    private final UserProfileLookupService userProfileLookupService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Value("${app.last-message-preview-length:120}")
@@ -50,17 +52,19 @@ public class ChatService {
     @Value("${app.guest-conversation-ttl-minutes:1440}")
     private long guestConversationTtlMinutes;
 
-    public Page<ConversationResponse> getConversations(UUID userId, Pageable pageable) {
+    public Page<ConversationResponse> getConversations(UUID userId, String userRole, Pageable pageable) {
         requireUserId(userId);
-        Page<ChatConversation> page = conversationRepository.findByParticipant(userId, pageable);
-        return page.map(conversation -> toConversationResponse(conversation, userId, null));
+        Page<ChatConversation> page = isAdmin(userRole)
+                ? conversationRepository.findAll(pageable)
+                : conversationRepository.findByParticipant(userId, pageable);
+        return page.map(conversation -> toConversationResponse(conversation, userId, null, userRole));
     }
 
     @Transactional(readOnly = true)
     public ConversationResponse getCurrentConversation(UUID userId, String guestSessionId) {
         ChatConversation conversation = findCurrentConversation(userId, guestSessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Current conversation not found"));
-        return toConversationResponse(conversation, userId, guestSessionId);
+        return toConversationResponse(conversation, userId, guestSessionId, null);
     }
 
     @Transactional
@@ -68,20 +72,21 @@ public class ChatService {
         ChatConversation conversation = findCurrentConversation(userId, guestSessionId)
                 .orElseGet(() -> createConversation(userId, guestSessionId));
 
-        conversationAssignmentService.assignIfPossible(conversation);
         refreshGuestExpiration(conversation);
         ChatConversation saved = conversationRepository.save(conversation);
-        return toConversationResponse(saved, userId, guestSessionId);
+        publishConversationUpdate(saved);
+        return toConversationResponse(saved, userId, guestSessionId, null);
     }
 
     @Transactional(readOnly = true)
     public CursorPageResponse<MessageResponse> getMessages(
             UUID userId,
             String guestSessionId,
+            String userRole,
             UUID conversationId,
             UUID cursor,
             Integer size) {
-        ChatConversation conversation = getConversationForActor(conversationId, userId, guestSessionId);
+        ChatConversation conversation = getConversationForActor(conversationId, userId, guestSessionId, userRole);
         int pageSize = normalizeSize(size);
         Pageable pageable = PageRequest.of(0, pageSize + 1);
 
@@ -117,14 +122,14 @@ public class ChatService {
     public MessageResponse sendMessage(
             UUID userId,
             String guestSessionId,
+            String userRole,
             UUID conversationId,
             SendMessageRequest request) {
-        ChatConversation conversation = getConversationForActor(conversationId, userId, guestSessionId);
-        conversationAssignmentService.assignIfPossible(conversation);
+        ChatConversation conversation = getConversationForActor(conversationId, userId, guestSessionId, userRole);
         UUID senderId = resolveActorId(userId, guestSessionId);
-        UUID recipientId = resolveRecipient(conversation, userId, guestSessionId);
+        UUID recipientId = resolveRecipient(conversation, userId, guestSessionId, userRole);
 
-        if (recipientId == null && !canSendWhileWaiting(conversation, userId, guestSessionId)) {
+        if (recipientId == null && !canSendToAdminInbox(conversation, userId, guestSessionId)) {
             throw new ForbiddenException("User is not part of the conversation");
         }
 
@@ -134,6 +139,7 @@ public class ChatService {
                 .senderId(senderId)
                 .recipientId(recipientId)
                 .content(request.getContent())
+                .productReference(request.getProductReference())
                 .createdAt(Instant.now())
                 .build();
 
@@ -146,16 +152,17 @@ public class ChatService {
         updateConversationLastMessage(conversation, saved);
 
         MessageResponse response = toMessageResponse(saved);
+        publishConversationUpdate(conversation);
         publishMessageUpdate(response);
         return response;
     }
 
     @Transactional
-    public MessageResponse markDelivered(UUID userId, String guestSessionId, UUID conversationId, UUID messageId) {
+    public MessageResponse markDelivered(UUID userId, String guestSessionId, String userRole, UUID conversationId, UUID messageId) {
         ChatMessage message = messageRepository.findByIdAndConversationId(messageId, conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found: " + messageId));
 
-        ensureRecipient(resolveActorId(userId, guestSessionId), message);
+        ensureRecipient(resolveActorId(userId, guestSessionId), message, userRole);
 
         if (message.getDeliveredAt() == null) {
             message.setDeliveredAt(Instant.now());
@@ -167,21 +174,87 @@ public class ChatService {
     }
 
     @Transactional
-    public MessageResponse markSeen(UUID userId, String guestSessionId, UUID conversationId, UUID messageId) {
+    public MessageResponse markSeen(UUID userId, String guestSessionId, String userRole, UUID conversationId, UUID messageId) {
         ChatMessage message = messageRepository.findByIdAndConversationId(messageId, conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found: " + messageId));
 
-        ensureRecipient(resolveActorId(userId, guestSessionId), message);
+        UUID actorId = resolveActorId(userId, guestSessionId);
+        ensureRecipient(actorId, message, userRole);
 
-        if (message.getDeliveredAt() == null) {
-            message.setDeliveredAt(Instant.now());
-        }
-        if (message.getSeenAt() == null) {
-            message.setSeenAt(Instant.now());
+        Instant now = Instant.now();
+        List<ChatMessage> unseenMessages = messageRepository
+                .findByConversationIdAndSenderIdNotAndSeenAtIsNullAndCreatedAtLessThanEqual(
+                        conversationId,
+                        actorId,
+                        message.getCreatedAt());
+
+        if (unseenMessages.isEmpty() && message.getSeenAt() == null) {
+            unseenMessages = List.of(message);
         }
 
-        MessageResponse response = toMessageResponse(messageRepository.save(message));
+        unseenMessages.forEach(item -> {
+            if (item.getDeliveredAt() == null) {
+                item.setDeliveredAt(now);
+            }
+            if (item.getSeenAt() == null) {
+                item.setSeenAt(now);
+            }
+        });
+
+        messageRepository.saveAll(unseenMessages);
+        ChatMessage latest = unseenMessages.stream()
+                .filter(item -> item.getId().equals(messageId))
+                .findFirst()
+                .orElse(message);
+
+        MessageResponse response = toMessageResponse(latest);
         publishMessageUpdate(response);
+        return response;
+    }
+
+    @Transactional
+    public MessageDeletedResponse deleteMessage(UUID userId, String userRole, UUID conversationId, UUID messageId) {
+        requireUserId(userId);
+        if (!isAdmin(userRole)) {
+            throw new ForbiddenException("Only admins can delete chat messages");
+        }
+
+        ChatConversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
+        ChatMessage message = messageRepository.findByIdAndConversationId(messageId, conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found: " + messageId));
+
+        messageRepository.delete(message);
+        refreshConversationLastMessage(conversation);
+
+        MessageDeletedResponse response = MessageDeletedResponse.builder()
+                .id(messageId)
+                .conversationId(conversationId)
+                .deletedAt(Instant.now())
+                .build();
+        publishConversationUpdate(conversation);
+        publishMessageDeleted(response);
+        return response;
+    }
+
+    @Transactional
+    public ConversationDeletedResponse deleteConversation(UUID userId, String userRole, UUID conversationId) {
+        requireUserId(userId);
+        if (!isAdmin(userRole)) {
+            throw new ForbiddenException("Only admins can delete chat conversations");
+        }
+
+        ChatConversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
+
+        messageRepository.deleteByConversationId(conversationId);
+        conversationRepository.delete(conversation);
+
+        ConversationDeletedResponse response = ConversationDeletedResponse.builder()
+                .id(conversationId)
+                .deletedAt(Instant.now())
+                .build();
+        publishConversationDeleted(response);
         return response;
     }
 
@@ -191,6 +264,19 @@ public class ChatService {
         conversation.setLastMessageAt(message.getCreatedAt());
         conversation.setLastMessagePreview(truncatePreview(message.getContent()));
         conversationRepository.save(conversation);
+    }
+
+    private void refreshConversationLastMessage(ChatConversation conversation) {
+        List<ChatMessage> latest = messageRepository.findLatest(conversation.getId(), PageRequest.of(0, 1));
+        if (latest.isEmpty()) {
+            conversation.setLastMessageId(null);
+            conversation.setLastMessageSenderId(null);
+            conversation.setLastMessageAt(null);
+            conversation.setLastMessagePreview(null);
+            conversationRepository.save(conversation);
+            return;
+        }
+        updateConversationLastMessage(conversation, latest.get(0));
     }
 
     private String truncatePreview(String content) {
@@ -207,8 +293,9 @@ public class ChatService {
     private ConversationResponse toConversationResponse(
             ChatConversation conversation,
             UUID userId,
-            String guestSessionId) {
-        UUID otherUserId = resolveOtherUserId(conversation, userId, guestSessionId);
+            String guestSessionId,
+            String userRole) {
+        UUID otherUserId = resolveOtherUserId(conversation, userId, guestSessionId, userRole);
         LastMessagePreview lastMessage = null;
         if (conversation.getLastMessageId() != null) {
             lastMessage = LastMessagePreview.builder()
@@ -225,14 +312,27 @@ public class ChatService {
                 .agentId(conversation.getAgentId())
                 .conversationType(conversation.getConversationType())
                 .status(conversation.getStatus())
-                .currentParticipantId(resolveActorId(userId, guestSessionId))
+                .currentParticipantId(resolveActorIdOrNull(userId, guestSessionId))
                 .otherUserId(otherUserId)
+                .participant(resolveParticipant(conversation, otherUserId))
                 .otherUserOnline(onlineStatusService.isOnline(otherUserId))
+                .unreadCount(resolveUnreadCount(conversation, userId, guestSessionId, userRole))
                 .lastMessage(lastMessage)
                 .expiresAt(conversation.getExpiresAt())
                 .createdAt(conversation.getCreatedAt())
                 .updatedAt(conversation.getUpdatedAt())
                 .build();
+    }
+
+    private long resolveUnreadCount(ChatConversation conversation, UUID userId, String guestSessionId, String userRole) {
+        UUID actorId = resolveActorIdOrNull(userId, guestSessionId);
+        if (actorId == null && isAdmin(userRole)) {
+            return 0;
+        }
+        if (actorId == null) {
+            return 0;
+        }
+        return messageRepository.countByConversationIdAndSenderIdNotAndSeenAtIsNull(conversation.getId(), actorId);
     }
 
     private MessageResponse toMessageResponse(ChatMessage message) {
@@ -242,6 +342,7 @@ public class ChatService {
                 .senderId(message.getSenderId())
                 .recipientId(message.getRecipientId())
                 .content(message.getContent())
+                .productReference(message.getProductReference())
                 .status(resolveStatus(message))
                 .deliveredAt(message.getDeliveredAt())
                 .seenAt(message.getSeenAt())
@@ -250,9 +351,26 @@ public class ChatService {
     }
 
     private void publishMessageUpdate(MessageResponse response) {
+        messagingTemplate.convertAndSend("/topic/messages", response);
         messagingTemplate.convertAndSend(
                 "/topic/conversations/" + response.getConversationId() + "/messages",
                 response);
+    }
+
+    private void publishMessageDeleted(MessageDeletedResponse response) {
+        messagingTemplate.convertAndSend(
+                "/topic/conversations/" + response.getConversationId() + "/messages/deleted",
+                response);
+    }
+
+    private void publishConversationUpdate(ChatConversation conversation) {
+        messagingTemplate.convertAndSend(
+                "/topic/conversations",
+                toConversationResponse(conversation, null, null, "ADMIN"));
+    }
+
+    private void publishConversationDeleted(ConversationDeletedResponse response) {
+        messagingTemplate.convertAndSend("/topic/conversations/deleted", response);
     }
 
     private MessageStatus resolveStatus(ChatMessage message) {
@@ -265,11 +383,11 @@ public class ChatService {
         return MessageStatus.SENT;
     }
 
-    private ChatConversation getConversationForActor(UUID conversationId, UUID userId, String guestSessionId) {
+    private ChatConversation getConversationForActor(UUID conversationId, UUID userId, String guestSessionId, String userRole) {
         ChatConversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
-        if (!isParticipant(conversation, userId, guestSessionId)) {
+        if (!isAdmin(userRole) && !isParticipant(conversation, userId, guestSessionId)) {
             throw new ForbiddenException("User is not part of the conversation");
         }
 
@@ -283,7 +401,13 @@ public class ChatService {
         return isGuestParticipant(conversation, guestSessionId);
     }
 
-    private UUID resolveOtherUserId(ChatConversation conversation, UUID userId, String guestSessionId) {
+    private UUID resolveOtherUserId(ChatConversation conversation, UUID userId, String guestSessionId, String userRole) {
+        if (isAdmin(userRole)) {
+            if (conversation.getConversationType() == ConversationType.GUEST) {
+                return guestParticipantId(conversation.getGuestSessionId());
+            }
+            return conversation.getCustomerId();
+        }
         if (isGuestParticipant(conversation, guestSessionId)) {
             return conversation.getAgentId();
         }
@@ -299,7 +423,13 @@ public class ChatService {
         throw new ForbiddenException("User is not part of the conversation");
     }
 
-    private UUID resolveRecipient(ChatConversation conversation, UUID userId, String guestSessionId) {
+    private UUID resolveRecipient(ChatConversation conversation, UUID userId, String guestSessionId, String userRole) {
+        if (isAdmin(userRole)) {
+            if (conversation.getConversationType() == ConversationType.GUEST) {
+                return guestParticipantId(conversation.getGuestSessionId());
+            }
+            return conversation.getCustomerId();
+        }
         if (isGuestParticipant(conversation, guestSessionId)) {
             return conversation.getAgentId();
         }
@@ -315,8 +445,8 @@ public class ChatService {
         return null;
     }
 
-    private boolean canSendWhileWaiting(ChatConversation conversation, UUID userId, String guestSessionId) {
-        if (conversation.getStatus() != ConversationStatus.WAITING) {
+    private boolean canSendToAdminInbox(ChatConversation conversation, UUID userId, String guestSessionId) {
+        if (conversation.getStatus() == ConversationStatus.CLOSED) {
             return false;
         }
         return isGuestParticipant(conversation, guestSessionId)
@@ -324,11 +454,14 @@ public class ChatService {
     }
 
     private java.util.Optional<ChatConversation> findCurrentConversation(UUID userId, String guestSessionId) {
+        Pageable latestOnly = PageRequest.of(0, 1);
         if (userId != null) {
-            return conversationRepository.findCurrentByCustomerId(userId);
+            return conversationRepository.findCurrentByCustomerId(userId, latestOnly).stream().findFirst();
         }
         String normalizedGuestSessionId = normalizeGuestSessionId(guestSessionId);
-        return conversationRepository.findCurrentByGuestSessionId(normalizedGuestSessionId, Instant.now());
+        return conversationRepository.findCurrentByGuestSessionId(normalizedGuestSessionId, Instant.now(), latestOnly)
+                .stream()
+                .findFirst();
     }
 
     private ChatConversation createConversation(UUID userId, String guestSessionId) {
@@ -336,7 +469,7 @@ public class ChatService {
             return ChatConversation.builder()
                     .customerId(userId)
                     .conversationType(ConversationType.AUTHENTICATED)
-                    .status(ConversationStatus.WAITING)
+                    .status(ConversationStatus.OPEN)
                     .build();
         }
 
@@ -344,9 +477,18 @@ public class ChatService {
         return ChatConversation.builder()
                 .guestSessionId(normalizedGuestSessionId)
                 .conversationType(ConversationType.GUEST)
-                .status(ConversationStatus.WAITING)
+                .status(ConversationStatus.OPEN)
                 .expiresAt(nextGuestExpiration())
                 .build();
+    }
+
+    private com.nexatech.chat.dto.response.ParticipantResponse resolveParticipant(
+            ChatConversation conversation,
+            UUID participantId) {
+        if (conversation.getConversationType() == ConversationType.GUEST) {
+            return userProfileLookupService.resolveGuest(participantId);
+        }
+        return userProfileLookupService.resolveUser(participantId);
     }
 
     private void refreshGuestExpiration(ChatConversation conversation) {
@@ -362,6 +504,16 @@ public class ChatService {
     private UUID resolveActorId(UUID userId, String guestSessionId) {
         if (userId != null) {
             return userId;
+        }
+        return guestParticipantId(normalizeGuestSessionId(guestSessionId));
+    }
+
+    private UUID resolveActorIdOrNull(UUID userId, String guestSessionId) {
+        if (userId != null) {
+            return userId;
+        }
+        if (guestSessionId == null || guestSessionId.isBlank()) {
+            return null;
         }
         return guestParticipantId(normalizeGuestSessionId(guestSessionId));
     }
@@ -397,10 +549,17 @@ public class ChatService {
         }
     }
 
-    private void ensureRecipient(UUID actorId, ChatMessage message) {
+    private void ensureRecipient(UUID actorId, ChatMessage message, String userRole) {
+        if (isAdmin(userRole)) {
+            return;
+        }
         if (actorId == null || !actorId.equals(message.getRecipientId())) {
             throw new ForbiddenException("Only the recipient can update delivery status");
         }
+    }
+
+    private boolean isAdmin(String userRole) {
+        return userRole != null && userRole.trim().equalsIgnoreCase("ADMIN");
     }
 
     private int normalizeSize(Integer size) {

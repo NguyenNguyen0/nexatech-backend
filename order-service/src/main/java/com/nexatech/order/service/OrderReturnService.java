@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -100,8 +101,12 @@ public class OrderReturnService {
 
         // Lưu event vào outbox thay vì publish Kafka trực tiếp
         saveReturnEventToOutbox(saved, "ORDER_RETURN_REQUESTED", order.getTotalAmount());
-        auditLogService.log("RETURN_REQUESTED", "OrderReturn", saved.getId().toString(),
-                "orderId=" + orderId, customerId.toString());
+        auditLogService.logEvent("RETURN_REQUESTED", "OrderReturn", saved.getId().toString(),
+                Map.of("returnId", saved.getId().toString(),
+                        "orderId", orderId.toString(),
+                        "reason", request.getReason() != null ? request.getReason() : "",
+                        "status", "PENDING"),
+                customerId.toString());
 
         return returnMapper.toResponse(saved);
     }
@@ -136,8 +141,12 @@ public class OrderReturnService {
 
         // Trigger hoàn tiền qua payment-service — lưu vào outbox
         saveReturnEventToOutbox(saved, "ORDER_RETURN_APPROVED", savedOrder.getTotalAmount());
-        auditLogService.log("RETURN_APPROVED", "OrderReturn", returnId.toString(),
-                "orderId=" + orderReturn.getOrderId(), "admin");
+        auditLogService.logEvent("RETURN_APPROVED", "OrderReturn", returnId.toString(),
+                Map.of("returnId", returnId.toString(),
+                        "orderId", orderReturn.getOrderId().toString(),
+                        "previousStatus", "PENDING",
+                        "newStatus", "APPROVED"),
+                "admin");
 
         return returnMapper.toResponse(saved);
     }
@@ -162,8 +171,12 @@ public class OrderReturnService {
 
         log.info("Từ chối trả hàng: returnId={}, adminNote: {}", returnId, adminNote);
         saveReturnEventToOutbox(saved, "ORDER_RETURN_REJECTED", BigDecimal.ZERO);
-        auditLogService.log("RETURN_REJECTED", "OrderReturn", returnId.toString(),
-                "adminNote=" + adminNote, "admin");
+        auditLogService.logEvent("RETURN_REJECTED", "OrderReturn", returnId.toString(),
+                Map.of("returnId", returnId.toString(),
+                        "previousStatus", "PENDING",
+                        "newStatus", "REJECTED",
+                        "adminNote", adminNote != null ? adminNote : ""),
+                "admin");
 
         return returnMapper.toResponse(saved);
     }
@@ -207,6 +220,11 @@ public class OrderReturnService {
                 .status(orderReturn.getStatus())
                 .reason(orderReturn.getReason())
                 .refundAmount(refundAmount)
+                .items(orderReturn.getItems() != null
+                        ? orderReturn.getItems().stream()
+                                .map(i -> new ReturnEvent.ReturnItemEvent(i.getProductId(), i.getQuantity()))
+                                .toList()
+                        : null)
                 .build();
         outboxEventService.saveEvent("OrderReturn", orderReturn.getOrderId().toString(), eventType, event);
     }

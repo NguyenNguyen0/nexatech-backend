@@ -1,5 +1,6 @@
 package com.nexatech.chat.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -9,6 +10,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class OnlineStatusService {
 
@@ -28,23 +30,36 @@ public class OnlineStatusService {
         if (userId == null) {
             return;
         }
-        stringRedisTemplate.opsForValue().set(key(userId), "1", presenceTtl);
+        try {
+            stringRedisTemplate.opsForValue().set(key(userId), "1", presenceTtl);
+        } catch (Exception e) {
+            log.warn("Redis unavailable - cannot mark user {} online: {}", userId, e.getMessage());
+        }
     }
 
     public void markOffline(UUID userId) {
         if (userId == null) {
             return;
         }
-        stringRedisTemplate.delete(key(userId));
-        stringRedisTemplate.opsForSet().remove(ONLINE_AGENTS_KEY, userId.toString());
+        try {
+            stringRedisTemplate.delete(key(userId));
+            stringRedisTemplate.opsForSet().remove(ONLINE_AGENTS_KEY, userId.toString());
+        } catch (Exception e) {
+            log.warn("Redis unavailable - cannot mark user {} offline: {}", userId, e.getMessage());
+        }
     }
 
     public boolean isOnline(UUID userId) {
         if (userId == null) {
             return false;
         }
-        Boolean exists = stringRedisTemplate.hasKey(key(userId));
-        return Boolean.TRUE.equals(exists);
+        try {
+            Boolean exists = stringRedisTemplate.hasKey(key(userId));
+            return Boolean.TRUE.equals(exists);
+        } catch (Exception e) {
+            log.warn("Redis unavailable - isOnline check failed for user {}: {}", userId, e.getMessage());
+            return false;
+        }
     }
 
     public void refreshPresence(UUID userId) {
@@ -55,20 +70,28 @@ public class OnlineStatusService {
         if (agentId == null) {
             return;
         }
-        markOnline(agentId);
-        stringRedisTemplate.opsForSet().add(ONLINE_AGENTS_KEY, agentId.toString());
+        try {
+            markOnline(agentId);
+            stringRedisTemplate.opsForSet().add(ONLINE_AGENTS_KEY, agentId.toString());
+        } catch (Exception e) {
+            log.warn("Redis unavailable - cannot mark agent {} online: {}", agentId, e.getMessage());
+        }
     }
 
     public Set<UUID> getOnlineAgentIds() {
-        Set<String> rawAgentIds = stringRedisTemplate.opsForSet().members(ONLINE_AGENTS_KEY);
-        if (rawAgentIds == null || rawAgentIds.isEmpty()) {
+        try {
+            Set<String> rawAgentIds = stringRedisTemplate.opsForSet().members(ONLINE_AGENTS_KEY);
+            if (rawAgentIds == null || rawAgentIds.isEmpty()) {
+                return Set.of();
+            }
+            return rawAgentIds.stream()
+                    .map(this::parseUuid)
+                    .filter(agentId -> agentId != null && isOnline(agentId))
+                    .collect(Collectors.toSet());
+        } catch (Exception e) {
+            log.warn("Redis unavailable - getOnlineAgentIds returning empty: {}", e.getMessage());
             return Set.of();
         }
-
-        return rawAgentIds.stream()
-                .map(this::parseUuid)
-                .filter(agentId -> agentId != null && isOnline(agentId))
-                .collect(Collectors.toSet());
     }
 
     private String key(UUID userId) {

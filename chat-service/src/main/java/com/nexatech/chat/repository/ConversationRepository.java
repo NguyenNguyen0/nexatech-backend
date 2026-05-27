@@ -23,7 +23,9 @@ public interface ConversationRepository extends JpaRepository<ChatConversation, 
               and c.status <> com.nexatech.chat.model.ConversationStatus.CLOSED
             order by c.updatedAt desc
             """)
-    Optional<ChatConversation> findCurrentByCustomerId(@Param("customerId") UUID customerId);
+    List<ChatConversation> findCurrentByCustomerId(
+            @Param("customerId") UUID customerId,
+            Pageable pageable);
 
     @Query("""
             select c from ChatConversation c
@@ -32,9 +34,10 @@ public interface ConversationRepository extends JpaRepository<ChatConversation, 
               and (c.expiresAt is null or c.expiresAt > :now)
             order by c.updatedAt desc
             """)
-    Optional<ChatConversation> findCurrentByGuestSessionId(
+    List<ChatConversation> findCurrentByGuestSessionId(
             @Param("guestSessionId") String guestSessionId,
-            @Param("now") Instant now);
+            @Param("now") Instant now,
+            Pageable pageable);
 
     long countByAgentIdAndStatus(UUID agentId, com.nexatech.chat.model.ConversationStatus status);
 

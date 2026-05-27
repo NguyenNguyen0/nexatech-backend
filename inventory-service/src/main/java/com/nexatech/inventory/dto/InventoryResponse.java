@@ -11,9 +11,14 @@ public class InventoryResponse {
 
     private UUID id;
     private String productId;
+    private String productName;
+    private String productSlug;
+    private String productThumbnail;
+    private String sku;
     private int quantity;
     private int reservedQuantity;
     private int availableQuantity;
     private int reorderLevel;
+    private String status;
     private String warehouseLocation;
 }

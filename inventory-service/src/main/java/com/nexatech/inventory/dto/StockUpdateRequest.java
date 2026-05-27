@@ -10,6 +10,8 @@ public class StockUpdateRequest {
     @NotBlank
     private String productId;
 
+    private String sku;
+
     @Min(0)
     private int quantity;
 

@@ -5,6 +5,7 @@ import com.nexatech.payment.dto.response.ApiResponse;
 import com.nexatech.payment.dto.response.PageResponse;
 import com.nexatech.payment.dto.CreatePaymentRequest;
 import com.nexatech.payment.dto.PaymentResponse;
+import com.nexatech.payment.exception.ResourceNotFoundException;
 import com.nexatech.payment.service.IdempotencyService;
 import com.nexatech.payment.service.PaymentService;
 import jakarta.validation.Valid;
@@ -70,7 +71,11 @@ public class PaymentController {
 
     @GetMapping("/order/{orderId}")
     public ApiResponse<PaymentResponse> getPaymentByOrder(@PathVariable UUID orderId) {
-        return ApiResponse.ok(paymentService.getPaymentByOrder(orderId));
+        try {
+            return ApiResponse.ok(paymentService.getPaymentByOrder(orderId));
+        } catch (ResourceNotFoundException e) {
+            return ApiResponse.ok(null, "Order has no payment yet");
+        }
     }
 
     @GetMapping("/my")

@@ -37,6 +37,7 @@ import com.nexatech.user.model.User;
 import com.nexatech.user.repository.UserRepository;
 import com.nexatech.user.service.IdentityResilienceService;
 import com.nexatech.user.service.UserService;
+import com.nexatech.user.service.audit.AuditEventPublisher;
 
 import feign.FeignException;
 
@@ -56,6 +57,7 @@ public class UserServiceImpl implements UserService {
     UserMapper userMapper;
     IdentityResilienceService identityResilienceService;
     KafkaTemplate<String, Object> kafkaTemplate;
+    AuditEventPublisher auditEventPublisher;
 
     @NonFinal
     @Value("${spring.kafka.topics.user-events:user.events}")
@@ -150,6 +152,8 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        String oldSnapshot = snapshot(user);
+
         boolean syncKeycloak = dto != null && (isChanged(user.getFirstName(), dto.getFirstName())
                 || isChanged(user.getLastName(), dto.getLastName())
                 || isChanged(user.getEmail(), dto.getEmail()));
@@ -167,7 +171,34 @@ public class UserServiceImpl implements UserService {
             syncUserToIdentity(updatedUser, true);
         }
 
+        auditEventPublisher.publish(com.nexatech.user.dto.event.AuditLogEvent.builder()
+                .action("USER_UPDATED")
+                .entityType("User")
+                .entityId(updatedUser.getId())
+                .entityLabel(updatedUser.getUsername())
+                .oldValue(oldSnapshot)
+                .newValue(snapshot(updatedUser))
+                .message("Updated user profile")
+                .build());
+
         return mapToUserResponseWithRole(updatedUser);
+    }
+
+    /** Compact JSON-like snapshot of audited User fields. */
+    private static String snapshot(User user) {
+        StringBuilder sb = new StringBuilder("{");
+        sb.append("\"username\":\"").append(safe(user.getUsername())).append("\",");
+        sb.append("\"email\":\"").append(safe(user.getEmail())).append("\",");
+        sb.append("\"firstName\":\"").append(safe(user.getFirstName())).append("\",");
+        sb.append("\"lastName\":\"").append(safe(user.getLastName())).append("\",");
+        sb.append("\"phone\":\"").append(safe(user.getPhone())).append("\",");
+        sb.append("\"active\":").append(Boolean.TRUE.equals(user.getActive()));
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value.replace("\"", "\\\"");
     }
 
     /**
@@ -211,6 +242,12 @@ public class UserServiceImpl implements UserService {
         User deletedUser = userRepository.save(user);
         revokeAllUserSessionsQuietly(id);
         syncUserToIdentity(deletedUser, false);
+
+        auditEventPublisher.publishUser(
+                "USER_DISABLED",
+                deletedUser.getId(),
+                deletedUser.getUsername(),
+                "Disabled user account");
     }
 
     /** {@link com.nexatech.identity.service.SessionService#logoutUser} — đá mọi thiết bị đang đăng nhập. */
@@ -231,6 +268,12 @@ public class UserServiceImpl implements UserService {
         user.setActive(true);
         User enabledUser = userRepository.save(user);
         syncUserToIdentity(enabledUser, true);
+
+        auditEventPublisher.publishUser(
+                "USER_ENABLED",
+                enabledUser.getId(),
+                enabledUser.getUsername(),
+                "Re-enabled user account");
     }
 
     @Override

@@ -15,6 +15,7 @@ import java.util.UUID;
 
 @Document(collection = "chat_messages")
 @CompoundIndex(name = "idx_messages_conversation_created", def = "{'conversationId': 1, 'createdAt': -1, '_id': -1}")
+@CompoundIndex(name = "idx_messages_conversation_sender_seen", def = "{'conversationId': 1, 'senderId': 1, 'seenAt': 1}")
 @Getter
 @Setter
 @Builder
@@ -33,6 +34,8 @@ public class ChatMessage {
     private UUID recipientId;
 
     private String content;
+
+    private ProductReference productReference;
 
     private Instant createdAt;
 

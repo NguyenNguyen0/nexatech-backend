@@ -20,7 +20,20 @@ public class GatewaySecurityConfig {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public SecurityFilterChain publicRoutes(HttpSecurity http) throws Exception {
         stateless(http);
-        http.securityMatcher("/actuator/**", "/api/v1/auth/**")
+        http.securityMatcher("/actuator/**", "/api/v1/auth/**", "/ws/chat", "/ws/chat/**")
+                .authorizeHttpRequests(a -> a.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE + 1)
+    public SecurityFilterChain publicRecommendationRoutes(HttpSecurity http) throws Exception {
+        stateless(http);
+        http.securityMatcher(
+                        "/api/v1/recommend/health",
+                        "/api/v1/recommend/popular",
+                        "/api/v1/recommend/popular/**",
+                        "/api/v1/recommend/similar/**")
                 .authorizeHttpRequests(a -> a.anyRequest().permitAll());
         return http.build();
     }
@@ -31,13 +44,29 @@ public class GatewaySecurityConfig {
         stateless(http);
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/api/v1/products/wishlist/**").authenticated()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/products/**",
                     "/api/v1/categories/**",
                     "/api/v1/brands/**",
-                    "/api/v1/reviews/**")
+                    "/api/v1/reviews/**",
+                    "/api/v1/promotions/**",
+                    "/api/v1/flash-sales/**")
                 .permitAll()
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/agent/health",
+                    "/api/v1/mcp/health")
+                .permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/checkout").permitAll()
+                // VNPay callbacks — server-to-server IPN and browser return (no auth token)
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/payments/vnpay/ipn",
+                    "/api/v1/payments/vnpay/return")
+                .permitAll()
+                // Guest order status polling after checkout
+                .requestMatchers(HttpMethod.GET, "/api/v1/orders/*").permitAll()
                 .requestMatchers("/api/v1/news/**").permitAll()
+                .requestMatchers("/api/v1/conversations/**").permitAll()
                 .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
         return http.build();

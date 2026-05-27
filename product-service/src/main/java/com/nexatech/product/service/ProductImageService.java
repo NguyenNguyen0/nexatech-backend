@@ -1,6 +1,5 @@
 package com.nexatech.product.service;
 
-import com.nexatech.product.client.StorageClient;
 import com.nexatech.product.dto.response.ProductResponse;
 import com.nexatech.product.dto.response.StorageUploadResult;
 import com.nexatech.product.exception.BadRequestException;
@@ -26,7 +25,7 @@ public class ProductImageService {
     private static final int MAX_IMAGES = 10;
 
     private final ProductRepository productRepository;
-    private final StorageClient storageClient;
+    private final ResilientDownstreamService resilientDownstreamService;
     private final ProductMapper productMapper;
     private final ProductResponseEnricher productResponseEnricher;
 
@@ -46,7 +45,7 @@ public class ProductImageService {
         }
 
         for (MultipartFile file : files) {
-            StorageUploadResult result = storageClient.upload(file, null);
+            StorageUploadResult result = resilientDownstreamService.uploadToStorage(file, null);
             if (result == null || result.getData() == null || result.getData().getUrl() == null) {
                 throw new BadRequestException("Upload failed for file: " + file.getOriginalFilename());
             }
@@ -73,7 +72,7 @@ public class ProductImageService {
         }
 
         String[] parts = extractBucketAndKey(imageUrl);
-        storageClient.delete(parts[0], parts[1]);
+    resilientDownstreamService.deleteFromStorage(parts[0], parts[1]);
 
         List<String> updated = new ArrayList<>(current);
         updated.remove(imageUrl);

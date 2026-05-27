@@ -34,15 +34,45 @@ public class ShipmentMapper {
                 .toList();
 
         return TrackingResponse.builder()
+                .orderId(shipment.getOrderId())
                 .trackingCode(shipment.getTrackingCode())
                 .provider(shipment.getProvider())
                 .status(shipment.getStatus())
+                .shippingFee(shipment.getShippingFee())
+                .currency(shipment.getCurrency())
+                .customerName(shipment.getCustomerName())
+                .customerPhone(shipment.getCustomerPhone())
+                .customerAddress(shipment.getCustomerAddress())
+                .createdAt(shipment.getCreatedAt())
+                .updatedAt(shipment.getUpdatedAt())
                 .currentLocation(CurrentLocation.builder()
                         .lat(shipment.getCurrentLat())
                         .lng(shipment.getCurrentLng())
                         .address(shipment.getCurrentAddress())
                         .build())
                 .histories(histories)
+                .build();
+    }
+
+    public TrackingResponse toTrackingSummaryResponse(Shipment shipment) {
+        return TrackingResponse.builder()
+                .orderId(shipment.getOrderId())
+                .trackingCode(shipment.getTrackingCode())
+                .provider(shipment.getProvider())
+                .status(shipment.getStatus())
+                .shippingFee(shipment.getShippingFee())
+                .currency(shipment.getCurrency())
+                .customerName(shipment.getCustomerName())
+                .customerPhone(shipment.getCustomerPhone())
+                .customerAddress(shipment.getCustomerAddress())
+                .createdAt(shipment.getCreatedAt())
+                .updatedAt(shipment.getUpdatedAt())
+                .currentLocation(CurrentLocation.builder()
+                        .lat(shipment.getCurrentLat())
+                        .lng(shipment.getCurrentLng())
+                        .address(shipment.getCurrentAddress())
+                        .build())
+                .histories(List.of())
                 .build();
     }
 

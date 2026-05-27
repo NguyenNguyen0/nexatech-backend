@@ -4,7 +4,7 @@ server:
 # Browser clients (e.g. Next.js on :3001) — comma-separated patterns; override with env GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS
 gateway:
   cors:
-    allowed-origin-patterns: "http://localhost:*,http://127.0.0.1:*"
+    allowed-origin-patterns: ${GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
 
 spring:
   security:
@@ -19,7 +19,7 @@ spring:
           routes:
             # Identity — AuthController /auth/**
             - id: identity-auth
-              uri: lb://identity-service
+              uri: ${IDENTITY_SERVICE_URI:lb://identity-service}
               predicates:
                 - Path=/api/v1/auth/**
               filters:
@@ -38,7 +38,7 @@ spring:
             - id: order-service
               uri: lb://order-service
               predicates:
-                - Path=/api/v1/orders/**,/api/v1/admin/orders/**,/api/v1/returns/**,/api/v1/checkout/**,/api/v1/cart/**
+                - Path=/api/v1/orders/**,/api/v1/admin/orders/**,/api/v1/returns/**,/api/v1/checkout/**,/api/v1/cart/**,/api/v1/admin/audit/orders/**
             - id: inventory-service
               uri: lb://inventory-service
               predicates:
@@ -46,7 +46,7 @@ spring:
             - id: payment-service
               uri: lb://payment-service
               predicates:
-                - Path=/api/v1/payments/**
+                - Path=/api/v1/payments/**,/api/v1/admin/payments/**,/api/v1/admin/audit/payments/**
             - id: shipping-service
               uri: lb://shipping-service
               predicates:
@@ -54,11 +54,26 @@ spring:
             - id: notification-service
               uri: lb://notification-service
               predicates:
-                - Path=/api/v1/notifications/**
+                - Path=/api/v1/notifications/**,/api/v1/admin/notifications/**
             - id: chat-service
-              uri: lb://chat-service
+              uri: ${CHAT_SERVICE_URI:lb://chat-service}
               predicates:
                 - Path=/api/v1/conversations/**
+            - id: chat-service-websocket
+              uri: ${CHAT_SERVICE_WS_URI:lb://chat-service}
+              predicates:
+                - Path=/ws/chat,/ws/chat/**
+                - Header=Upgrade, websocket
+              filters:
+                - RemoveRequestHeader=Origin
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+            - id: chat-service-sockjs
+              uri: ${CHAT_SERVICE_URI:lb://chat-service}
+              predicates:
+                - Path=/ws/chat,/ws/chat/**
+              filters:
+                - RemoveRequestHeader=Origin
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
             - id: storage-service
               uri: lb://storage-service
               predicates:
@@ -67,3 +82,37 @@ spring:
               uri: lb://news-service
               predicates:
                 - Path=/api/v1/news/**
+            - id: promotion-service
+              uri: ${PROMOTION_SERVICE_URI:http://localhost:8093}
+              predicates:
+                - Path=/api/v1/promotions/**,/api/v1/flash-sales/**,/api/v1/admin/promotions/**,/api/v1/admin/flash-sales/**,/api/v1/internal/promotions/**
+            - id: audit-service
+              uri: lb://audit-service
+              predicates:
+                - Path=/api/v1/admin/audit,/api/v1/admin/audit/**
+              filters:
+                - StripPrefix=3
+            - id: agent-service
+              uri: lb://agent-service
+              predicates:
+                - Path=/api/v1/agent/**
+              filters:
+                - StripPrefix=3
+            - id: mcp-server
+              uri: lb://mcp-server
+              predicates:
+                - Path=/api/v1/mcp/**
+              filters:
+                - StripPrefix=3
+            - id: recommendation-service
+              uri: lb://recommendation-service
+              predicates:
+                - Path=/api/v1/recommend/**
+              filters:
+                - StripPrefix=2
+            - id: recommendation-behavior-ingestion
+              uri: lb://recommendation-service
+              predicates:
+                - Path=/api/v1/behaviors/**
+              filters:
+                - StripPrefix=2

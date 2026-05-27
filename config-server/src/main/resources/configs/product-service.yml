@@ -19,3 +19,50 @@ spring:
       enabled: true
       max-file-size: 10MB
       max-request-size: 55MB
+
+product:
+  internal:
+    api-key: ${PRODUCT_INTERNAL_API_KEY:change-me}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+    instances:
+      storageService:
+        baseConfig: default
+      orderService:
+        baseConfig: default
+        ignoreExceptions:
+          - com.nexatech.product.exception.BadRequestException
+          - com.nexatech.product.exception.ForbiddenException
+          - com.nexatech.product.exception.ResourceNotFoundException
+      inventoryService:
+        baseConfig: default
+  retry:
+    instances:
+      storageService:
+        maxAttempts: 3
+        waitDuration: 500ms
+      orderService:
+        maxAttempts: 3
+        waitDuration: 300ms
+      inventoryService:
+        maxAttempts: 2
+        waitDuration: 200ms
+
+management:
+  health:
+    circuitbreakers:
+      enabled: true
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,circuitbreakerevents

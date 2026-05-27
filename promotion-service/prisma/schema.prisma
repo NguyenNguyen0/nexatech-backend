@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Promotion {
+  id              String          @id @default(uuid())
+  code            String          @unique
+  name            String
+  description     String?
+  type            PromotionType
+  discountPercent Decimal?        @db.Decimal(5, 2)
+  discountAmount  Decimal?        @db.Decimal(12, 2)
+  minOrderValue   Decimal?        @db.Decimal(12, 2)
+  maxDiscount     Decimal?        @db.Decimal(12, 2)
+  usageLimit      Int?
+  usageCount      Int             @default(0)
+  userLimit       Int             @default(1)
+  startTime       DateTime
+  endTime         DateTime
+  status          PromotionStatus @default(DRAFT)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  flashSale       FlashSale?
+  redemptions     PromotionRedemption[]
+
+  @@map("promotions")
+}
+
+model FlashSale {
+  id             String    @id @default(uuid())
+  promotionId    String    @unique
+  promotion      Promotion @relation(fields: [promotionId], references: [id])
+  productId      String
+  productName    String?
+  productSlug    String?
+  productThumbnail String?
+  originalPrice  Decimal   @db.Decimal(12, 2)
+  salePrice      Decimal   @db.Decimal(12, 2)
+  totalStock     Int
+  remainingStock Int
+  soldCount      Int       @default(0)
+  loadedToSpace  Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  reservations FlashSaleReservation[]
+
+  @@map("flash_sales")
+}
+
+model FlashSaleReservation {
+  id          String            @id @default(uuid())
+  flashSaleId String
+  flashSale   FlashSale         @relation(fields: [flashSaleId], references: [id])
+  userId      String
+  orderId     String?
+  quantity    Int               @default(1)
+  status      ReservationStatus @default(PENDING)
+  expiresAt   DateTime
+  confirmedAt DateTime?
+  releasedAt  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([flashSaleId, userId])
+  @@index([status, expiresAt])
+  @@map("flash_sale_reservations")
+}
+
+model PromotionRedemption {
+  id          String    @id @default(uuid())
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id])
+  userId      String
+  orderId     String
+  discount    Decimal   @db.Decimal(12, 2)
+  usedAt      DateTime  @default(now())
+
+  @@unique([promotionId, userId, orderId])
+  @@map("promotion_redemptions")
+}
+
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  aggregateType String
+  aggregateId   String
+  eventType     String
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  retryCount    Int          @default(0)
+  createdAt     DateTime     @default(now())
+  publishedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@map("outbox_events")
+}
+
+enum PromotionType {
+  FLASH_SALE
+  COUPON
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum PromotionStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+  CANCELLED
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  RELEASED
+  EXPIRED
+}
+
+enum OutboxStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}

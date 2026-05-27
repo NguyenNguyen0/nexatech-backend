@@ -31,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +56,7 @@ public class OrderService {
     private final ProductClient productClient;
     private final OutboxEventService outboxEventService;
     private final AuditLogService auditLogService;
+    private final SnapshotService snapshotService;
     private final PlatformTransactionManager transactionManager;
 
     /**
@@ -109,8 +111,14 @@ public class OrderService {
         Order saved = new TransactionTemplate(transactionManager).execute(status -> {
             Order o = orderRepository.save(order);
             saveOrderEventToOutbox(o, "ORDER_PLACED");
-            auditLogService.log("ORDER_CREATED", "Order", o.getId().toString(),
-                    "status=" + o.getStatus(), customerId != null ? customerId.toString() : "guest");
+            auditLogService.logEvent("ORDER_CREATED", "Order", o.getId().toString(),
+                    Map.of("orderId", o.getId().toString(),
+                            "orderNumber", o.getOrderNumber(),
+                            "customerId", o.getCustomerId() != null ? o.getCustomerId().toString() : "guest",
+                            "status", o.getStatus().name(),
+                            "totalAmount", o.getTotalAmount(),
+                            "paymentMethod", String.valueOf(o.getPaymentMethod())),
+                    customerId != null ? customerId.toString() : "guest");
             return o;
         });
 
@@ -150,6 +158,7 @@ public class OrderService {
     /**
      * Lấy danh sách đơn hàng của customer (phân trang).
      */
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getMyOrders(UUID customerId, Pageable pageable) {
         return orderRepository.findByCustomerId(customerId, pageable)
                 .map(orderMapper::toResponse);
@@ -162,6 +171,7 @@ public class OrderService {
     /**
      * Lấy toàn bộ đơn hàng trong hệ thống — dùng bởi admin, delegate sang getAllOrders(status, pageable).
      */
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getAllOrders(Pageable pageable) {
         return getAllOrders(null, pageable);
     }
@@ -169,6 +179,7 @@ public class OrderService {
     /**
      * Lấy danh sách đơn hàng theo trạng thái (admin, có thể null để lấy tất cả).
      */
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getAllOrders(OrderStatus status, Pageable pageable) {
         if (status != null) {
             return orderRepository.findByStatus(status, pageable).map(orderMapper::toResponse);
@@ -198,8 +209,22 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
         saveOrderEventToOutbox(saved, "ORDER_STATUS_UPDATED");
-        auditLogService.log("ORDER_STATUS_CHANGED", "Order", orderId.toString(),
-                oldStatus.name(), newStatus.name(), "system", null);
+        auditLogService.logEvent("ORDER_STATUS_CHANGED", "Order", orderId.toString(),
+                Map.of("orderId", orderId.toString(),
+                        "previousStatus", oldStatus.name(),
+                        "newStatus", newStatus.name()),
+                "system");
+
+        // Snapshot tại các mốc quan trọng để tối ưu point-in-time query
+        if (newStatus == OrderStatus.DELIVERED || newStatus == OrderStatus.COMPLETED
+                || newStatus == OrderStatus.RETURNED || newStatus == OrderStatus.CANCELLED) {
+            snapshotService.takeSnapshot("Order", orderId,
+                    Map.of("orderId", orderId.toString(),
+                            "status", newStatus.name(),
+                            "previousStatus", oldStatus.name(),
+                            "snapshotReason", "terminal_state"));
+        }
+
         log.info("Cập nhật trạng thái đơn hàng {} : {} → {}", orderId, oldStatus, newStatus);
 
         return orderMapper.toResponse(saved);
@@ -266,8 +291,13 @@ public class OrderService {
             o.setStatus(OrderStatus.CANCELLED);
             Order saved = orderRepository.save(o);
             saveOrderEventToOutbox(saved, "ORDER_CANCELLED");
-            auditLogService.log("ORDER_CANCELLED", "Order", orderId.toString(),
-                    null, "CANCELLED", customerId != null ? customerId.toString() : "guest", "customer request");
+            auditLogService.logEvent("ORDER_CANCELLED", "Order", orderId.toString(),
+                    Map.of("orderId", orderId.toString(),
+                            "previousStatus", "PENDING_OR_CONFIRMED",
+                            "newStatus", "CANCELLED",
+                            "reason", "customer_request",
+                            "customerId", customerId != null ? customerId.toString() : "guest"),
+                    customerId != null ? customerId.toString() : "guest");
             log.info("Huỷ đơn hàng thành công: {} | customer: {}", orderId, customerId);
             return orderMapper.toResponse(saved);
         });
@@ -292,7 +322,11 @@ public class OrderService {
         try {
             ProductInfo product = productClient.getProduct(productId).getData();
             if (product != null && product.isActive()) {
-                price = product.getPrice();
+                // Prefer client-provided unitPrice (may be flash sale / discounted price);
+                // fall back to product-service price only when client sends nothing.
+                price = (itemReq.getUnitPrice() != null && itemReq.getUnitPrice().compareTo(BigDecimal.ZERO) > 0)
+                        ? itemReq.getUnitPrice()
+                        : product.getPrice();
                 productName = product.getName();
             } else if (product != null && !product.isActive()) {
                 throw new BadRequestException("Sản phẩm không tồn tại hoặc đã ngừng bán: " + productId);
