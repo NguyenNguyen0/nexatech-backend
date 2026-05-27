@@ -29,7 +29,7 @@ openfeign:
     url: ${KEYCLOAK_URL:http://localhost:9000}
     realm: ${KEYCLOAK_REALM:nexatech}
     client-id: ${KEYCLOAK_CLIENT_ID:nexatech-id}
-    client-secret: ${KEYCLOAK_CLIENT_SECRET:gUZhl1gcgZgpLbzzvXwnExf8DTnK8YuG}
+    client-secret: ${KEYCLOAK_CLIENT_SECRET:}
   user-service:
     url: ${OPENFEIGN_USER_SERVICE_URL:http://localhost:8083}
 
