@@ -24,5 +24,12 @@ public interface MessageRepository extends MongoRepository<ChatMessage, UUID> {
 
     java.util.Optional<ChatMessage> findByIdAndConversationId(UUID messageId, UUID conversationId);
 
+    long countByConversationIdAndSenderIdNotAndSeenAtIsNull(UUID conversationId, UUID senderId);
+
+    List<ChatMessage> findByConversationIdAndSenderIdNotAndSeenAtIsNullAndCreatedAtLessThanEqual(
+            UUID conversationId,
+            UUID senderId,
+            Instant createdAt);
+
     void deleteByConversationId(UUID conversationId);
 }
