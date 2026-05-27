@@ -137,13 +137,25 @@ public class AuditLogServiceImpl implements AuditLogService {
             return List.of();
         }
 
+        String escaped = java.util.regex.Pattern.quote(value);
         Query query = new Query()
                 .addCriteria(new Criteria().orOperator(
                         Criteria.where("entity_id").is(value),
+                        Criteria.where("entity_label").is(value),
+                        Criteria.where("entity_label").regex(escaped, "i"),
+                        Criteria.where("correlation_id").is(value),
+                        Criteria.where("trace_id").is(value),
                         Criteria.where("metadata.correlationId").is(value),
                         Criteria.where("metadata.traceId").is(value),
+                        Criteria.where("metadata.businessFlowId").is(value),
+                        Criteria.where("metadata.flowId").is(value),
+                        Criteria.where("metadata.aggregateId").is(value),
                         Criteria.where("metadata.orderId").is(value),
-                        Criteria.where("metadata.paymentId").is(value)))
+                        Criteria.where("metadata.orderNumber").is(value),
+                        Criteria.where("metadata.paymentId").is(value),
+                        Criteria.where("metadata.transactionId").is(value),
+                        Criteria.where("metadata.shipmentId").is(value),
+                        Criteria.where("message").regex(escaped, "i")))
                 .with(org.springframework.data.domain.Sort.by("timestamp").ascending());
 
         return mongoTemplate.find(query, AuditLog.class)
