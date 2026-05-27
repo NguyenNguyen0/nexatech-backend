@@ -17,7 +17,10 @@ public class ShippingProviderFactory {
     private final GhnShippingClient ghnShippingClient;
 
     public ShippingProviderClient getCurrentProviderClient() {
-        ShippingProvider provider = shippingProperties.getProvider();
+        return getProviderClient(shippingProperties.getProvider());
+    }
+
+    public ShippingProviderClient getProviderClient(ShippingProvider provider) {
         if (provider == ShippingProvider.GHN) {
             // Fail fast with a clear config error before calling the sandbox API.
             ghnShippingClient.validateConfiguration();
