@@ -54,7 +54,7 @@ spring:
             - id: notification-service
               uri: lb://notification-service
               predicates:
-                - Path=/api/v1/notifications/**
+                - Path=/api/v1/notifications/**,/api/v1/admin/notifications/**
             - id: chat-service
               uri: ${CHAT_SERVICE_URI:lb://chat-service}
               predicates:
@@ -64,10 +64,16 @@ spring:
               predicates:
                 - Path=/ws/chat,/ws/chat/**
                 - Header=Upgrade, websocket
+              filters:
+                - RemoveRequestHeader=Origin
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
             - id: chat-service-sockjs
               uri: ${CHAT_SERVICE_URI:lb://chat-service}
               predicates:
                 - Path=/ws/chat,/ws/chat/**
+              filters:
+                - RemoveRequestHeader=Origin
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
             - id: storage-service
               uri: lb://storage-service
               predicates:
