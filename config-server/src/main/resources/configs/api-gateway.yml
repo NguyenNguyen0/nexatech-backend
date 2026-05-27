@@ -4,7 +4,7 @@ server:
 # Browser clients (e.g. Next.js on :3001) — comma-separated patterns; override with env GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS
 gateway:
   cors:
-    allowed-origin-patterns: "http://localhost:*,http://127.0.0.1:*"
+    allowed-origin-patterns: ${GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
 
 spring:
   security:
