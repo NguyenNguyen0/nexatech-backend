@@ -12,7 +12,6 @@ variables:
   DOCKER_DRIVER: overlay2
   DOCKER_HOST: tcp://docker:2375
   DOCKER_TLS_CERTDIR: ""
-  INFRA_REF: main
 
 .docker-build:
   image: docker:27.5.1
@@ -83,14 +82,14 @@ build:node-python-images:
 
 trigger:infra-deploy:
   stage: deploy
+  inherit:
+    variables: false
   trigger:
     project: software-architecture264301/nexatech-infra
-    branch: $INFRA_REF
+    branch: main
     strategy: depend
-  variables:
-    BACKEND_COMMIT_SHA: $CI_COMMIT_SHA
-    BACKEND_COMMIT_SHORT_SHA: $CI_COMMIT_SHORT_SHA
-    BACKEND_IMAGE_TAG: $CI_COMMIT_SHORT_SHA
-    IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+    inputs:
+      backend_image_tag: $CI_COMMIT_SHORT_SHA
+      image_tag: $CI_COMMIT_SHORT_SHA
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"'
