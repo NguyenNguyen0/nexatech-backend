@@ -6,6 +6,7 @@ workflow:
 
 stages:
   - build
+  - deploy
 
 variables:
   DOCKER_DRIVER: overlay2
@@ -78,3 +79,17 @@ build:node-python-images:
       - IMAGE_NAME: recommendation-service
         CONTEXT: python-services/recommendation-service
         DOCKERFILE: Dockerfile
+
+trigger:infra-deploy:
+  stage: deploy
+  trigger:
+    project: software-architecture264301/nexatech-infra
+    branch: $CI_COMMIT_BRANCH
+    strategy: depend
+  variables:
+    BACKEND_COMMIT_SHA: $CI_COMMIT_SHA
+    BACKEND_COMMIT_SHORT_SHA: $CI_COMMIT_SHORT_SHA
+    BACKEND_IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+    IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"'
