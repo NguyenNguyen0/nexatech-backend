@@ -12,6 +12,7 @@ variables:
   DOCKER_DRIVER: overlay2
   DOCKER_HOST: tcp://docker:2375
   DOCKER_TLS_CERTDIR: ""
+  INFRA_REF: main
 
 .docker-build:
   image: docker:27.5.1
@@ -84,7 +85,7 @@ trigger:infra-deploy:
   stage: deploy
   trigger:
     project: software-architecture264301/nexatech-infra
-    branch: $CI_COMMIT_BRANCH
+    branch: $INFRA_REF
     strategy: depend
   variables:
     BACKEND_COMMIT_SHA: $CI_COMMIT_SHA
