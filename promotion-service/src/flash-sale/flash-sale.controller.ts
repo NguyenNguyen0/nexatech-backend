@@ -11,6 +11,15 @@ export class FlashSaleController {
     return { items, total: items.length };
   }
 
+  /** Decrement remainingStock for a concrete flash sale after confirmed payment */
+  @Patch(':id/sell')
+  async sellByFlashSale(
+    @Param('id') id: string,
+    @Body('quantity', new DefaultValuePipe(1), ParseIntPipe) quantity: number,
+  ) {
+    return this.flashSaleService.decrementStockById(id, quantity);
+  }
+
   /** Decrement remainingStock after a confirmed sale */
   @Patch('by-product/:productId/sell')
   async sell(
