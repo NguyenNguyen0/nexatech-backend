@@ -53,3 +53,22 @@ plan.md
 realm-export.json
 
 node_modules
+
+### Node / NestJS services ###
+node_modules/
+dist/
+*.tsbuildinfo
+
+### Promotion service generated files ###
+promotion-service/node_modules/
+promotion-service/dist/
+promotion-service/coverage/
+promotion-service/.turbo/
+promotion-service/.npm/
+promotion-service/npm-debug.log*
+promotion-service/yarn-debug.log*
+promotion-service/yarn-error.log*
+promotion-service/pnpm-debug.log*
+promotion-service/.env
+promotion-service/.env.*
+!promotion-service/.env.example

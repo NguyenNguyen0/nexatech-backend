@@ -33,6 +33,22 @@ function Import-DotEnvFile {
 Import-DotEnvFile -Path (Join-Path $PSScriptRoot ".env")
 Import-DotEnvFile -Path (Join-Path $PSScriptRoot ".env.ec2") -Required
 
+if (-not $env:SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE) {
+    $env:SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE = "2"
+}
+if (-not $env:SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE) {
+    $env:SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE = "0"
+}
+if (-not $env:SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT) {
+    $env:SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT = "5000"
+}
+if (-not $env:SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT) {
+    $env:SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT = "30000"
+}
+if (-not $env:SPRING_JPA_OPEN_IN_VIEW) {
+    $env:SPRING_JPA_OPEN_IN_VIEW = "false"
+}
+
 switch ($ServiceName) {
     "api-gateway" {}
     "product-service" {}
@@ -53,6 +69,19 @@ switch ($ServiceName) {
     }
     "chat-service" {
         $env:DB_URL = "jdbc:postgresql://$($env:EC2_HOST):5432/nexatech_chats"
+    }
+    "audit-service" {
+        $env:SPRING_MONGODB_URI = if ($env:MONGO_AUDIT_URL) {
+            $env:MONGO_AUDIT_URL
+        } else {
+            "mongodb://nexatech:nexatech123@$($env:EC2_HOST):27017/nexatech_audit?authSource=admin&authMechanism=SCRAM-SHA-256"
+        }
+        $env:KAFKA_GROUP_ID = if ($env:AUDIT_KAFKA_GROUP_ID) { $env:AUDIT_KAFKA_GROUP_ID } else { "audit-service-group" }
+        $env:AUDIT_LOG_TOPIC = if ($env:AUDIT_LOG_TOPIC) { $env:AUDIT_LOG_TOPIC } else { "audit-topic" }
+        $env:SPRING_KAFKA_CONSUMER_GROUP_ID = $env:KAFKA_GROUP_ID
+        $env:SPRING_KAFKA_CONSUMER_GROUPID = $env:KAFKA_GROUP_ID
+        $env:SPRING_KAFKA_TOPIC_AUDIT_LOG = $env:AUDIT_LOG_TOPIC
+        $env:SPRING_KAFKA_TOPIC_AUDITLOG = $env:AUDIT_LOG_TOPIC
     }
     "user-service" {
         $env:DATASOURCE_URL = "jdbc:postgresql://$($env:EC2_HOST):5432/nexatech_users"

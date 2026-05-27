@@ -178,16 +178,36 @@ public class ChatService {
         ChatMessage message = messageRepository.findByIdAndConversationId(messageId, conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found: " + messageId));
 
-        ensureRecipient(resolveActorId(userId, guestSessionId), message, userRole);
+        UUID actorId = resolveActorId(userId, guestSessionId);
+        ensureRecipient(actorId, message, userRole);
 
-        if (message.getDeliveredAt() == null) {
-            message.setDeliveredAt(Instant.now());
-        }
-        if (message.getSeenAt() == null) {
-            message.setSeenAt(Instant.now());
+        Instant now = Instant.now();
+        List<ChatMessage> unseenMessages = messageRepository
+                .findByConversationIdAndSenderIdNotAndSeenAtIsNullAndCreatedAtLessThanEqual(
+                        conversationId,
+                        actorId,
+                        message.getCreatedAt());
+
+        if (unseenMessages.isEmpty() && message.getSeenAt() == null) {
+            unseenMessages = List.of(message);
         }
 
-        MessageResponse response = toMessageResponse(messageRepository.save(message));
+        unseenMessages.forEach(item -> {
+            if (item.getDeliveredAt() == null) {
+                item.setDeliveredAt(now);
+            }
+            if (item.getSeenAt() == null) {
+                item.setSeenAt(now);
+            }
+        });
+
+        messageRepository.saveAll(unseenMessages);
+        ChatMessage latest = unseenMessages.stream()
+                .filter(item -> item.getId().equals(messageId))
+                .findFirst()
+                .orElse(message);
+
+        MessageResponse response = toMessageResponse(latest);
         publishMessageUpdate(response);
         return response;
     }
@@ -296,11 +316,23 @@ public class ChatService {
                 .otherUserId(otherUserId)
                 .participant(resolveParticipant(conversation, otherUserId))
                 .otherUserOnline(onlineStatusService.isOnline(otherUserId))
+                .unreadCount(resolveUnreadCount(conversation, userId, guestSessionId, userRole))
                 .lastMessage(lastMessage)
                 .expiresAt(conversation.getExpiresAt())
                 .createdAt(conversation.getCreatedAt())
                 .updatedAt(conversation.getUpdatedAt())
                 .build();
+    }
+
+    private long resolveUnreadCount(ChatConversation conversation, UUID userId, String guestSessionId, String userRole) {
+        UUID actorId = resolveActorIdOrNull(userId, guestSessionId);
+        if (actorId == null && isAdmin(userRole)) {
+            return 0;
+        }
+        if (actorId == null) {
+            return 0;
+        }
+        return messageRepository.countByConversationIdAndSenderIdNotAndSeenAtIsNull(conversation.getId(), actorId);
     }
 
     private MessageResponse toMessageResponse(ChatMessage message) {

@@ -28,7 +28,7 @@ spring:
         reconnect.backoff.max.ms: 10000
 
 shipping:
-  provider: ${SHIPPING_PROVIDER:mock} # mock | ghn
+  provider: ${SHIPPING_PROVIDER:ghn} # mock | ghn
   ghn:
     base-url: ${GHN_BASE_URL:https://dev-online-gateway.ghn.vn/shiip/public-api}
     token: ${GHN_TOKEN:}
