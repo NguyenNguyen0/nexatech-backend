@@ -21,6 +21,7 @@ $localTargets = @{
     "payment-service"       = "run-payment"
     "notification-service"  = "run-notification"
     "chat-service"          = "run-chat"
+    "audit-service"         = "run-audit"
     "storage-service"       = "run-storage"
     "promotion-service"     = "run-promotion"
 }
@@ -36,6 +37,7 @@ $ec2Targets = @{
     "shipping-service"      = "run-shipping-ec2"
     "notification-service"  = "run-notification-ec2"
     "chat-service"          = "run-chat-ec2"
+    "audit-service"         = "run-audit-ec2"
     "storage-service"       = "run-storage-ec2"
     "news-service"          = "run-news-ec2"
     "promotion-service"     = "run-promotion-ec2"
@@ -53,6 +55,7 @@ $defaultLocalServices = @(
     "payment-service",
     "notification-service",
     "chat-service",
+    "audit-service",
     "storage-service",
     "promotion-service"
 )
@@ -68,6 +71,7 @@ $defaultEc2Services = @(
     "shipping-service",
     "notification-service",
     "chat-service",
+    "audit-service",
     "storage-service",
     "news-service",
     "promotion-service"

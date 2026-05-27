@@ -1,6 +1,7 @@
 package com.nexatech.audit.controller;
 
 import java.time.Instant;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -67,6 +68,14 @@ public class AuditController {
     public ApiResponse<AuditLogResponse> getById(@PathVariable String id) {
         return ApiResponse.<AuditLogResponse>builder()
                 .result(auditLogService.getById(id))
+                .build();
+    }
+
+    @GetMapping("/trace/{lookupId}")
+//     @RequiresPermission(PermissionsAccept.Audit.READ)
+    public ApiResponse<List<AuditLogResponse>> trace(@PathVariable String lookupId) {
+        return ApiResponse.<List<AuditLogResponse>>builder()
+                .result(auditLogService.trace(lookupId))
                 .build();
     }
 
