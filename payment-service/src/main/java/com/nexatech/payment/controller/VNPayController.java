@@ -1,7 +1,9 @@
 package com.nexatech.payment.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.payment.dto.VNPayPaymentRequest;
 import com.nexatech.payment.dto.VNPayResponse;
+import com.nexatech.payment.service.IdempotencyService;
 import com.nexatech.payment.service.VNPayService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,8 @@ import java.util.UUID;
 public class VNPayController {
 
     private final VNPayService vnPayService;
+    private final IdempotencyService idempotencyService;
+    private final ObjectMapper objectMapper;
 
     @Value("${frontend.url:http://localhost:3000}")
     private String frontendUrl;
@@ -42,8 +46,25 @@ public class VNPayController {
     @PostMapping("/create")
     public ResponseEntity<VNPayResponse> createPayment(
             @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody VNPayPaymentRequest request) {
-        return ResponseEntity.ok(vnPayService.createPaymentUrl(customerId, request));
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return ResponseEntity.ok(vnPayService.createPaymentUrl(customerId, request));
+        }
+
+        return idempotencyService.checkAndGetCached(idempotencyKey)
+                .map(payload -> ResponseEntity.ok(readCachedVNPayResponse(payload)))
+                .orElseGet(() -> {
+                    idempotencyService.markProcessing(idempotencyKey, request.getOrderId());
+                    try {
+                        VNPayResponse response = vnPayService.createPaymentUrl(customerId, request);
+                        idempotencyService.markCompleted(idempotencyKey, response.getPaymentId(), response);
+                        return ResponseEntity.ok(response);
+                    } catch (RuntimeException ex) {
+                        idempotencyService.markFailed(idempotencyKey);
+                        throw ex;
+                    }
+                });
     }
 
     /**
@@ -93,5 +114,13 @@ public class VNPayController {
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(redirectUri);
         return new ResponseEntity<>(headers, HttpStatus.FOUND);
+    }
+
+    private VNPayResponse readCachedVNPayResponse(String payload) {
+        try {
+            return objectMapper.readValue(payload, VNPayResponse.class);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Unable to read cached VNPay response");
+        }
     }
 }

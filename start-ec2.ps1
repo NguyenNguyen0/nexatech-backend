@@ -102,7 +102,7 @@ switch ($ServiceName) {
         exit $LASTEXITCODE
     }
     "recommendation-service" {
-        Import-DotEnvFile -Path (Join-Path $PSScriptRoot "python-services/recommendation-service/.env.ec2") -Required
+        Import-DotEnvFile -Path (Join-Path $PSScriptRoot "python-services/recommendation-service/.env.ec2")
         Set-Location (Join-Path $PSScriptRoot "python-services/recommendation-service")
         uv run main.py
         exit $LASTEXITCODE

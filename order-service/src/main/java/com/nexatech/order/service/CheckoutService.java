@@ -9,6 +9,7 @@ import com.nexatech.order.dto.*;
 import com.nexatech.order.dto.response.ApiResponse;
 import com.nexatech.order.enums.PaymentMethod;
 import com.nexatech.order.exception.BadRequestException;
+import com.nexatech.order.exception.ServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -83,13 +84,14 @@ public class CheckoutService {
 
         if (request.getPaymentMethod() == PaymentMethod.VNPAY) {
             VNPayInfo vnpay = paymentClient.createVNPayPayment(customerId,
+                    "checkout-vnpay-" + order.getId(),
                     VNPayCreateDto.builder()
                             .orderId(order.getId())
                             .amount(order.getTotalAmount())
                             .orderInfo("Thanh toan don hang " + order.getOrderNumber())
                             .build());
             if (vnpay == null || vnpay.getPaymentId() == null || vnpay.getPaymentUrl() == null) {
-                compensateOrderAfterPaymentFailure(customerId, order.getId(), "VNPay payment URL creation failed");
+                compensateOrderAfterPaymentFailure(customerId, order.getId(), "PAYMENT_UNAVAILABLE");
             }
             paymentId = vnpay.getPaymentId();
             paymentUrl = vnpay.getPaymentUrl();
@@ -102,7 +104,7 @@ public class CheckoutService {
                             .method(request.getPaymentMethod().name())
                             .build());
             if (paymentResp == null || !paymentResp.isSuccess() || paymentResp.getData() == null) {
-                compensateOrderAfterPaymentFailure(customerId, order.getId(), "Payment creation failed");
+                compensateOrderAfterPaymentFailure(customerId, order.getId(), "PAYMENT_UNAVAILABLE");
             }
             paymentId = paymentResp.getData().getId();
 
@@ -166,10 +168,10 @@ public class CheckoutService {
 
     private void compensateOrderAfterPaymentFailure(UUID customerId, UUID orderId, String reason) {
         try {
-            orderService.cancelOrder(customerId, orderId);
+            orderService.cancelOrderForSaga(orderId, reason, customerId != null ? customerId.toString() : "guest");
         } catch (Exception e) {
             log.error("Unable to compensate checkout after payment failure, orderId={} error={}", orderId, e.getMessage());
         }
-        throw new BadRequestException(reason);
+        throw new ServiceUnavailableException("Thanh toán này không khả dụng, hãy đợi một chút rồi thử lại.");
     }
 }

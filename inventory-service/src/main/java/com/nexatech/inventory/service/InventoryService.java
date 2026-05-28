@@ -103,6 +103,11 @@ public class InventoryService {
         validateItems(request);
 
         for (StockCheckRequest.Item itemRequest : request.getItems()) {
+            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RELEASED, reference)) {
+                log.info("Skip duplicate stock release: productId={} reference={}", itemRequest.getProductId(), reference);
+                continue;
+            }
+
             InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Inventory item", "productId", itemRequest.getProductId()));
@@ -203,6 +208,11 @@ public class InventoryService {
         }
 
         for (StockCheckRequest.Item itemRequest : request.getItems()) {
+            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.SALE, reference)) {
+                log.info("Skip duplicate sale finalization: productId={} reference={}", itemRequest.getProductId(), reference);
+                continue;
+            }
+
             InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Inventory item", "productId", itemRequest.getProductId()));
@@ -221,6 +231,11 @@ public class InventoryService {
         validateItems(request);
 
         for (StockCheckRequest.Item itemRequest : request.getItems()) {
+            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RETURN, reference)) {
+                log.info("Skip duplicate return restock: productId={} reference={}", itemRequest.getProductId(), reference);
+                continue;
+            }
+
             InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Inventory item", "productId", itemRequest.getProductId()));
@@ -327,6 +342,11 @@ public class InventoryService {
                 .reason(reason)
                 .performedBy(performedBy)
                 .build());
+    }
+
+    private boolean hasMovement(String productId, StockMovement.MovementType type, String reference) {
+        return reference != null
+                && stockMovementRepository.existsByProductIdAndTypeAndReference(productId, type, reference);
     }
 
     private StockMovementResponse toMovementResponse(StockMovement movement) {
