@@ -14,6 +14,7 @@ import { FlashSaleModule } from './flash-sale/flash-sale.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { OutboxModule } from './outbox/outbox.module';
+import { DiscoveryModule } from './discovery/discovery.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { OutboxModule } from './outbox/outbox.module';
     MessagingModule,
     SchedulerModule,
     OutboxModule,
+    DiscoveryModule,
   ],
 })
 export class AppModule {}
