@@ -24,6 +24,7 @@ $localTargets = @{
     "audit-service"         = "run-audit"
     "storage-service"       = "run-storage"
     "promotion-service"     = "run-promotion"
+    "recommendation-service" = "run-recommendation"
 }
 
 $ec2Targets = @{
@@ -41,6 +42,7 @@ $ec2Targets = @{
     "storage-service"       = "run-storage-ec2"
     "news-service"          = "run-news-ec2"
     "promotion-service"     = "run-promotion-ec2"
+    "recommendation-service" = "run-recommendation-ec2"
 }
 
 $defaultLocalServices = @(
@@ -57,7 +59,8 @@ $defaultLocalServices = @(
     "chat-service",
     "audit-service",
     "storage-service",
-    "promotion-service"
+    "promotion-service",
+    "recommendation-service"
 )
 
 $defaultEc2Services = @(
@@ -74,7 +77,8 @@ $defaultEc2Services = @(
     "audit-service",
     "storage-service",
     "news-service",
-    "promotion-service"
+    "promotion-service",
+    "recommendation-service"
 )
 
 if ($Services.Count -eq 0) {
