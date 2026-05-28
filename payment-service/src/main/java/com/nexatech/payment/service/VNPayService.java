@@ -42,6 +42,24 @@ public class VNPayService {
      */
     @Transactional
     public VNPayResponse createPaymentUrl(UUID customerId, VNPayPaymentRequest request) {
+        var existingPayment = paymentRepository.findByOrderId(request.getOrderId());
+        if (existingPayment.isPresent()) {
+            Payment payment = existingPayment.get();
+            if (payment.getMethod() == PaymentMethod.VNPAY && payment.getStatus() == PaymentStatus.PENDING) {
+                if (payment.getTransactionId() == null || payment.getTransactionId().isBlank()) {
+                    payment.setTransactionId(payment.getId().toString().replace("-", ""));
+                    payment = paymentRepository.save(payment);
+                }
+                String paymentUrl = buildVNPayUrl(payment.getTransactionId(), request);
+                log.info("Tra lai URL VNPay cho giao dich PENDING: paymentId={}, orderId={}",
+                        payment.getId(), request.getOrderId());
+                return VNPayResponse.builder()
+                        .paymentId(payment.getId())
+                        .paymentUrl(paymentUrl)
+                        .build();
+            }
+            throw new BadRequestException("Don hang " + request.getOrderId() + " khong con o trang thai co the thanh toan");
+        }
         // Kiểm tra đơn hàng đã có giao dịch VNPay đang chờ xử lý chưa
         paymentRepository.findByOrderId(request.getOrderId()).ifPresent(p -> {
             if (p.getMethod() == PaymentMethod.VNPAY && p.getStatus() == PaymentStatus.PENDING) {

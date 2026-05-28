@@ -49,6 +49,7 @@ public class GatewaySecurityConfig {
                     "/api/v1/mcp/health")
                 .permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/checkout").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/orders/*/continue-payment").permitAll()
                 // VNPay callbacks — server-to-server IPN and browser return (no auth token)
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/payments/vnpay/ipn",

@@ -20,7 +20,7 @@ public final class OrderStateMachine {
         ALLOWED_TRANSITIONS.put(OrderStatus.SHIPPED,    EnumSet.of(OrderStatus.DELIVERED));
         ALLOWED_TRANSITIONS.put(OrderStatus.DELIVERED,  EnumSet.of(OrderStatus.COMPLETED, OrderStatus.RETURNED));
         ALLOWED_TRANSITIONS.put(OrderStatus.COMPLETED,  EnumSet.noneOf(OrderStatus.class));
-        ALLOWED_TRANSITIONS.put(OrderStatus.CANCELLED,  EnumSet.noneOf(OrderStatus.class));
+        ALLOWED_TRANSITIONS.put(OrderStatus.CANCELLED,  EnumSet.of(OrderStatus.REFUNDED));
         ALLOWED_TRANSITIONS.put(OrderStatus.RETURNED,   EnumSet.of(OrderStatus.REFUNDED));
         ALLOWED_TRANSITIONS.put(OrderStatus.REFUNDED,   EnumSet.noneOf(OrderStatus.class));
     }

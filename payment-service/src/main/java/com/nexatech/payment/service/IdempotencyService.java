@@ -15,16 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Đảm bảo tính idempotency cho Payment API.
- *
- * Flow:
- *  1. Client gửi request với header Idempotency-Key
- *  2. Nếu key chưa tồn tại → insert PROCESSING, cho phép xử lý
- *  3. Nếu key COMPLETED    → trả cached response
- *  4. Nếu key PROCESSING   → trả 409 (đang xử lý, tránh duplicate)
- *  5. Sau khi xử lý xong   → gọi markCompleted()
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,30 +23,39 @@ public class IdempotencyService {
     private final PaymentIdempotencyKeyRepository idempotencyKeyRepository;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Kiểm tra nếu key đã được xử lý thành công → trả về cached response.
-     * Nếu PROCESSING → ném 409.
-     * Nếu chưa tồn tại → trả empty.
-     */
     public Optional<String> checkAndGetCached(String idempotencyKey) {
-        return idempotencyKeyRepository.findByIdempotencyKey(idempotencyKey).map(record -> {
-            if (record.getStatus() == IdempotencyStatus.COMPLETED) {
-                log.info("Idempotent hit (COMPLETED): key={}", idempotencyKey);
-                return record.getResponsePayload();
-            } else {
-                // PROCESSING — đang xử lý, từ chối duplicate
-                throw new ConflictException("Request đang được xử lý. Vui lòng đợi trước khi retry.");
-            }
-        });
+        Optional<PaymentIdempotencyKey> recordOptional = idempotencyKeyRepository.findByIdempotencyKey(idempotencyKey);
+        if (recordOptional.isEmpty()) {
+            return Optional.empty();
+        }
+
+        PaymentIdempotencyKey record = recordOptional.get();
+        if (record.getStatus() == IdempotencyStatus.COMPLETED) {
+            log.info("Payment idempotent hit: key={}", idempotencyKey);
+            return Optional.ofNullable(record.getResponsePayload());
+        }
+        if (record.getStatus() == IdempotencyStatus.FAILED) {
+            return Optional.empty();
+        }
+        throw new ConflictException("Request is being processed. Please wait before retrying.");
     }
 
-    /**
-     * Ghi key với trạng thái PROCESSING trước khi xử lý.
-     * Dùng REQUIRES_NEW để commit ngay lập tức — tránh race condition.
-     * Nếu DataIntegrityViolation (key đã tồn tại) → ném 409.
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markProcessing(String idempotencyKey, UUID orderId) {
+        Optional<PaymentIdempotencyKey> existing = idempotencyKeyRepository.findByIdempotencyKey(idempotencyKey);
+        if (existing.isPresent()) {
+            PaymentIdempotencyKey record = existing.get();
+            if (record.getStatus() == IdempotencyStatus.FAILED) {
+                record.setOrderId(orderId);
+                record.setPaymentId(null);
+                record.setResponsePayload(null);
+                record.setStatus(IdempotencyStatus.PROCESSING);
+                idempotencyKeyRepository.save(record);
+                return;
+            }
+            throw new ConflictException("Idempotency key conflict: request is processing or already completed.");
+        }
+
         try {
             idempotencyKeyRepository.save(PaymentIdempotencyKey.builder()
                     .idempotencyKey(idempotencyKey)
@@ -64,13 +63,10 @@ public class IdempotencyService {
                     .status(IdempotencyStatus.PROCESSING)
                     .build());
         } catch (DataIntegrityViolationException e) {
-            throw new ConflictException("Idempotency key conflict: request đang được xử lý hoặc đã hoàn thành.");
+            throw new ConflictException("Idempotency key conflict: request is processing or already completed.");
         }
     }
 
-    /**
-     * Cập nhật trạng thái COMPLETED với response đã serialize.
-     */
     @Transactional
     public void markCompleted(String idempotencyKey, UUID paymentId, Object responsePayload) {
         idempotencyKeyRepository.findByIdempotencyKey(idempotencyKey).ifPresent(record -> {
@@ -80,14 +76,12 @@ public class IdempotencyService {
                 record.setStatus(IdempotencyStatus.COMPLETED);
                 idempotencyKeyRepository.save(record);
             } catch (Exception e) {
-                log.error("Không thể serialize idempotency response: key={} error={}", idempotencyKey, e.getMessage());
+                log.error("Unable to serialize payment idempotency response: key={} error={}",
+                        idempotencyKey, e.getMessage());
             }
         });
     }
 
-    /**
-     * Đánh dấu FAILED — cho phép client retry với cùng key.
-     */
     @Transactional
     public void markFailed(String idempotencyKey) {
         idempotencyKeyRepository.findByIdempotencyKey(idempotencyKey).ifPresent(record -> {

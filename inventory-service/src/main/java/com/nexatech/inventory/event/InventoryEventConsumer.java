@@ -33,12 +33,18 @@ public class InventoryEventConsumer {
             switch (eventType) {
                 case "ORDER_CANCELLED" -> handleOrderCancelled(event);
                 case "ORDER_DELIVERED" -> handleOrderDelivered(event);
+                case "ORDER_STATUS_UPDATED" -> {
+                    if ("DELIVERED".equals(event.getStatus())) {
+                        handleOrderDelivered(event);
+                    }
+                }
                 case "ORDER_RETURN_APPROVED" -> handleOrderReturnApproved(event);
                 default -> log.debug("Ignoring unsupported order event type={}", eventType);
             }
         } catch (Exception e) {
             log.error("Failed to process order event type={} orderId={} error={}",
                     event.getEventType(), event.getOrderId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to process order event", e);
         }
     }
 

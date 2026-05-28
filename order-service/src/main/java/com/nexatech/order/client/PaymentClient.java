@@ -17,12 +17,13 @@ public interface PaymentClient {
 
     @PostMapping
     ApiResponse<PaymentInfo> createPayment(
-            @RequestHeader("X-User-Id") UUID customerId,
+            @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody CreatePaymentDto request);
 
     @PostMapping("/vnpay/create")
     VNPayInfo createVNPayPayment(
-            @RequestHeader("X-User-Id") UUID customerId,
+            @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody VNPayCreateDto request);
 }
