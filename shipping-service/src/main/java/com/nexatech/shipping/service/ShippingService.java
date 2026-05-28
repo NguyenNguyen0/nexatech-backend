@@ -32,6 +32,13 @@ public class ShippingService {
     }
 
     public CreateShipmentResponse createShipment(CreateShipmentRequest request) {
+        if (request.getOrderId() != null) {
+            var existing = shipmentRepository.findByOrderId(request.getOrderId());
+            if (existing.isPresent()) {
+                log.info("Shipment already exists for orderId={}, returning existing shipment", request.getOrderId());
+                return shipmentMapper.toCreateResponse(existing.get());
+            }
+        }
         return providerFactory.getCurrentProviderClient().createShipment(request);
     }
 

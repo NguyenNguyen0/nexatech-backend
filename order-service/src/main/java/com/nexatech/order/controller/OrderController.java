@@ -3,6 +3,7 @@ package com.nexatech.order.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexatech.order.dto.response.ApiResponse;
 import com.nexatech.order.dto.response.PageResponse;
+import com.nexatech.order.dto.ContinuePaymentResponse;
 import com.nexatech.order.dto.CreateOrderRequest;
 import com.nexatech.order.dto.OrderResponse;
 import com.nexatech.order.service.IdempotencyService;
@@ -63,6 +64,13 @@ public class OrderController {
             @RequestHeader("X-User-Id") UUID customerId,
             @PathVariable UUID id) {
         return ApiResponse.ok(orderService.cancelOrder(customerId, id));
+    }
+
+    @PostMapping("/{id}/continue-payment")
+    public ApiResponse<ContinuePaymentResponse> continuePayment(
+            @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
+            @PathVariable UUID id) {
+        return ApiResponse.ok(orderService.continueVNPayPayment(customerId, id));
     }
 
     private ApiResponse<OrderResponse> handleIdempotentCreateOrder(

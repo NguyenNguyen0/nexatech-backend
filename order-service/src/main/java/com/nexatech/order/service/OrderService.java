@@ -1,17 +1,23 @@
 package com.nexatech.order.service;
 
 import com.nexatech.order.client.InventoryClient;
+import com.nexatech.order.client.PaymentClient;
 import com.nexatech.order.client.ProductClient;
 import com.nexatech.order.client.dto.ProductInfo;
 import com.nexatech.order.client.dto.StockOperationRequest;
+import com.nexatech.order.client.dto.VNPayCreateDto;
+import com.nexatech.order.client.dto.VNPayInfo;
+import com.nexatech.order.dto.ContinuePaymentResponse;
 import com.nexatech.order.dto.CreateOrderRequest;
 import com.nexatech.order.dto.OrderResponse;
 import com.nexatech.order.dto.UpdateShippingRequest;
 import com.nexatech.order.enums.OrderStatus;
+import com.nexatech.order.enums.PaymentMethod;
 import com.nexatech.order.event.OrderEvent;
 import com.nexatech.order.exception.BadRequestException;
 import com.nexatech.order.exception.ForbiddenException;
 import com.nexatech.order.exception.ResourceNotFoundException;
+import com.nexatech.order.exception.ServiceUnavailableException;
 import com.nexatech.order.mapper.OrderMapper;
 import com.nexatech.order.model.Order;
 import com.nexatech.order.model.OrderItem;
@@ -19,6 +25,7 @@ import com.nexatech.order.repository.OrderRepository;
 import com.nexatech.order.util.OrderStateMachine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -54,10 +61,14 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final InventoryClient inventoryClient;
     private final ProductClient productClient;
+    private final PaymentClient paymentClient;
     private final OutboxEventService outboxEventService;
     private final AuditLogService auditLogService;
     private final SnapshotService snapshotService;
     private final PlatformTransactionManager transactionManager;
+
+    @Value("${order.payment.pending-timeout-minutes:20}")
+    private long pendingPaymentTimeoutMinutes;
 
     /**
      * Tạo đơn hàng mới.
@@ -166,6 +177,47 @@ public class OrderService {
 
     public boolean hasPurchasedProduct(UUID customerId, String productId) {
         return orderRepository.existsPurchasedProduct(customerId, productId, PURCHASED_STATUSES);
+    }
+
+    public ContinuePaymentResponse continueVNPayPayment(UUID customerId, UUID orderId) {
+        Order order = findById(orderId);
+
+        if (order.getCustomerId() != null && !Objects.equals(order.getCustomerId(), customerId)) {
+            throw new ForbiddenException("Bạn không có quyền thanh toán đơn hàng này");
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BadRequestException("Chỉ có thể tiếp tục thanh toán khi đơn hàng đang chờ thanh toán");
+        }
+        if (order.getPaymentMethod() != PaymentMethod.VNPAY) {
+            throw new BadRequestException("Đơn hàng này không sử dụng phương thức thanh toán VNPay");
+        }
+
+        Instant expiresAt = order.getCreatedAt().plusSeconds(pendingPaymentTimeoutMinutes * 60);
+        if (!Instant.now().isBefore(expiresAt)) {
+            cancelOrderForSaga(orderId, "payment_timeout", customerId != null ? customerId.toString() : "guest");
+            throw new BadRequestException("Đơn hàng đã quá thời gian thanh toán và đã được huỷ");
+        }
+
+        VNPayInfo vnpay = paymentClient.createVNPayPayment(customerId,
+                null,
+                VNPayCreateDto.builder()
+                        .orderId(order.getId())
+                        .amount(order.getTotalAmount())
+                        .orderInfo("Thanh toan don hang " + order.getOrderNumber())
+                        .build());
+
+        if (vnpay == null || vnpay.getPaymentId() == null || vnpay.getPaymentUrl() == null) {
+            throw new ServiceUnavailableException("Thanh toán này không khả dụng, hãy đợi một chút rồi thử lại.");
+        }
+
+        return ContinuePaymentResponse.builder()
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .paymentId(vnpay.getPaymentId())
+                .paymentMethod(order.getPaymentMethod())
+                .paymentUrl(vnpay.getPaymentUrl())
+                .expiresAt(expiresAt)
+                .build();
     }
 
     /**
@@ -301,6 +353,71 @@ public class OrderService {
             log.info("Huỷ đơn hàng thành công: {} | customer: {}", orderId, customerId);
             return orderMapper.toResponse(saved);
         });
+    }
+
+    /**
+     * Internal saga compensation path.
+     *
+     * This method intentionally does not call inventory/payment/shipping synchronously.
+     * It changes the order state and writes ORDER_CANCELLED to the outbox; downstream
+     * services consume that event and perform their own compensating action.
+     */
+    public OrderResponse cancelOrderForSaga(UUID orderId, String reason, String actor) {
+        Order current = findById(orderId);
+        if (current.getStatus() == OrderStatus.CANCELLED) {
+            log.info("Order already cancelled, skip duplicate compensation: orderId={} reason={}", orderId, reason);
+            return orderMapper.toResponse(current);
+        }
+        if (current.getStatus() != OrderStatus.PENDING && current.getStatus() != OrderStatus.CONFIRMED) {
+            log.warn("Skip saga cancellation for order {} because status is {}", orderId, current.getStatus());
+            return orderMapper.toResponse(current);
+        }
+
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            Order order = findById(orderId);
+            if (order.getStatus() == OrderStatus.CANCELLED) {
+                return orderMapper.toResponse(order);
+            }
+            if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
+                log.warn("Skip saga cancellation inside transaction for order {} because status is {}", orderId, order.getStatus());
+                return orderMapper.toResponse(order);
+            }
+
+            OrderStatus oldStatus = order.getStatus();
+            order.setStatus(OrderStatus.CANCELLED);
+            Order saved = orderRepository.save(order);
+            saveOrderEventToOutbox(saved, "ORDER_CANCELLED");
+            auditLogService.logEvent("ORDER_CANCELLED", "Order", orderId.toString(),
+                    Map.of("orderId", orderId.toString(),
+                            "previousStatus", oldStatus.name(),
+                            "newStatus", "CANCELLED",
+                            "reason", reason,
+                            "actor", actor),
+                    actor);
+            snapshotService.takeSnapshot("Order", orderId,
+                    Map.of("orderId", orderId.toString(),
+                            "status", "CANCELLED",
+                            "previousStatus", oldStatus.name(),
+                            "snapshotReason", reason));
+            log.info("Saga cancelled order: orderId={} previousStatus={} reason={} actor={}",
+                    orderId, oldStatus, reason, actor);
+            return orderMapper.toResponse(saved);
+        });
+    }
+
+    public boolean hasStatus(UUID orderId, OrderStatus status) {
+        return findById(orderId).getStatus() == status;
+    }
+
+    public void cancelExpiredPendingOrders(Instant createdBefore, String actor) {
+        List<Order> expiredOrders = orderRepository
+                .findTop50ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(OrderStatus.PENDING, createdBefore);
+        for (Order order : expiredOrders) {
+            if (order.getPaymentMethod() == PaymentMethod.COD) {
+                continue;
+            }
+            cancelOrderForSaga(order.getId(), "payment_timeout", actor);
+        }
     }
 
     // ==================== Private helpers ====================

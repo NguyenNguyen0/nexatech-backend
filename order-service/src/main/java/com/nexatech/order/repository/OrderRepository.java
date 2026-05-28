@@ -32,6 +32,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
        @EntityGraph(attributePaths = "items")
        Page<Order> findByStatus(OrderStatus status, Pageable pageable);
 
+       @EntityGraph(attributePaths = "items")
+       List<Order> findTop50ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(OrderStatus status, Instant createdAt);
+
        @Override
        @EntityGraph(attributePaths = "items")
        Page<Order> findAll(Pageable pageable);

@@ -39,3 +39,8 @@ spring:
     openfeign:
       circuitbreaker:
         enabled: true
+
+order:
+  payment:
+    pending-timeout-minutes: ${ORDER_PAYMENT_PENDING_TIMEOUT_MINUTES:20}
+    pending-timeout-scan-delay-ms: ${ORDER_PAYMENT_PENDING_TIMEOUT_SCAN_DELAY_MS:60000}
