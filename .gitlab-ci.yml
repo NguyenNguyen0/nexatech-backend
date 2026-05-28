@@ -1,10 +1,11 @@
 workflow:
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
       when: always
     - when: never
 
 stages:
+  - prepare
   - build
   - deploy
 
@@ -12,6 +13,78 @@ variables:
   DOCKER_DRIVER: overlay2
   DOCKER_HOST: tcp://docker:2375
   DOCKER_TLS_CERTDIR: ""
+
+detect:changed-services:
+  stage: prepare
+  image: alpine/git:2.47.2
+  variables:
+    GIT_DEPTH: "0"
+  script:
+    - |
+      set -eu
+
+      JAVA_SERVICES="api-gateway discovery-server config-server identity-service user-service product-service order-service inventory-service payment-service shipping-service notification-service chat-service storage-service news-service audit-service"
+      OTHER_SERVICES="promotion-service agent-service mcp-server recommendation-service"
+      ALL_SERVICES="$JAVA_SERVICES $OTHER_SERVICES"
+
+      add_service() {
+        case " $CHANGED_SERVICES " in
+          *" $1 "*) ;;
+          *) CHANGED_SERVICES="$CHANGED_SERVICES $1" ;;
+        esac
+      }
+
+      add_many() {
+        for service in $1; do
+          add_service "$service"
+        done
+      }
+
+      if [ -n "${CI_COMMIT_BEFORE_SHA:-}" ] && [ "$CI_COMMIT_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+        BASE_SHA="$CI_COMMIT_BEFORE_SHA"
+      else
+        BASE_SHA="$(git rev-list --max-parents=0 HEAD)"
+      fi
+
+      CHANGED_SERVICES=""
+      git diff --name-only "$BASE_SHA" "$CI_COMMIT_SHA" > changed-files.txt
+
+      while IFS= read -r file; do
+        case "$file" in
+          .gitlab-ci.yml)
+            add_many "$ALL_SERVICES"
+            ;;
+          pom.xml|Dockerfile)
+            add_many "$JAVA_SERVICES"
+            ;;
+          api-gateway/*|discovery-server/*|config-server/*|identity-service/*|user-service/*|product-service/*|order-service/*|inventory-service/*|payment-service/*|shipping-service/*|notification-service/*|chat-service/*|storage-service/*|news-service/*|audit-service/*)
+            add_service "${file%%/*}"
+            ;;
+          promotion-service/*)
+            add_service promotion-service
+            ;;
+          python-services/agent-service/*)
+            add_service agent-service
+            ;;
+          python-services/mcp-server/*)
+            add_service mcp-server
+            ;;
+          python-services/recommendation-service/*)
+            add_service recommendation-service
+            ;;
+        esac
+      done < changed-files.txt
+
+      CHANGED_SERVICES="$(printf '%s\n' "$CHANGED_SERVICES" | xargs)"
+      printf 'CHANGED_SERVICES=%s\n' "$CHANGED_SERVICES" > changed-services.env
+      echo "Changed services: ${CHANGED_SERVICES:-<none>}"
+  artifacts:
+    paths:
+      - changed-files.txt
+      - changed-services.env
+    expire_in: 1 day
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
 
 .docker-build:
   image: docker:27.5.1
@@ -35,62 +108,281 @@ variables:
         docker tag "$IMAGE_NAMESPACE/$IMAGE_NAME:$IMAGE_TAG" "$IMAGE_NAMESPACE/$IMAGE_NAME:latest"
         docker push "$IMAGE_NAMESPACE/$IMAGE_NAME:latest"
       fi
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
 
-build:java-images:
+.java-docker-build:
   extends: .docker-build
   stage: build
-  parallel:
-    matrix:
-      - SERVICE_NAME:
-          - api-gateway
-          - discovery-server
-          - config-server
-          - identity-service
-          - user-service
-          - product-service
-          - order-service
-          - inventory-service
-          - payment-service
-          - shipping-service
-          - notification-service
-          - chat-service
-          - storage-service
-          - news-service
-          - audit-service
   variables:
     CONTEXT: .
 
-build:node-python-images:
+build:api-gateway:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: api-gateway
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - api-gateway/**/*
+
+build:discovery-server:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: discovery-server
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - discovery-server/**/*
+
+build:config-server:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: config-server
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - config-server/**/*
+
+build:identity-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: identity-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - identity-service/**/*
+
+build:user-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: user-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - user-service/**/*
+
+build:product-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: product-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - product-service/**/*
+
+build:order-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: order-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - order-service/**/*
+
+build:inventory-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: inventory-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - inventory-service/**/*
+
+build:payment-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: payment-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - payment-service/**/*
+
+build:shipping-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: shipping-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - shipping-service/**/*
+
+build:notification-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: notification-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - notification-service/**/*
+
+build:chat-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: chat-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - chat-service/**/*
+
+build:storage-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: storage-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - storage-service/**/*
+
+build:news-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: news-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - news-service/**/*
+
+build:audit-service:
+  extends: .java-docker-build
+  variables:
+    SERVICE_NAME: audit-service
+    CONTEXT: .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - Dockerfile
+        - pom.xml
+        - audit-service/**/*
+
+build:promotion-service:
   extends: .docker-build
   stage: build
-  parallel:
-    matrix:
-      - IMAGE_NAME: promotion-service
-        CONTEXT: promotion-service
-        DOCKERFILE: Dockerfile
-      - IMAGE_NAME: agent-service
-        CONTEXT: python-services/agent-service
-        DOCKERFILE: Dockerfile
-      - IMAGE_NAME: mcp-server
-        CONTEXT: python-services/mcp-server
-        DOCKERFILE: Dockerfile
-      - IMAGE_NAME: recommendation-service
-        CONTEXT: python-services/recommendation-service
-        DOCKERFILE: Dockerfile
+  variables:
+    IMAGE_NAME: promotion-service
+    CONTEXT: promotion-service
+    DOCKERFILE: Dockerfile
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - promotion-service/**/*
+
+build:agent-service:
+  extends: .docker-build
+  stage: build
+  variables:
+    IMAGE_NAME: agent-service
+    CONTEXT: python-services/agent-service
+    DOCKERFILE: Dockerfile
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - python-services/agent-service/**/*
+
+build:mcp-server:
+  extends: .docker-build
+  stage: build
+  variables:
+    IMAGE_NAME: mcp-server
+    CONTEXT: python-services/mcp-server
+    DOCKERFILE: Dockerfile
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - python-services/mcp-server/**/*
+
+build:recommendation-service:
+  extends: .docker-build
+  stage: build
+  variables:
+    IMAGE_NAME: recommendation-service
+    CONTEXT: python-services/recommendation-service
+    DOCKERFILE: Dockerfile
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+      changes:
+        - .gitlab-ci.yml
+        - python-services/recommendation-service/**/*
 
 trigger:infra-deploy:
   stage: deploy
   image: curlimages/curl:8.10.1
+  dependencies:
+    - detect:changed-services
   script:
+    - 'CHANGED_SERVICES="$(sed -n "s/^CHANGED_SERVICES=//p" changed-services.env)"'
+    - |
+      if [ -z "${CHANGED_SERVICES:-}" ]; then
+        echo "No service image changes detected; skipping infra trigger."
+        exit 0
+      fi
     - 'echo "Triggering infra pipeline with backend image tag: $CI_COMMIT_SHORT_SHA"'
+    - 'echo "Changed services: $CHANGED_SERVICES"'
     - >-
       curl --fail --request POST
       --form "token=$CI_JOB_TOKEN"
       --form "ref=main"
       --form "inputs[backend_image_tag]=$CI_COMMIT_SHORT_SHA"
       --form "inputs[image_tag]=$CI_COMMIT_SHORT_SHA"
+      --form "inputs[changed_services]=$CHANGED_SERVICES"
       "$CI_API_V4_URL/projects/software-architecture264301%2Fnexatech-infra/trigger/pipeline"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'

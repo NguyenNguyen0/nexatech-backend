@@ -32,6 +32,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ResponseInterceptor());
 
   const port = process.env.PORT ?? 8093;
+  app.enableShutdownHooks();
   await app.listen(port, '0.0.0.0');
 
   console.log(`Promotion Service is running on port ${port}`);

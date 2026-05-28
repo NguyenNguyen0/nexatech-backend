@@ -83,7 +83,7 @@ spring:
               predicates:
                 - Path=/api/v1/news,/api/v1/news/**
             - id: promotion-service
-              uri: ${PROMOTION_SERVICE_URI:http://localhost:8093}
+              uri: ${PROMOTION_SERVICE_URI:lb://promotion-service}
               predicates:
                 - Path=/api/v1/promotions,/api/v1/promotions/**,/api/v1/flash-sales,/api/v1/flash-sales/**,/api/v1/admin/promotions,/api/v1/admin/promotions/**,/api/v1/admin/flash-sales,/api/v1/admin/flash-sales/**,/api/v1/internal/promotions,/api/v1/internal/promotions/**
             - id: audit-service

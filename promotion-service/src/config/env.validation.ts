@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsIn, IsInt, IsString, Max, Min, validateSync } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
 
 class EnvironmentVariables {
   @IsIn(['development', 'production', 'test'])
@@ -30,6 +30,30 @@ class EnvironmentVariables {
   @IsInt()
   @Min(30)
   RESERVATION_TTL_SECONDS: number;
+
+  @IsOptional()
+  @IsString()
+  SERVICE_NAME?: string;
+
+  @IsOptional()
+  @IsString()
+  EUREKA_ENABLED?: string;
+
+  @IsOptional()
+  @IsString()
+  EUREKA_SERVER_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  EUREKA_INSTANCE_HOSTNAME?: string;
+
+  @IsOptional()
+  @IsString()
+  EUREKA_INSTANCE_IP_ADDRESS?: string;
+
+  @IsOptional()
+  @IsString()
+  EUREKA_INSTANCE_PORT?: string;
 }
 
 export function validate(config: Record<string, unknown>) {
