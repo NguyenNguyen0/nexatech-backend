@@ -54,7 +54,15 @@ public class PaymentController {
         }
 
         // --- Xử lý nghiệp vụ ---
-        PaymentResponse response = paymentService.createPayment(customerId, request);
+        PaymentResponse response;
+        try {
+            response = paymentService.createPayment(customerId, request);
+        } catch (RuntimeException ex) {
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                idempotencyService.markFailed(idempotencyKey);
+            }
+            throw ex;
+        }
 
         // --- Lưu response vào idempotency cache ---
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {

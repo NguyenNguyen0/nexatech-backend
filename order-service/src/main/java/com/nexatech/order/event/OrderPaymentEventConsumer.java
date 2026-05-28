@@ -67,11 +67,31 @@ public class OrderPaymentEventConsumer {
         try {
             switch (event.getEventType() != null ? event.getEventType() : "") {
                 case "PAYMENT_COMPLETED" -> {
+                    if (orderService.hasStatus(event.getOrderId(), OrderStatus.CANCELLED)) {
+                        log.warn("Late PAYMENT_COMPLETED ignored because order is already CANCELLED: orderId={}",
+                                event.getOrderId());
+                        auditLogService.logEvent("PAYMENT_COMPLETED_LATE_IGNORED", "Order",
+                                event.getOrderId().toString(),
+                                Map.of("orderId", event.getOrderId().toString(),
+                                        "currentStatus", "CANCELLED",
+                                        "triggeredBy", "kafka:payment.events"),
+                                CONSUMER_NAME);
+                        break;
+                    }
                     orderService.updateOrderStatus(event.getOrderId(), OrderStatus.CONFIRMED);
                     auditLogService.logEvent("PAYMENT_COMPLETED_RECEIVED", "Order",
                             event.getOrderId().toString(),
                             Map.of("orderId", event.getOrderId().toString(),
                                     "newStatus", "CONFIRMED",
+                                    "triggeredBy", "kafka:payment.events"),
+                            CONSUMER_NAME);
+                }
+                case "PAYMENT_FAILED" -> {
+                    orderService.cancelOrderForSaga(event.getOrderId(), "payment_failed", CONSUMER_NAME);
+                    auditLogService.logEvent("PAYMENT_FAILED_RECEIVED", "Order",
+                            event.getOrderId().toString(),
+                            Map.of("orderId", event.getOrderId().toString(),
+                                    "newStatus", "CANCELLED",
                                     "triggeredBy", "kafka:payment.events"),
                             CONSUMER_NAME);
                 }

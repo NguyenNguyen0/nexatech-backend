@@ -21,7 +21,7 @@ public class PaymentClientFallback implements PaymentClient {
     }
 
     @Override
-    public VNPayInfo createVNPayPayment(UUID customerId, VNPayCreateDto request) {
+    public VNPayInfo createVNPayPayment(UUID customerId, String idempotencyKey, VNPayCreateDto request) {
         log.warn("Fallback: payment-service createVNPay không khả dụng, orderId={}", request.getOrderId());
         return null;
     }

@@ -12,4 +12,6 @@ import java.util.UUID;
 public interface StockMovementRepository extends JpaRepository<StockMovement, UUID> {
 
     Page<StockMovement> findByProductId(String productId, Pageable pageable);
+
+    boolean existsByProductIdAndTypeAndReference(String productId, StockMovement.MovementType type, String reference);
 }
