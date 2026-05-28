@@ -86,6 +86,8 @@ spring:
               uri: ${PROMOTION_SERVICE_URI:lb://promotion-service}
               predicates:
                 - Path=/api/v1/promotions,/api/v1/promotions/**,/api/v1/flash-sales,/api/v1/flash-sales/**,/api/v1/admin/promotions,/api/v1/admin/promotions/**,/api/v1/admin/flash-sales,/api/v1/admin/flash-sales/**,/api/v1/internal/promotions,/api/v1/internal/promotions/**
+              filters:
+                - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
             - id: audit-service
               uri: lb://audit-service
               predicates:

@@ -72,3 +72,4 @@ promotion-service/pnpm-debug.log*
 promotion-service/.env
 promotion-service/.env.*
 !promotion-service/.env.example
+_scripts/last-selected-build.env
