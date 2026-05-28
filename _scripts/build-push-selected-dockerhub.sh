@@ -34,6 +34,7 @@ EXTRA_IMAGES=(
 SELECTED_SERVICES=()
 OUTPUT_FILE="${OUTPUT_FILE:-$SCRIPT_DIR/last-selected-build.env}"
 DOCKER_BUILD_PARALLELISM="${DOCKER_BUILD_PARALLELISM:-2}"
+DOCKER_BUILD_NO_CACHE="${DOCKER_BUILD_NO_CACHE:-false}"
 
 usage() {
   cat <<'USAGE'
@@ -51,6 +52,7 @@ Optional environment variables:
   DOCKER_BUILD_PUSH_SKIP_LOGIN=true  Skip docker login.
   DOCKER_BUILDKIT             Override builder mode. Auto-detected when omitted.
   DOCKER_BUILD_PARALLELISM    Number of images to build/push in parallel. Defaults to 2.
+  DOCKER_BUILD_NO_CACHE       Set to true to pass --no-cache to docker build.
   OUTPUT_FILE                 Where to write IMAGE_TAG and DEPLOY_SERVICES.
 
 Output:
@@ -165,14 +167,19 @@ build_and_push() {
   local dockerfile="$4"
   local dockerfile_path="$context/$dockerfile"
   local image_ref="$IMAGE_NAMESPACE/$image_name:$IMAGE_TAG"
+  local build_args=(--pull)
 
   if [ ! -f "$dockerfile_path" ]; then
     echo "Dockerfile not found: $dockerfile_path" >&2
     exit 1
   fi
 
+  if [ "$DOCKER_BUILD_NO_CACHE" = "true" ]; then
+    build_args+=(--no-cache)
+  fi
+
   echo "[$index/$TOTAL_IMAGES] Building $image_ref"
-  docker build --pull -f "$dockerfile_path" -t "$image_ref" "$context"
+  docker build "${build_args[@]}" -f "$dockerfile_path" -t "$image_ref" "$context"
 
   echo "[$index/$TOTAL_IMAGES] Pushing $image_ref"
   docker push "$image_ref"
@@ -222,6 +229,10 @@ while [ "$#" -gt 0 ]; do
         exit 1
       fi
       shift 2
+      ;;
+    --no-cache)
+      DOCKER_BUILD_NO_CACHE=true
+      shift
       ;;
     -*)
       echo "Unknown option: $1" >&2
