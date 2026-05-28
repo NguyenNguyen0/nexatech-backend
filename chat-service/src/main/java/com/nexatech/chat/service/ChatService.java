@@ -54,7 +54,7 @@ public class ChatService {
 
     public Page<ConversationResponse> getConversations(UUID userId, String userRole, Pageable pageable) {
         requireUserId(userId);
-        Page<ChatConversation> page = isAdmin(userRole)
+        Page<ChatConversation> page = canAccessAdminInbox(userRole)
                 ? conversationRepository.findAll(pageable)
                 : conversationRepository.findByParticipant(userId, pageable);
         return page.map(conversation -> toConversationResponse(conversation, userId, null, userRole));
@@ -326,7 +326,7 @@ public class ChatService {
 
     private long resolveUnreadCount(ChatConversation conversation, UUID userId, String guestSessionId, String userRole) {
         UUID actorId = resolveActorIdOrNull(userId, guestSessionId);
-        if (actorId == null && isAdmin(userRole)) {
+        if (actorId == null && canAccessAdminInbox(userRole)) {
             return 0;
         }
         if (actorId == null) {
@@ -387,7 +387,7 @@ public class ChatService {
         ChatConversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
-        if (!isAdmin(userRole) && !isParticipant(conversation, userId, guestSessionId)) {
+        if (!canAccessAdminInbox(userRole) && !isParticipant(conversation, userId, guestSessionId)) {
             throw new ForbiddenException("User is not part of the conversation");
         }
 
@@ -402,7 +402,7 @@ public class ChatService {
     }
 
     private UUID resolveOtherUserId(ChatConversation conversation, UUID userId, String guestSessionId, String userRole) {
-        if (isAdmin(userRole)) {
+        if (canAccessAdminInbox(userRole)) {
             if (conversation.getConversationType() == ConversationType.GUEST) {
                 return guestParticipantId(conversation.getGuestSessionId());
             }
@@ -424,7 +424,7 @@ public class ChatService {
     }
 
     private UUID resolveRecipient(ChatConversation conversation, UUID userId, String guestSessionId, String userRole) {
-        if (isAdmin(userRole)) {
+        if (canAccessAdminInbox(userRole)) {
             if (conversation.getConversationType() == ConversationType.GUEST) {
                 return guestParticipantId(conversation.getGuestSessionId());
             }
@@ -550,7 +550,7 @@ public class ChatService {
     }
 
     private void ensureRecipient(UUID actorId, ChatMessage message, String userRole) {
-        if (isAdmin(userRole)) {
+        if (canAccessAdminInbox(userRole)) {
             return;
         }
         if (actorId == null || !actorId.equals(message.getRecipientId())) {
@@ -560,6 +560,16 @@ public class ChatService {
 
     private boolean isAdmin(String userRole) {
         return userRole != null && userRole.trim().equalsIgnoreCase("ADMIN");
+    }
+
+    private boolean canAccessAdminInbox(String userRole) {
+        if (userRole == null || userRole.isBlank()) {
+            return false;
+        }
+        String normalizedRole = userRole.trim().toUpperCase(java.util.Locale.ROOT);
+        return normalizedRole.equals("ADMIN")
+                || normalizedRole.equals("MANAGER")
+                || normalizedRole.equals("STAFF");
     }
 
     private int normalizeSize(Integer size) {

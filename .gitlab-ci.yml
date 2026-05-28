@@ -1,6 +1,6 @@
 workflow:
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
       when: always
     - when: never
 
@@ -36,7 +36,7 @@ variables:
         docker push "$IMAGE_NAMESPACE/$IMAGE_NAME:latest"
       fi
   rules:
-    - if: '($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev") && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
+    - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
 
 build:java-images:
   extends: .docker-build
@@ -93,4 +93,4 @@ trigger:infra-deploy:
       --form "inputs[image_tag]=$CI_COMMIT_SHORT_SHA"
       "$CI_API_V4_URL/projects/software-architecture264301%2Fnexatech-infra/trigger/pipeline"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "dev"'
+    - if: '$CI_COMMIT_BRANCH == "main"'

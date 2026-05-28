@@ -21,44 +21,44 @@ spring:
             - id: identity-auth
               uri: ${IDENTITY_SERVICE_URI:lb://identity-service}
               predicates:
-                - Path=/api/v1/auth/**
+                - Path=/api/v1/auth,/api/v1/auth/**
               filters:
                 - StripPrefix=2
             # User service — /users, /groups, /roles, /permissions
             - id: user-service
               uri: lb://user-service
               predicates:
-                - Path=/api/v1/users/**,/api/v1/groups/**,/api/v1/roles/**,/api/v1/permissions/**
+                - Path=/api/v1/users,/api/v1/users/**,/api/v1/groups,/api/v1/groups/**,/api/v1/roles,/api/v1/roles/**,/api/v1/permissions,/api/v1/permissions/**
               filters:
                 - StripPrefix=2
             - id: product-service
               uri: lb://product-service
               predicates:
-                - Path=/api/v1/products/**,/api/v1/categories/**,/api/v1/brands/**,/api/v1/reviews/**
+                - Path=/api/v1/products,/api/v1/products/**,/api/v1/categories,/api/v1/categories/**,/api/v1/brands,/api/v1/brands/**,/api/v1/reviews,/api/v1/reviews/**
             - id: order-service
               uri: lb://order-service
               predicates:
-                - Path=/api/v1/orders/**,/api/v1/admin/orders/**,/api/v1/returns/**,/api/v1/checkout/**,/api/v1/cart/**,/api/v1/admin/audit/orders/**
+                - Path=/api/v1/orders,/api/v1/orders/**,/api/v1/admin/orders,/api/v1/admin/orders/**,/api/v1/returns,/api/v1/returns/**,/api/v1/checkout,/api/v1/checkout/**,/api/v1/cart,/api/v1/cart/**,/api/v1/admin/audit/orders,/api/v1/admin/audit/orders/**
             - id: inventory-service
               uri: lb://inventory-service
               predicates:
-                - Path=/api/v1/inventory/**
+                - Path=/api/v1/inventory,/api/v1/inventory/**
             - id: payment-service
               uri: lb://payment-service
               predicates:
-                - Path=/api/v1/payments/**,/api/v1/admin/payments/**,/api/v1/admin/audit/payments/**
+                - Path=/api/v1/payments,/api/v1/payments/**,/api/v1/admin/payments,/api/v1/admin/payments/**,/api/v1/admin/audit/payments,/api/v1/admin/audit/payments/**
             - id: shipping-service
               uri: lb://shipping-service
               predicates:
-                - Path=/api/v1/shipping/**
+                - Path=/api/v1/shipping,/api/v1/shipping/**
             - id: notification-service
               uri: lb://notification-service
               predicates:
-                - Path=/api/v1/notifications/**,/api/v1/admin/notifications/**
+                - Path=/api/v1/notifications,/api/v1/notifications/**,/api/v1/admin/notifications,/api/v1/admin/notifications/**
             - id: chat-service
               uri: ${CHAT_SERVICE_URI:lb://chat-service}
               predicates:
-                - Path=/api/v1/conversations/**
+                - Path=/api/v1/conversations,/api/v1/conversations/**
             - id: chat-service-websocket
               uri: ${CHAT_SERVICE_WS_URI:lb://chat-service}
               predicates:
@@ -77,15 +77,15 @@ spring:
             - id: storage-service
               uri: lb://storage-service
               predicates:
-                - Path=/api/v1/files/**
+                - Path=/api/v1/files,/api/v1/files/**
             - id: news-service
               uri: lb://news-service
               predicates:
-                - Path=/api/v1/news/**
+                - Path=/api/v1/news,/api/v1/news/**
             - id: promotion-service
               uri: ${PROMOTION_SERVICE_URI:http://localhost:8093}
               predicates:
-                - Path=/api/v1/promotions/**,/api/v1/flash-sales/**,/api/v1/admin/promotions/**,/api/v1/admin/flash-sales/**,/api/v1/internal/promotions/**
+                - Path=/api/v1/promotions,/api/v1/promotions/**,/api/v1/flash-sales,/api/v1/flash-sales/**,/api/v1/admin/promotions,/api/v1/admin/promotions/**,/api/v1/admin/flash-sales,/api/v1/admin/flash-sales/**,/api/v1/internal/promotions,/api/v1/internal/promotions/**
             - id: audit-service
               uri: lb://audit-service
               predicates:
@@ -93,26 +93,26 @@ spring:
               filters:
                 - StripPrefix=3
             - id: agent-service
-              uri: lb://agent-service
+              uri: ${AGENT_SERVICE_URI:lb://agent-service}
               predicates:
-                - Path=/api/v1/agent/**
+                - Path=/api/v1/agent,/api/v1/agent/**
               filters:
                 - StripPrefix=3
             - id: mcp-server
               uri: lb://mcp-server
               predicates:
-                - Path=/api/v1/mcp/**
+                - Path=/api/v1/mcp,/api/v1/mcp/**
               filters:
                 - StripPrefix=3
             - id: recommendation-service
               uri: lb://recommendation-service
               predicates:
-                - Path=/api/v1/recommend/**
+                - Path=/api/v1/recommend,/api/v1/recommend/**
               filters:
                 - StripPrefix=2
             - id: recommendation-behavior-ingestion
               uri: lb://recommendation-service
               predicates:
-                - Path=/api/v1/behaviors/**
+                - Path=/api/v1/behaviors,/api/v1/behaviors/**
               filters:
                 - StripPrefix=2

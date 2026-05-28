@@ -149,7 +149,7 @@ public class OrderEventConsumer {
             shippingService.createShipment(shipmentRequest);
         } catch (Exception ex) {
             log.error("Tạo shipment thất bại cho orderId={}: {} ({})", event.getOrderId(), ex.getMessage(), ex.getClass().getSimpleName(), ex);
-            // Không ném lại exception để Kafka consumer tiếp tục xử lý message tiếp theo
+            throw ex;
         }
     }
 }

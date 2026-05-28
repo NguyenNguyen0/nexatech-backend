@@ -6,9 +6,12 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:${REDIS_HOST:localhost}}
       port: ${SPRING_DATA_REDIS_PORT:${REDIS_PORT:6379}}
+      username: ${SPRING_DATA_REDIS_USERNAME:${REDIS_USERNAME:}}
       password: ${SPRING_DATA_REDIS_PASSWORD:${REDIS_PASSWORD:}}
+      ssl:
+        enabled: ${SPRING_DATA_REDIS_SSL_ENABLED:${REDIS_SSL_ENABLED:false}}
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5440/news_nexatech}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/nexatech_news}
     username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:admin}}
     password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:admin}}
     driver-class-name: org.postgresql.Driver

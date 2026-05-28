@@ -101,6 +101,12 @@ switch ($ServiceName) {
         npm run start:dev
         exit $LASTEXITCODE
     }
+    "recommendation-service" {
+        Import-DotEnvFile -Path (Join-Path $PSScriptRoot "python-services/recommendation-service/.env.ec2") -Required
+        Set-Location (Join-Path $PSScriptRoot "python-services/recommendation-service")
+        uv run main.py
+        exit $LASTEXITCODE
+    }
     "promotion-migrate" {
         $env:DATABASE_URL = "postgresql://$($env:DB_USERNAME):$($env:DB_PASSWORD)@$($env:EC2_HOST):5432/nexatech_promotions"
         Set-Location (Join-Path $PSScriptRoot "promotion-service")
