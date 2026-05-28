@@ -14,10 +14,10 @@ MVN = mvn
 .PHONY: help build clean compile dev-up dev-down full-up full-down infra-reset logs-infra logs-full prune \
 	core-up core-down core-build core-logs \
 	run-discovery run-config run-gateway \
-	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-audit run-storage run-promotion \
+	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-audit run-storage run-promotion run-recommendation \
 	run-gateway-test run-chat-test \
 	run-gateway-ec2 run-identity-ec2 run-user-ec2 run-product-ec2 run-inventory-ec2 \
-	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-audit-ec2 run-storage-ec2 run-news-ec2 run-promotion-ec2 \
+	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-audit-ec2 run-storage-ec2 run-news-ec2 run-promotion-ec2 run-recommendation-ec2 \
 	run-all-terminals run-all-ec2-terminals run-store-ec2-terminals run-chat-ec2-terminals run-order-ec2-terminals
 
 help:
@@ -51,6 +51,7 @@ help:
 	@echo "  make run-audit          - Run audit-service"
 	@echo "  make run-storage        - Run storage-service"
 	@echo "  make run-promotion      - Run promotion-service (Node.js, requires .env in promotion-service/)"
+	@echo "  make run-recommendation - Run recommendation-service (Python/FastAPI)"
 	@echo ""
 	@echo "Run with EC2 infra (loads .env.ec2):"
 	@echo "  make run-gateway-test    - Alias for run-gateway-ec2 (client REST uses this)"
@@ -69,6 +70,7 @@ help:
 	@echo "  make run-audit-ec2        - Run audit-service (EC2 infra)"
 	@echo "  make run-news-ec2         - Run news-service (EC2 infra)"
 	@echo "  make run-promotion-ec2    - Run promotion-service (EC2 infra, Node.js)"
+	@echo "  make run-recommendation-ec2 - Run recommendation-service (EC2 infra, Python/FastAPI)"
 
 	@echo ""
 	@echo "Open services in separate PowerShell terminals:"
@@ -169,6 +171,9 @@ run-storage:
 run-promotion:
 	powershell -NoProfile -Command "Set-Location promotion-service; npm run start:dev"
 
+run-recommendation:
+	powershell -NoProfile -Command "Set-Location python-services/recommendation-service; uv run main.py"
+
 # --- Chat test via local app + EC2 infra ---
 # Use these when the frontend points REST to localhost:8080 and infra/Eureka lives on EC2.
 run-gateway-test: run-gateway-ec2
@@ -217,6 +222,9 @@ run-news-ec2:
 
 run-promotion-ec2:
 	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 promotion-service
+
+run-recommendation-ec2:
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 recommendation-service
 
 migrate-promotion-ec2:
 	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 promotion-migrate
