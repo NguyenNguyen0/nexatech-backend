@@ -7,32 +7,20 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
-function corsOrigins() {
-  const configured = process.env.PROMOTION_CORS_ALLOWED_ORIGIN_PATTERNS ?? '';
-  const origins = configured
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
-  return [
-    /^http:\/\/localhost:\d+$/,
-    /^http:\/\/127\.0\.0\.1:\d+$/,
-    ...origins,
-  ];
-}
-
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
   );
 
-  app.enableCors({
-    origin: corsOrigins(),
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    credentials: true,
-  });
+  if (process.env.NODE_ENV !== 'production') {
+    app.enableCors({
+      origin: [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/],
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      credentials: true,
+    });
+  }
 
   app.useGlobalPipes(
     new ValidationPipe({
