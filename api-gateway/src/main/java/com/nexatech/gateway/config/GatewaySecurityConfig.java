@@ -2,8 +2,6 @@ package com.nexatech.gateway.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -17,64 +15,29 @@ import org.springframework.security.web.SecurityFilterChain;
 public class GatewaySecurityConfig {
 
     @Bean
-    @Order(Ordered.HIGHEST_PRECEDENCE)
-    public SecurityFilterChain publicRoutes(HttpSecurity http) throws Exception {
-        stateless(http);
-        http.securityMatcher("/actuator/**", "/api/v1/auth", "/api/v1/auth/**", "/ws/chat", "/ws/chat/**")
-                .authorizeHttpRequests(a -> a.anyRequest().permitAll());
-        return http.build();
-    }
-
-    @Bean
-    @Order(Ordered.HIGHEST_PRECEDENCE + 1)
-    public SecurityFilterChain publicRecommendationRoutes(HttpSecurity http) throws Exception {
-        stateless(http);
-        http.securityMatcher(
-                        "/api/v1/recommend",
-                        "/api/v1/recommend/health",
-                        "/api/v1/recommend/popular",
-                        "/api/v1/recommend/popular/**",
-                        "/api/v1/recommend/similar/**")
-                .authorizeHttpRequests(a -> a.anyRequest().permitAll());
-        return http.build();
-    }
-
-    @Bean
-    @Order(Ordered.HIGHEST_PRECEDENCE + 2)
-    public SecurityFilterChain publicCatalogRoutes(HttpSecurity http) throws Exception {
-        stateless(http);
-        http.securityMatcher(
-                        "/api/v1/products",
-                        "/api/v1/products/**",
-                        "/api/v1/categories",
-                        "/api/v1/categories/**",
-                        "/api/v1/brands",
-                        "/api/v1/brands/**",
-                        "/api/v1/reviews",
-                        "/api/v1/reviews/**")
-                .authorizeHttpRequests(a -> a
-                        .requestMatchers("/api/v1/products/wishlist/**").authenticated()
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/v1/products",
-                                "/api/v1/products/**",
-                                "/api/v1/categories",
-                                "/api/v1/categories/**",
-                                "/api/v1/brands",
-                                "/api/v1/brands/**",
-                                "/api/v1/reviews",
-                                "/api/v1/reviews/**")
-                        .permitAll()
-                        .anyRequest().authenticated())
-                .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
-        return http.build();
-    }
-
-    @Bean
-    @Order(Ordered.LOWEST_PRECEDENCE)
-    public SecurityFilterChain jwtRoutes(HttpSecurity http) throws Exception {
+    public SecurityFilterChain gatewayRoutes(HttpSecurity http) throws Exception {
         stateless(http);
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/actuator/**", "/api/v1/auth", "/api/v1/auth/**", "/ws/chat", "/ws/chat/**")
+                .permitAll()
+                .requestMatchers("/api/v1/products/wishlist/**").authenticated()
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/products",
+                    "/api/v1/products/**",
+                    "/api/v1/categories",
+                    "/api/v1/categories/**",
+                    "/api/v1/brands",
+                    "/api/v1/brands/**",
+                    "/api/v1/reviews",
+                    "/api/v1/reviews/**",
+                    "/api/v1/recommend",
+                    "/api/v1/recommend/**",
+                    "/api/v1/news",
+                    "/api/v1/news/**",
+                    "/api/v1/conversations",
+                    "/api/v1/conversations/**")
+                .permitAll()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/promotions",
                     "/api/v1/promotions/**",
@@ -93,8 +56,6 @@ public class GatewaySecurityConfig {
                 .permitAll()
                 // Guest order status polling after checkout
                 .requestMatchers(HttpMethod.GET, "/api/v1/orders/*").permitAll()
-                .requestMatchers("/api/v1/news", "/api/v1/news/**").permitAll()
-                .requestMatchers("/api/v1/conversations", "/api/v1/conversations/**").permitAll()
                 .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
         return http.build();

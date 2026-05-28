@@ -93,7 +93,7 @@ spring:
               filters:
                 - StripPrefix=3
             - id: agent-service
-              uri: lb://agent-service
+              uri: ${AGENT_SERVICE_URI:lb://agent-service}
               predicates:
                 - Path=/api/v1/agent,/api/v1/agent/**
               filters:
