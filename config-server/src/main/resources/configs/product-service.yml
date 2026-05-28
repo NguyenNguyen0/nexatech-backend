@@ -2,9 +2,20 @@ server:
   port: 8090
 
 spring:
+  cache:
+    type: redis
   data:
     mongodb:
       uri: ${MONGO_PRODUCT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_products?authSource=admin&authMechanism=SCRAM-SHA-256}
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:${REDIS_HOST:localhost}}
+      port: ${SPRING_DATA_REDIS_PORT:${REDIS_PORT:6379}}
+      username: ${SPRING_DATA_REDIS_USERNAME:${REDIS_USERNAME:}}
+      password: ${SPRING_DATA_REDIS_PASSWORD:${REDIS_PASSWORD:}}
+      ssl:
+        enabled: ${SPRING_DATA_REDIS_SSL_ENABLED:${REDIS_SSL_ENABLED:false}}
+      timeout: ${SPRING_DATA_REDIS_TIMEOUT:500ms}
+      connect-timeout: ${SPRING_DATA_REDIS_CONNECT_TIMEOUT:500ms}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:

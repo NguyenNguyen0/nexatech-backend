@@ -20,7 +20,7 @@ public class GatewaySecurityConfig {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public SecurityFilterChain publicRoutes(HttpSecurity http) throws Exception {
         stateless(http);
-        http.securityMatcher("/actuator/**", "/api/v1/auth/**", "/ws/chat", "/ws/chat/**")
+        http.securityMatcher("/actuator/**", "/api/v1/auth", "/api/v1/auth/**", "/ws/chat", "/ws/chat/**")
                 .authorizeHttpRequests(a -> a.anyRequest().permitAll());
         return http.build();
     }
@@ -30,6 +30,7 @@ public class GatewaySecurityConfig {
     public SecurityFilterChain publicRecommendationRoutes(HttpSecurity http) throws Exception {
         stateless(http);
         http.securityMatcher(
+                        "/api/v1/recommend",
                         "/api/v1/recommend/health",
                         "/api/v1/recommend/popular",
                         "/api/v1/recommend/popular/**",
@@ -43,16 +44,24 @@ public class GatewaySecurityConfig {
     public SecurityFilterChain publicCatalogRoutes(HttpSecurity http) throws Exception {
         stateless(http);
         http.securityMatcher(
+                        "/api/v1/products",
                         "/api/v1/products/**",
+                        "/api/v1/categories",
                         "/api/v1/categories/**",
+                        "/api/v1/brands",
                         "/api/v1/brands/**",
+                        "/api/v1/reviews",
                         "/api/v1/reviews/**")
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/api/v1/products/wishlist/**").authenticated()
                         .requestMatchers(HttpMethod.GET,
+                                "/api/v1/products",
                                 "/api/v1/products/**",
+                                "/api/v1/categories",
                                 "/api/v1/categories/**",
+                                "/api/v1/brands",
                                 "/api/v1/brands/**",
+                                "/api/v1/reviews",
                                 "/api/v1/reviews/**")
                         .permitAll()
                         .anyRequest().authenticated())
@@ -67,7 +76,9 @@ public class GatewaySecurityConfig {
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.GET,
+                    "/api/v1/promotions",
                     "/api/v1/promotions/**",
+                    "/api/v1/flash-sales",
                     "/api/v1/flash-sales/**")
                 .permitAll()
                 .requestMatchers(HttpMethod.GET,
@@ -82,8 +93,8 @@ public class GatewaySecurityConfig {
                 .permitAll()
                 // Guest order status polling after checkout
                 .requestMatchers(HttpMethod.GET, "/api/v1/orders/*").permitAll()
-                .requestMatchers("/api/v1/news/**").permitAll()
-                .requestMatchers("/api/v1/conversations/**").permitAll()
+                .requestMatchers("/api/v1/news", "/api/v1/news/**").permitAll()
+                .requestMatchers("/api/v1/conversations", "/api/v1/conversations/**").permitAll()
                 .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
         return http.build();
