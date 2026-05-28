@@ -20,8 +20,12 @@ spring:
       uri: ${MONGO_CHAT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_chats?authSource=admin&authMechanism=SCRAM-SHA-256}
       uuid-representation: standard
     redis:
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
-      port: ${SPRING_DATA_REDIS_PORT:6379}
+      host: ${SPRING_DATA_REDIS_HOST:${REDIS_HOST:localhost}}
+      port: ${SPRING_DATA_REDIS_PORT:${REDIS_PORT:6379}}
+      username: ${SPRING_DATA_REDIS_USERNAME:${REDIS_USERNAME:}}
+      password: ${SPRING_DATA_REDIS_PASSWORD:${REDIS_PASSWORD:}}
+      ssl:
+        enabled: ${SPRING_DATA_REDIS_SSL_ENABLED:${REDIS_SSL_ENABLED:false}}
 
 app:
   presence-ttl-seconds: 90
