@@ -2,6 +2,7 @@ package com.nexatech.identity.config.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -35,14 +36,38 @@ public class SecurityConfig {
         private final SessionRevocationFilter sessionRevocationFilter;
 
         @Bean
-        public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
+        @Order(1)
+        public SecurityFilterChain publicFilterChain(HttpSecurity httpSecurity) throws Exception {
+                httpSecurity
+                                .securityMatcher(PUBLIC_ENDPOINTS)
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authorizeHttpRequests(request -> request.anyRequest().permitAll())
+                                .csrf(AbstractHttpConfigurer::disable);
+
+                return httpSecurity.build();
+        }
+
+        @Bean
+        @Order(2)
+        public SecurityFilterChain internalFilterChain(HttpSecurity httpSecurity) throws Exception {
+                httpSecurity
+                                .securityMatcher("/internal/**")
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authorizeHttpRequests(request -> request.anyRequest().permitAll())
+                                .csrf(AbstractHttpConfigurer::disable);
+
+                return httpSecurity.build();
+        }
+
+        @Bean
+        @Order(3)
+        public SecurityFilterChain protectedFilterChain(HttpSecurity httpSecurity) throws Exception {
                 httpSecurity
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .anonymous(AbstractHttpConfigurer::disable)
                                 .authorizeHttpRequests(request -> request
-                                                .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                                                .requestMatchers("/internal/**").permitAll()
                                                 .anyRequest().authenticated())
                                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(
                                                 jwtConfigurer -> jwtConfigurer
