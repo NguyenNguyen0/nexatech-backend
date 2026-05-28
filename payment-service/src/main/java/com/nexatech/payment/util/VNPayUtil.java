@@ -34,6 +34,9 @@ public class VNPayUtil {
      * @return chuỗi hex lowercase 128 ký tự
      */
     public static String hmacSha512(String key, String data) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalStateException("Missing VNPay hash secret. Set VNPAY_HASH_SECRET before starting payment-service.");
+        }
         try {
             SecretKeySpec keySpec = new SecretKeySpec(
                     key.getBytes(StandardCharsets.UTF_8), "HmacSHA512");
@@ -59,8 +62,7 @@ public class VNPayUtil {
         return params.entrySet().stream()
                 .filter(e -> e.getValue() != null && !e.getValue().isEmpty())
                 .sorted(Map.Entry.comparingByKey())
-                .map(e -> e.getKey() + "=" +
-                        URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .map(e -> urlEncode(e.getKey()) + "=" + urlEncode(e.getValue()))
                 .collect(Collectors.joining("&"));
     }
 
@@ -71,9 +73,12 @@ public class VNPayUtil {
     public static String buildQueryString(Map<String, String> params) {
         return params.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
-                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8)
-                        + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .map(e -> urlEncode(e.getKey()) + "=" + urlEncode(e.getValue()))
                 .collect(Collectors.joining("&"));
+    }
+
+    private static String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.US_ASCII);
     }
 
     /** Lấy thời điểm hiện tại theo giờ Việt Nam, định dạng yyyyMMddHHmmss. */
