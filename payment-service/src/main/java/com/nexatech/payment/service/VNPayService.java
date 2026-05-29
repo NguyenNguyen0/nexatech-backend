@@ -6,7 +6,6 @@ import com.nexatech.payment.dto.VNPayResponse;
 import com.nexatech.payment.enums.PaymentMethod;
 import com.nexatech.payment.enums.PaymentStatus;
 import com.nexatech.payment.event.PaymentEvent;
-import com.nexatech.payment.event.PaymentEventProducer;
 import com.nexatech.payment.exception.BadRequestException;
 import com.nexatech.payment.model.Payment;
 import com.nexatech.payment.repository.PaymentRepository;
@@ -15,8 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -34,7 +31,6 @@ public class VNPayService {
     private final OutboxEventService outboxEventService;
     private final AuditLogService auditLogService;
     private final SnapshotService snapshotService;
-    private final PaymentEventProducer paymentEventProducer;
 
     /**
      * Tạo URL thanh toán VNPay và lưu giao dịch với trạng thái PENDING.
@@ -60,13 +56,6 @@ public class VNPayService {
             }
             throw new BadRequestException("Don hang " + request.getOrderId() + " khong con o trang thai co the thanh toan");
         }
-        // Kiểm tra đơn hàng đã có giao dịch VNPay đang chờ xử lý chưa
-        paymentRepository.findByOrderId(request.getOrderId()).ifPresent(p -> {
-            if (p.getMethod() == PaymentMethod.VNPAY && p.getStatus() == PaymentStatus.PENDING) {
-                throw new BadRequestException(
-                        "Đơn hàng " + request.getOrderId() + " đã có giao dịch VNPay đang chờ thanh toán");
-            }
-        });
 
         // Tạo bản ghi thanh toán nội bộ với trạng thái PENDING
         Payment payment = Payment.builder()
@@ -197,6 +186,8 @@ public class VNPayService {
         result.put("success", valid && "00".equals(cloned.get("vnp_ResponseCode")) ? "true" : "false");
 
         // Fallback: cập nhật DB nếu IPN chưa xử lý (status vẫn PENDING)
+        // Chỉ dùng outbox để publish event — KHÔNG publish trực tiếp qua Kafka
+        // để tránh gửi duplicate PAYMENT_COMPLETED với eventId khác nhau.
         if (valid) {
             String txnRef = cloned.get("vnp_TxnRef");
             String responseCode = cloned.get("vnp_ResponseCode");
@@ -207,19 +198,6 @@ public class VNPayService {
                         paymentRepository.save(payment);
                         savePaymentEventToOutbox(payment, "PAYMENT_COMPLETED");
                         log.info("Return URL fallback: thanh toán VNPay thành công — orderId={}", payment.getOrderId());
-                        // Publish ngay lập tức sau khi transaction commit — không chờ outbox scheduler
-                        PaymentEvent immediateEvent = buildPaymentEvent(payment, "PAYMENT_COMPLETED");
-                        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                            @Override
-                            public void afterCommit() {
-                                try {
-                                    paymentEventProducer.publishPaymentEvent(immediateEvent);
-                                    log.info("Return fallback: đã publish PAYMENT_COMPLETED ngay tức thì — orderId={}", payment.getOrderId());
-                                } catch (Exception ex) {
-                                    log.warn("Return fallback: immediate Kafka publish thất bại (outbox sẽ retry) — orderId={} error={}", payment.getOrderId(), ex.getMessage());
-                                }
-                            }
-                        });
                     } else {
                         payment.setStatus(PaymentStatus.FAILED);
                         payment.setFailureReason("VNPay return code: " + responseCode);
