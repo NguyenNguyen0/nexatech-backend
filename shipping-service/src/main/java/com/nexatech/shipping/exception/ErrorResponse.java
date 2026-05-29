@@ -16,7 +16,9 @@ public class ErrorResponse {
 
     private boolean success;
     private int status;
+    private String tag;
     private String message;
+    private String correlationId;
     private String path;
     private List<FieldError> errors;
 
