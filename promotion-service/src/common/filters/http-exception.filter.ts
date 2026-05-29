@@ -11,11 +11,14 @@ import { Prisma } from '@prisma/client';
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger('HttpExceptionFilter');
+  private readonly servicePrefix = 'PRO';
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
     const request = ctx.getRequest();
+    const correlationId = this.resolveCorrelationId(request);
+    const userId = this.resolveUserId(request);
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
@@ -33,12 +36,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = exception.message;
       }
       this.logger.error(
-        `[${status}] ${request.method} ${request.url} → Prisma ${exception.code}: ${message}`,
+        `[${this.buildTag(status)}] ${request.method} ${request.url} correlationId=${correlationId} userId=${userId} → Prisma ${exception.code}: ${message}`,
       );
       response.status(status).send({
         success: false,
+        tag: this.buildTag(status),
         error,
         message,
+        correlationId,
         timestamp: new Date().toISOString(),
       });
       return;
@@ -53,15 +58,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
       error = 'DATABASE_UNAVAILABLE';
       message = 'Database is temporarily unavailable. Please try again shortly.';
       this.logger.error(
-        `[${status}] ${request.method} ${request.url} → ${error}: ${
+        `[${this.buildTag(status)}] ${request.method} ${request.url} correlationId=${correlationId} userId=${userId} → ${error}: ${
           (exception as Error).message
         }`,
         (exception as Error).stack,
       );
       response.status(status).send({
         success: false,
+        tag: this.buildTag(status),
         error,
         message,
+        correlationId,
         timestamp: new Date().toISOString(),
       });
       return;
@@ -81,20 +88,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // Unexpected / unhandled — log full stack
       const err = exception instanceof Error ? exception : new Error(String(exception));
       this.logger.error(
-        `Unhandled exception on ${request.method} ${request.url}: ${err.message}`,
+        `[${this.buildTag(status)}] ${request.method} ${request.url} correlationId=${correlationId} userId=${userId} - ${err.message}`,
         err.stack,
       );
     }
 
     if (status >= 500) {
       this.logger.error(
-        `[${status}] ${request.method} ${request.url} → ${error}: ${
+        `[${this.buildTag(status)}] ${request.method} ${request.url} correlationId=${correlationId} userId=${userId} → ${error}: ${
           Array.isArray(message) ? message.join(', ') : message
         }`,
       );
     } else if (status >= 400) {
       this.logger.warn(
-        `[${status}] ${request.method} ${request.url} → ${error}: ${
+        `[${this.buildTag(status)}] ${request.method} ${request.url} correlationId=${correlationId} userId=${userId} → ${error}: ${
           Array.isArray(message) ? message.join(', ') : message
         }`,
       );
@@ -102,9 +109,25 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     response.status(status).send({
       success: false,
+      tag: this.buildTag(status),
       error,
       message,
+      correlationId,
       timestamp: new Date().toISOString(),
     });
+  }
+
+  private buildTag(status: number): string {
+    return `${this.servicePrefix}-${status}`;
+  }
+
+  private resolveCorrelationId(request: any): string {
+    const value = request?.headers?.['x-correlation-id'];
+    return typeof value === 'string' && value.trim().length > 0 ? value : 'unknown';
+  }
+
+  private resolveUserId(request: any): string {
+    const value = request?.headers?.['x-user-id'];
+    return typeof value === 'string' && value.trim().length > 0 ? value : 'anonymous';
   }
 }

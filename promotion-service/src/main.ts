@@ -7,6 +7,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { randomUUID } from 'crypto';
 
 const logger = new Logger('Bootstrap');
 
@@ -45,6 +46,16 @@ async function bootstrap() {
     allowedHeaders: ['*'],
     exposedHeaders: ['Authorization', 'Content-Type'],
     maxAge: 3600,
+  });
+
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook('onRequest', (request: any, reply: any, done: any) => {
+    const incoming = request.headers['x-correlation-id'];
+    const correlationId =
+      typeof incoming === 'string' && incoming.trim().length > 0 ? incoming : randomUUID();
+    request.headers['x-correlation-id'] = correlationId;
+    reply.header('X-Correlation-Id', correlationId);
+    done();
   });
 
   // ─── Global pipes / filters / interceptors ────────────────────────────────

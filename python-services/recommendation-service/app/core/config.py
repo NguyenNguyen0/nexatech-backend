@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     service_version: str = "0.1.0"
     port: int = 8095
     log_level: str = "INFO"
-    request_id_header: str = "X-Request-Id"
+    request_id_header: str = "X-Correlation-Id"
 
     eureka_enabled: bool = True
     eureka_server_url: str = "http://localhost:8761/eureka/"
