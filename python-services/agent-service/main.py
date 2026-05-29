@@ -2,8 +2,12 @@ import logging
 import os
 import socket
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+import uuid
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 import uvicorn
 
 try:
@@ -21,14 +25,24 @@ INSTANCE_HOST = os.getenv("EUREKA_INSTANCE_HOSTNAME", socket.gethostbyname(socke
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(SERVICE_NAME)
 
+READINESS_CHECKS: dict[str, str] = {
+    "service": "ok",
+    "eureka": "pending",
+}
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    logger.info("[STARTUP] Checking dependencies...")
     if not EUREKA_ENABLED:
+        READINESS_CHECKS["eureka"] = "disabled"
+        logger.info("[STARTUP] - Eureka: disabled")
         logger.info("Eureka registration is disabled")
         yield
         return
 
     if eureka_client is None:
+        READINESS_CHECKS["eureka"] = "client_missing"
+        logger.warning("[STARTUP] - Eureka: client missing, running without registration")
         logger.warning("py-eureka-client is not installed, skip Eureka registration")
         yield
         return
@@ -42,8 +56,12 @@ async def lifespan(_: FastAPI):
             health_check_url=f"http://{INSTANCE_HOST}:{PORT}/health",
             home_page_url=f"http://{INSTANCE_HOST}:{PORT}",
         )
+        READINESS_CHECKS["eureka"] = "ok"
+        logger.info("[STARTUP] + Eureka: registered")
         logger.info("Registered %s to Eureka at %s", SERVICE_NAME, EUREKA_SERVER_URL)
     except Exception as exc:  # pragma: no cover
+        READINESS_CHECKS["eureka"] = f"error: {exc.__class__.__name__}"
+        logger.warning("[STARTUP] - Eureka: registration failed (%s)", exc.__class__.__name__)
         logger.warning("Failed to register to Eureka: %s", exc)
 
     try:
@@ -58,9 +76,113 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Agent Service", version="0.1.0", lifespan=lifespan)
 
 
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    correlation_id = request.headers.get("X-Correlation-Id") or str(uuid.uuid4())
+    request.state.correlation_id = correlation_id
+
+    response = await call_next(request)
+    response.headers["X-Correlation-Id"] = correlation_id
+    return response
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    correlation_id = getattr(request.state, "correlation_id", "unknown")
+    user_id = request.headers.get("X-User-Id", "anonymous")
+    tag = f"AGT-{exc.status_code}"
+
+    logger.warning(
+        "[%s] %s %s correlationId=%s userId=%s - %s",
+        tag,
+        request.method,
+        request.url.path,
+        correlation_id,
+        user_id,
+        exc.detail,
+    )
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": exc.status_code,
+            "tag": tag,
+            "message": str(exc.detail),
+            "correlationId": correlation_id,
+            "timestamp": _utc_timestamp(),
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    correlation_id = getattr(request.state, "correlation_id", "unknown")
+    tag = "AGT-400"
+    logger.warning(
+        "[%s] %s %s correlationId=%s userId=%s - Validation failed",
+        tag,
+        request.method,
+        request.url.path,
+        correlation_id,
+        request.headers.get("X-User-Id", "anonymous"),
+    )
+    return JSONResponse(
+        status_code=400,
+        content={
+            "code": 400,
+            "tag": tag,
+            "message": "Validation failed",
+            "correlationId": correlation_id,
+            "errors": exc.errors(),
+            "timestamp": _utc_timestamp(),
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    correlation_id = getattr(request.state, "correlation_id", "unknown")
+    tag = "AGT-500"
+    logger.exception(
+        "[%s] %s %s correlationId=%s userId=%s - %s",
+        tag,
+        request.method,
+        request.url.path,
+        correlation_id,
+        request.headers.get("X-User-Id", "anonymous"),
+        str(exc),
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "code": 500,
+            "tag": tag,
+            "message": "Internal server error",
+            "correlationId": correlation_id,
+            "timestamp": _utc_timestamp(),
+        },
+    )
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "UP", "service": SERVICE_NAME}
+
+
+@app.get("/ready")
+def ready() -> dict[str, object]:
+    eureka_state = READINESS_CHECKS.get("eureka", "unknown")
+    degraded = eureka_state.startswith("error") or eureka_state == "client_missing"
+    return {
+        "ready": True,
+        "service": SERVICE_NAME,
+        "degraded": degraded,
+        "checks": READINESS_CHECKS,
+    }
 
 
 @app.get("/")

@@ -19,8 +19,10 @@ public class ApiResponse<T> {
     @Builder.Default
     private int code = 1000;
 
+    private String tag;
     @Builder.Default
     private String message = "Success";
 
+    private String correlationId;
     private T result;
 }

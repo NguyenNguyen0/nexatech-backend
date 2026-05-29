@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -118,6 +120,7 @@ public class NotificationEventConsumer {
             log.info("Processed user event type={} for userId={}", normalizedEventType, userId);
         } catch (Exception e) {
             log.error("Failed to process user event: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to process user event", e);
         }
     }
 
@@ -154,6 +157,7 @@ public class NotificationEventConsumer {
                     userId, event.getEmail());
         } catch (Exception e) {
             log.error("Failed to process email verification event: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to process email verification event", e);
         }
     }
 
@@ -190,6 +194,7 @@ public class NotificationEventConsumer {
                     userId, event.getEmail());
         } catch (Exception e) {
             log.error("Failed to process forgot password event: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to process forgot password event", e);
         }
     }
 
@@ -248,6 +253,7 @@ public class NotificationEventConsumer {
                     event.getOrderId(), recipientUserId);
         } catch (Exception e) {
             log.error("Failed to process order event: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to process order event", e);
         }
     }
 
@@ -290,6 +296,7 @@ public class NotificationEventConsumer {
             log.info("Processed payment event status={} paymentId={}", event.getStatus(), event.getPaymentId());
         } catch (Exception e) {
             log.error("Failed to process payment event: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to process payment event", e);
         }
     }
 
@@ -321,7 +328,30 @@ public class NotificationEventConsumer {
                     event.getProductId(), event.getQuantity());
         } catch (Exception e) {
             log.error("Failed to process inventory event: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to process inventory event", e);
         }
+    }
+
+    @KafkaListener(topics = {
+            "user.events.DLT",
+            "order.events.DLT",
+            "payment.events.DLT",
+            "inventory.events.DLT"
+    }, groupId = "notification-dlt-group")
+    public void handleDlt(
+            String payload,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) String key,
+            @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String error) {
+        log.error("[DLT][{}] partition={} offset={} key={} error={}",
+                topic,
+                partition,
+                offset,
+                key,
+                error != null ? error : "unknown");
+        log.debug("[DLT][{}] payload={}", topic, payload);
     }
 
     // ===== Private helper =====

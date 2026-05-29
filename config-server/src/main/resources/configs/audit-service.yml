@@ -46,15 +46,24 @@ springdoc:
     enabled: false
 
 management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+      show-details: always
       status:
         http-mapping:
           UP: 200
           DOWN: 503
   health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
     mongodb:
       enabled: false
   info:

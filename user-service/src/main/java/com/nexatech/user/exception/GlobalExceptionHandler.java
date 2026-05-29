@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import jakarta.validation.ConstraintViolation;
 
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -28,6 +29,7 @@ public class GlobalExceptionHandler {
 
     private static final String MIN_ATTRIBUTE = "min";
     private static final String MAX_ATTRIBUTE = "max";
+    private static final String SERVICE_PREFIX = "USR";
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -35,10 +37,10 @@ public class GlobalExceptionHandler {
         log.warn("Malformed JSON body: {}", exception.getMessage());
         ErrorCode errorCode = ErrorCode.INVALID_JSON_BODY;
         return ResponseEntity.status(errorCode.getStatusCode())
-                .body(ApiResponse.builder()
+            .body(withContext(ApiResponse.builder()
                         .code(errorCode.getCode())
                         .message(errorCode.getMessage())
-                        .build());
+                .build(), errorCode));
     }
 
     @ExceptionHandler(value = AppException.class)
@@ -47,6 +49,13 @@ public class GlobalExceptionHandler {
         ApiResponse<?> apiResponse = new ApiResponse<>();
         apiResponse.setCode(errorCode.getCode());
         apiResponse.setMessage(errorCode.getMessage());
+        apiResponse.setTag(toTag(errorCode));
+        apiResponse.setCorrelationId(resolveCorrelationId());
+        log.warn("[{}] AppException correlationId={} userId={} - {}",
+                apiResponse.getTag(),
+                apiResponse.getCorrelationId(),
+                resolveUserId(),
+                errorCode.getMessage());
         return ResponseEntity.status(errorCode.getStatusCode()).body(apiResponse);
     }
 
@@ -54,10 +63,10 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiResponse<?>> handlingAccessDeniedException(AccessDeniedException exception) {
         ErrorCode errorCode = ErrorCode.UNAUTHORIZED;
         return ResponseEntity.status(errorCode.getStatusCode())
-                .body(ApiResponse.builder()
+            .body(withContext(ApiResponse.builder()
                         .code(errorCode.getCode())
                         .message(errorCode.getMessage())
-                        .build());
+                .build(), errorCode));
     }
 
     @ExceptionHandler(value = MethodArgumentNotValidException.class)
@@ -67,10 +76,10 @@ public class GlobalExceptionHandler {
                 : exception.getBindingResult().getAllErrors().getFirst();
         if (first == null) {
             return ResponseEntity.badRequest()
-                    .body(ApiResponse.builder()
+                    .body(withContext(ApiResponse.builder()
                             .code(ErrorCode.INVALID_KEY.getCode())
                             .message(ErrorCode.INVALID_KEY.getMessage())
-                            .build());
+                        .build(), ErrorCode.INVALID_KEY));
         }
 
         String enumKey = first.getDefaultMessage();
@@ -95,16 +104,26 @@ public class GlobalExceptionHandler {
                 Objects.nonNull(attributes)
                         ? mapAttribute(errorCode.getMessage(), attributes)
                         : errorCode.getMessage());
+        apiResponse.setTag(toTag(errorCode));
+        apiResponse.setCorrelationId(resolveCorrelationId());
         return ResponseEntity.badRequest().body(apiResponse);
     }
 
     @ExceptionHandler(value = Exception.class)
     ResponseEntity<ApiResponse<?>> handlingGenericException(Exception exception) {
-        log.error("Exception: ", exception);
+        String correlationId = resolveCorrelationId();
+        log.error("[{}] GenericException correlationId={} userId={} - {}",
+                toTag(ErrorCode.UNCATEGORIZED_EXCEPTION),
+                correlationId,
+                resolveUserId(),
+                exception.getMessage(),
+                exception);
         ApiResponse<?> apiResponse = new ApiResponse<>();
 
         apiResponse.setCode(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode());
         apiResponse.setMessage(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage());
+        apiResponse.setTag(toTag(ErrorCode.UNCATEGORIZED_EXCEPTION));
+        apiResponse.setCorrelationId(correlationId);
 
         return ResponseEntity.status(ErrorCode.UNCATEGORIZED_EXCEPTION.getStatusCode()).body(apiResponse);
     }
@@ -123,10 +142,10 @@ public class GlobalExceptionHandler {
                 // 1. Transparently proxy internal ApiResponse (e.g. from identity-service)
                 if (node.has("code") && node.has("message")) {
                     return ResponseEntity.status(status)
-                            .body(ApiResponse.builder()
+                            .body(withContext(ApiResponse.builder()
                                     .code(node.get("code").asInt())
                                     .message(node.get("message").asText())
-                                    .build());
+                                .build(), ErrorCode.KEYCLOAK_ERROR));
                 }
 
                 // 2. Parse direct Keycloak responses if applicable
@@ -152,10 +171,30 @@ public class GlobalExceptionHandler {
         HttpStatus responseStatus = status >= 500 ? HttpStatus.BAD_GATEWAY : (HttpStatus) errorCode.getStatusCode();
 
         return ResponseEntity.status(responseStatus)
-                .body(ApiResponse.builder()
+                .body(withContext(ApiResponse.builder()
                         .code(errorCode.getCode())
                         .message(dynamicMessage != null ? dynamicMessage : errorCode.getMessage())
-                        .build());
+                        .build(), errorCode));
+    }
+
+    private ApiResponse<?> withContext(ApiResponse<?> response, ErrorCode errorCode) {
+        response.setTag(toTag(errorCode));
+        response.setCorrelationId(resolveCorrelationId());
+        return response;
+    }
+
+    private String toTag(ErrorCode errorCode) {
+        return SERVICE_PREFIX + "-" + errorCode.getCode();
+    }
+
+    private String resolveCorrelationId() {
+        String correlationId = MDC.get("correlationId");
+        return (correlationId != null && !correlationId.isBlank()) ? correlationId : "unknown";
+    }
+
+    private String resolveUserId() {
+        String userId = MDC.get("userId");
+        return (userId != null && !userId.isBlank()) ? userId : "anonymous";
     }
 
     private String mapAttribute(String message, Map<String, Object> attributes) {

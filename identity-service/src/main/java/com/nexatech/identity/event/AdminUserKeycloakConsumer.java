@@ -1,6 +1,8 @@
 package com.nexatech.identity.event;
 
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,7 +27,12 @@ public class AdminUserKeycloakConsumer {
             topics = "${spring.kafka.topics.user-registration}",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void onMessage(String json) {
+    public void onMessage(
+            String json,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) String key) {
         try {
             UserCreationParam param = objectMapper.readValue(json, UserCreationParam.class);
             if (param.getCredentials() == null || param.getCredentials().isEmpty()) {
@@ -34,7 +41,13 @@ public class AdminUserKeycloakConsumer {
             String userId = userService.createUser(param);
             log.info("Keycloak user created from admin provision event userId={}", userId);
         } catch (Exception ex) {
-            log.error("Failed to process admin Keycloak provision event", ex);
+            log.error("[KAFKA][{}] partition={} offset={} key={} error={}",
+                    topic,
+                    partition,
+                    offset,
+                    key,
+                    ex.getMessage(),
+                    ex);
             throw new RuntimeException(ex);
         }
     }

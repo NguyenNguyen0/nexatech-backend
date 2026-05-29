@@ -1,9 +1,12 @@
 package com.nexatech.user.event;
 
 import org.springframework.kafka.annotation.BackOff;
+import org.springframework.kafka.annotation.DltHandler;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.RetryableTopic;
 import org.springframework.kafka.retrytopic.DltStrategy;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import com.nexatech.user.dto.request.UserCreationRequest;
@@ -46,5 +49,22 @@ public class UserConsumer {
             }
             throw e;
         }
+    }
+
+    @DltHandler
+    public void onDltMessage(
+            UserCreationRequest request,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) String key,
+            @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String error) {
+        log.error("[DLT][{}] partition={} offset={} key={} error={}",
+                topic,
+                partition,
+                offset,
+                key,
+                error != null ? error : "unknown");
+        log.debug("[DLT][{}] payload={}", topic, request);
     }
 }

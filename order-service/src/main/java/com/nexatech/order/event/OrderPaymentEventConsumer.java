@@ -10,6 +10,8 @@ import com.nexatech.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,12 +42,23 @@ public class OrderPaymentEventConsumer {
 
     @Transactional
     @KafkaListener(topics = "payment.events", groupId = "order-service-group")
-    public void handlePaymentEvent(String message) {
+    public void handlePaymentEvent(
+            String message,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) String key) {
         PaymentEventDto event;
         try {
             event = objectMapper.readValue(message, PaymentEventDto.class);
         } catch (Exception e) {
-            log.error("Không thể parse PaymentEvent: {} | message: {}", e.getMessage(), message);
+            log.error("[KAFKA][{}] partition={} offset={} key={} parseError={} message={}",
+                    topic,
+                    partition,
+                    offset,
+                    key,
+                    e.getMessage(),
+                    message);
             throw new RuntimeException("Không thể parse PaymentEvent: " + e.getMessage(), e);
         }
 
@@ -114,7 +127,14 @@ public class OrderPaymentEventConsumer {
                 default -> log.debug("Bỏ qua PaymentEvent không xử lý: {}", event.getEventType());
             }
         } catch (Exception e) {
-            log.error("Lỗi xử lý PaymentEvent type={} orderId={}: {}", event.getEventType(), event.getOrderId(), e.getMessage());
+            log.error("[KAFKA][{}] partition={} offset={} key={} processError type={} orderId={} error={}",
+                topic,
+                partition,
+                offset,
+                key,
+                event.getEventType(),
+                event.getOrderId(),
+                e.getMessage());
             throw new RuntimeException("Lỗi xử lý PaymentEvent type=" + event.getEventType()
                     + " orderId=" + event.getOrderId(), e);
         }

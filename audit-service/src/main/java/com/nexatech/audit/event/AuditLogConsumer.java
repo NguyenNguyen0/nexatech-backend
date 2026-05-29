@@ -1,6 +1,8 @@
 package com.nexatech.audit.event;
 
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -40,7 +42,27 @@ public class AuditLogConsumer {
             auditLogService.save(event);
         } catch (Exception ex) {
             log.error("Failed to process audit message: payload={} error={}", payload, ex.getMessage(), ex);
+            throw new IllegalStateException("Failed to process audit message", ex);
         }
+    }
+
+    @KafkaListener(
+            topicPattern = "${spring.kafka.topic.audit-log:${AUDIT_LOG_TOPIC:audit-topic}}\\.DLT",
+            groupId = "${spring.kafka.consumer.group-id:${KAFKA_GROUP_ID:audit-service-group}}-dlt")
+    public void onDlt(
+            String payload,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) String key,
+            @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String error) {
+        log.error("[DLT][{}] partition={} offset={} key={} error={}",
+                topic,
+                partition,
+                offset,
+                key,
+                error != null ? error : "unknown");
+        log.debug("[DLT][{}] payload={}", topic, payload);
     }
 
     /**

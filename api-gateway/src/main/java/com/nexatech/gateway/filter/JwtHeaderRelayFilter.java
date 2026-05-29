@@ -26,18 +26,24 @@ public class JwtHeaderRelayFilter extends OncePerRequestFilter {
     private static final String HEADER_USER_ID = "X-User-Id";
     private static final String HEADER_USER_ROLE = "X-User-Role";
     private static final String HEADER_USER_EMAIL = "X-User-Email";
+    private static final String HEADER_CORRELATION_ID = "X-Correlation-Id";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
+        Map<String, String> extraHeaders = new HashMap<>();
+        String correlationId = Optional.ofNullable(request.getHeader(HEADER_CORRELATION_ID))
+                .filter(s -> !s.isBlank())
+                .orElseGet(() -> UUID.randomUUID().toString());
+        extraHeaders.put(HEADER_CORRELATION_ID, correlationId);
+        response.setHeader(HEADER_CORRELATION_ID, correlationId);
+
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication instanceof JwtAuthenticationToken jwtAuth) {
             Jwt jwt = jwtAuth.getToken();
-
-            Map<String, String> extraHeaders = new HashMap<>();
 
             // sub claim → X-User-Id
             String sub = jwt.getSubject();
@@ -55,13 +61,9 @@ public class JwtHeaderRelayFilter extends OncePerRequestFilter {
             String role = extractRole(jwt);
             extraHeaders.put(HEADER_USER_ROLE, role != null ? role : "USER");
 
-            if (!extraHeaders.isEmpty()) {
-                filterChain.doFilter(new HeaderInjectingRequest(request, extraHeaders), response);
-                return;
-            }
         }
 
-        filterChain.doFilter(request, response);
+        filterChain.doFilter(new HeaderInjectingRequest(request, extraHeaders), response);
     }
 
     private String extractRole(Jwt jwt) {

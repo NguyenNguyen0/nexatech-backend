@@ -26,4 +26,11 @@ management:
         include: health,info,prometheus
   endpoint:
     health:
-      show-details: when-authorized
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true

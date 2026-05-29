@@ -47,3 +47,19 @@ aws:
     # Optional for LocalStack/MinIO-compatible testing. Keep empty for real AWS S3.
     endpoint: ${AWS_S3_ENDPOINT:}
     path-style-access-enabled: ${AWS_S3_PATH_STYLE_ACCESS_ENABLED:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true

@@ -11,6 +11,8 @@ import com.nexatech.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -41,12 +43,23 @@ public class OrderShippingEventConsumer {
 
     @Transactional
     @KafkaListener(topics = "shipping.events", groupId = "order-service-group")
-    public void handleShippingEvent(String message) {
+    public void handleShippingEvent(
+            String message,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) String key) {
         ShippingEventDto event;
         try {
             event = objectMapper.readValue(message, ShippingEventDto.class);
         } catch (Exception e) {
-            log.error("Không thể parse ShippingEvent: {} | message: {}", e.getMessage(), message);
+            log.error("[KAFKA][{}] partition={} offset={} key={} parseError={} message={}",
+                    topic,
+                    partition,
+                    offset,
+                    key,
+                    e.getMessage(),
+                    message);
             throw new RuntimeException("Không thể parse ShippingEvent: " + e.getMessage(), e);
         }
 
@@ -83,7 +96,14 @@ public class OrderShippingEventConsumer {
                 default -> log.debug("Bỏ qua ShippingEvent không xử lý: {}", event.getEventType());
             }
         } catch (Exception e) {
-            log.error("Lỗi xử lý ShippingEvent type={} orderId={}: {}", event.getEventType(), orderId, e.getMessage());
+            log.error("[KAFKA][{}] partition={} offset={} key={} processError type={} orderId={} error={}",
+                topic,
+                partition,
+                offset,
+                key,
+                event.getEventType(),
+                orderId,
+                e.getMessage());
             throw new RuntimeException("Lỗi xử lý ShippingEvent type=" + event.getEventType()
                     + " orderId=" + orderId, e);
         }

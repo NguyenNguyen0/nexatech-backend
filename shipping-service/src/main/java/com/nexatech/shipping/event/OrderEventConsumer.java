@@ -12,6 +12,8 @@ import com.nexatech.shipping.service.ShippingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,12 +36,23 @@ public class OrderEventConsumer {
 
     @Transactional
     @KafkaListener(topics = "order.events", groupId = "shipping-service-group")
-    public void handleOrderEvent(String message) {
+    public void handleOrderEvent(
+            String message,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) String key) {
         OrderEventDto event;
         try {
             event = objectMapper.readValue(message, OrderEventDto.class);
         } catch (Exception e) {
-            log.error("Unable to parse OrderEvent for shipping: {} | message={}", e.getMessage(), message);
+            log.error("[KAFKA][{}] partition={} offset={} key={} parseError={} message={}",
+                    topic,
+                    partition,
+                    offset,
+                    key,
+                    e.getMessage(),
+                    message);
             throw new RuntimeException("Unable to parse OrderEvent for shipping: " + e.getMessage(), e);
         }
 
@@ -73,8 +86,14 @@ public class OrderEventConsumer {
                 default -> log.debug("OrderEvent ignored by shipping-service: type={}", event.getEventType());
             }
         } catch (Exception e) {
-            log.error("Unable to process OrderEvent in shipping-service: type={} orderId={} error={}",
-                    event.getEventType(), event.getOrderId(), e.getMessage());
+            log.error("[KAFKA][{}] partition={} offset={} key={} processError type={} orderId={} error={}",
+                topic,
+                partition,
+                offset,
+                key,
+                event.getEventType(),
+                event.getOrderId(),
+                e.getMessage());
             throw new RuntimeException("Unable to process OrderEvent type=" + event.getEventType()
                     + " orderId=" + event.getOrderId(), e);
         }

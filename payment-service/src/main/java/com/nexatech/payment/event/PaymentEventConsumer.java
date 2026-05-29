@@ -9,6 +9,8 @@ import com.nexatech.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,12 +41,23 @@ public class PaymentEventConsumer {
 
     @Transactional
     @KafkaListener(topics = "order.events", groupId = "payment-service-group")
-    public void handleOrderEvent(String message) {
+    public void handleOrderEvent(
+            String message,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) String key) {
         OrderEventDto event;
         try {
             event = objectMapper.readValue(message, OrderEventDto.class);
         } catch (Exception e) {
-            log.error("Không thể parse OrderEvent: {} | message: {}", e.getMessage(), message);
+            log.error("[KAFKA][{}] partition={} offset={} key={} parseError={} message={}",
+                    topic,
+                    partition,
+                    offset,
+                    key,
+                    e.getMessage(),
+                    message);
             return;
         }
 

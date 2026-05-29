@@ -6,6 +6,8 @@ import com.nexatech.inventory.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -21,7 +23,12 @@ public class InventoryEventConsumer {
             topics = "order.events",
             groupId = "inventory-service-group",
             containerFactory = "orderEventKafkaListenerContainerFactory")
-    public void handleOrderEvent(OrderEventDto event) {
+    public void handleOrderEvent(
+            OrderEventDto event,
+            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset,
+            @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) String key) {
         if (event == null) {
             return;
         }
@@ -42,8 +49,15 @@ public class InventoryEventConsumer {
                 default -> log.debug("Ignoring unsupported order event type={}", eventType);
             }
         } catch (Exception e) {
-            log.error("Failed to process order event type={} orderId={} error={}",
-                    event.getEventType(), event.getOrderId(), e.getMessage(), e);
+            log.error("[KAFKA][{}] partition={} offset={} key={} processError type={} orderId={} error={}",
+                    topic,
+                    partition,
+                    offset,
+                    key,
+                    event.getEventType(),
+                    event.getOrderId(),
+                    e.getMessage(),
+                    e);
             throw new RuntimeException("Failed to process order event", e);
         }
     }

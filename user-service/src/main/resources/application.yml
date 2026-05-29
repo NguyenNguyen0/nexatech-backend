@@ -87,7 +87,7 @@ logging:
     # Bật log khi config-server không phản hồi để dễ debug
     org.springframework.cloud.config.client: INFO
   pattern:
-    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{correlationId:-}]"
 
 resilience4j:
   circuitbreaker:

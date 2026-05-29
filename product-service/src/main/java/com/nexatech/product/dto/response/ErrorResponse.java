@@ -17,8 +17,10 @@ import java.util.List;
 public class ErrorResponse {
 
     private int status;
+    private String tag;
     private String message;
     private List<FieldError> errors;
+    private String correlationId;
     @Builder.Default
     private Instant timestamp = Instant.now();
     private String path;

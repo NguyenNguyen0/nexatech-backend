@@ -49,7 +49,7 @@ logging:
   level:
     com.nexatech: DEBUG
   pattern:
-    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{correlationId:-}]"
 
 resilience4j:
   circuitbreaker:
