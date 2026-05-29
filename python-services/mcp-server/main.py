@@ -25,14 +25,24 @@ INSTANCE_HOST = os.getenv("EUREKA_INSTANCE_HOSTNAME", socket.gethostbyname(socke
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(SERVICE_NAME)
 
+READINESS_CHECKS: dict[str, str] = {
+    "service": "ok",
+    "eureka": "pending",
+}
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    logger.info("[STARTUP] Checking dependencies...")
     if not EUREKA_ENABLED:
+        READINESS_CHECKS["eureka"] = "disabled"
+        logger.info("[STARTUP] - Eureka: disabled")
         logger.info("Eureka registration is disabled")
         yield
         return
 
     if eureka_client is None:
+        READINESS_CHECKS["eureka"] = "client_missing"
+        logger.warning("[STARTUP] - Eureka: client missing, running without registration")
         logger.warning("py-eureka-client is not installed, skip Eureka registration")
         yield
         return
@@ -46,8 +56,12 @@ async def lifespan(_: FastAPI):
             health_check_url=f"http://{INSTANCE_HOST}:{PORT}/health",
             home_page_url=f"http://{INSTANCE_HOST}:{PORT}",
         )
+        READINESS_CHECKS["eureka"] = "ok"
+        logger.info("[STARTUP] + Eureka: registered")
         logger.info("Registered %s to Eureka at %s", SERVICE_NAME, EUREKA_SERVER_URL)
     except Exception as exc:  # pragma: no cover
+        READINESS_CHECKS["eureka"] = f"error: {exc.__class__.__name__}"
+        logger.warning("[STARTUP] - Eureka: registration failed (%s)", exc.__class__.__name__)
         logger.warning("Failed to register to Eureka: %s", exc)
 
     try:
@@ -157,6 +171,18 @@ async def generic_exception_handler(request: Request, exc: Exception):
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "UP", "service": SERVICE_NAME}
+
+
+@app.get("/ready")
+def ready() -> dict[str, object]:
+    eureka_state = READINESS_CHECKS.get("eureka", "unknown")
+    degraded = eureka_state.startswith("error") or eureka_state == "client_missing"
+    return {
+        "ready": True,
+        "service": SERVICE_NAME,
+        "degraded": degraded,
+        "checks": READINESS_CHECKS,
+    }
 
 
 @app.get("/")

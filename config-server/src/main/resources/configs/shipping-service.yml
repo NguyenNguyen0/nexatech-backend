@@ -41,3 +41,19 @@ shipping:
     from-province-name: ${GHN_FROM_PROVINCE_NAME:TP. Hồ Chí Minh}
     from-district-name: ${GHN_FROM_DISTRICT_NAME:Thành phố Thủ Đức}
     from-ward-name: ${GHN_FROM_WARD_NAME:Linh Trung}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true

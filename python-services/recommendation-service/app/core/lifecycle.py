@@ -94,26 +94,33 @@ async def lifespan(app: FastAPI):
         "kafka": "pending",
         "model_store": "not_configured",
     }
+    logger.info("[STARTUP] Checking dependencies...")
 
     try:
         await mongo_repo.init_indexes()
         app.state.readiness_checks["mongo"] = "ok"
+        logger.info("[STARTUP] + Mongo: reachable")
     except Exception as exc:  # pragma: no cover
         app.state.readiness_checks["mongo"] = f"error: {exc.__class__.__name__}"
+        logger.warning("[STARTUP] - Mongo: unreachable (%s)", exc.__class__.__name__)
         logger.warning("Mongo index initialization failed: %s", exc)
 
     try:
         if await redis_repo.ping():
             app.state.readiness_checks["redis"] = "ok"
+            logger.info("[STARTUP] + Redis: reachable")
     except Exception as exc:  # pragma: no cover
         app.state.readiness_checks["redis"] = f"error: {exc.__class__.__name__}"
+        logger.warning("[STARTUP] - Redis: unreachable (%s)", exc.__class__.__name__)
         logger.warning("Redis ping failed: %s", exc)
 
     try:
         if await kafka_client.ping():
             app.state.readiness_checks["kafka"] = "ok"
+            logger.info("[STARTUP] + Kafka: reachable")
     except Exception as exc:  # pragma: no cover
         app.state.readiness_checks["kafka"] = f"error: {exc.__class__.__name__}"
+        logger.warning("[STARTUP] - Kafka: unreachable (%s)", exc.__class__.__name__)
         logger.warning("Kafka ping failed: %s", exc)
 
     try:
@@ -159,11 +166,16 @@ async def lifespan(app: FastAPI):
                 health_check_url=f"http://{settings.eureka_instance_hostname}:{settings.port}/health",
                 home_page_url=f"http://{settings.eureka_instance_hostname}:{settings.port}",
             )
+            logger.info("[STARTUP] + Eureka: registered")
             logger.info("Registered to Eureka: %s", settings.eureka_server_url)
         except Exception as exc:  # pragma: no cover
+            logger.warning("[STARTUP] - Eureka: registration failed (%s)", exc.__class__.__name__)
             logger.warning("Eureka registration failed: %s", exc)
     elif settings.eureka_enabled:
+        logger.warning("[STARTUP] - Eureka: client missing, running without registration")
         logger.warning("py-eureka-client not installed, skip Eureka registration")
+    else:
+        logger.info("[STARTUP] - Eureka: disabled")
 
     try:
         yield
