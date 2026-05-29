@@ -23,3 +23,20 @@ uv run main.py
 - EUREKA_ENABLED=true
 - EUREKA_SERVER_URL=http://localhost:8761/eureka/
 - EUREKA_INSTANCE_HOSTNAME=127.0.0.1
+
+## Service Graph
+
+```mermaid
+flowchart LR
+	A[mcp-server]
+	B[discovery-server]
+	C[api-gateway]
+
+	A --> B
+	C --> A
+```
+
+## Dependencies
+
+- Exposed through: [api-gateway](../../api-gateway/README.md)
+- Service discovery: [discovery-server](../../discovery-server/README.md)
