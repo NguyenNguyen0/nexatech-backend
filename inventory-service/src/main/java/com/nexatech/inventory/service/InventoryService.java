@@ -19,6 +19,7 @@ import com.nexatech.inventory.model.StockMovement;
 import com.nexatech.inventory.repository.InventoryItemRepository;
 import com.nexatech.inventory.repository.StockMovementRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -39,6 +40,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class InventoryService {
 
@@ -103,11 +105,6 @@ public class InventoryService {
         validateItems(request);
 
         for (StockCheckRequest.Item itemRequest : request.getItems()) {
-            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RELEASED, reference)) {
-                log.info("Skip duplicate stock release: productId={} reference={}", itemRequest.getProductId(), reference);
-                continue;
-            }
-
             InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Inventory item", "productId", itemRequest.getProductId()));
