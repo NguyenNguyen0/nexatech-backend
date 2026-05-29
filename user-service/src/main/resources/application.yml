@@ -3,15 +3,6 @@ spring:
     name: user-service
   config:
     import: "optional:file:../.env[.properties],optional:file:./.env[.properties],optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
-
-# ─── Fallback defaults khi config-server không phản hồi ──────────────────────
-# Tất cả giá trị này sẽ bị override bởi config-server nếu nó online.
-# Mục đích: service vẫn start được trong môi trường dev / khi config-server chưa ready.
-
-server:
-  port: ${SERVER_PORT:8083}
-
-spring:
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:${REDIS_HOST:localhost}}
@@ -56,6 +47,13 @@ spring:
         max-attempts: 4
         max-interval: 5000
         multiplier: 1.5
+
+# ─── Fallback defaults khi config-server không phản hồi ──────────────────────
+# Tất cả giá trị này sẽ bị override bởi config-server nếu nó online.
+# Mục đích: service vẫn start được trong môi trường dev / khi config-server chưa ready.
+
+server:
+  port: ${SERVER_PORT:8083}
 
 openfeign:
   identity-service:
