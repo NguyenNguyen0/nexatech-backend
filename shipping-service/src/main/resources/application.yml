@@ -6,11 +6,21 @@ spring:
     name: shipping-service
   config:
     import: "optional:file:./.env[.properties],optional:file:./shipping-service/.env[.properties],optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
+  cloud:
+    config:
+      fail-fast: false
+      retry:
+        initial-interval: 1500
+        max-attempts: 4
+        max-interval: 5000
+        multiplier: 1.5
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/nexatech_shipping}
     username: ${DB_USERNAME:nexatech}
     password: ${DB_PASSWORD:nexatech123}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      initialization-fail-timeout: -1
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:

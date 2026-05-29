@@ -8,6 +8,8 @@ spring:
     username: ${DB_USERNAME:nexatech}
     password: ${DB_PASSWORD:nexatech123}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      initialization-fail-timeout: -1
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -32,6 +34,13 @@ spring:
         reconnect.backoff.ms: 1000
         reconnect.backoff.max.ms: 10000
   cloud:
+    config:
+      fail-fast: false
+      retry:
+        initial-interval: 1500
+        max-attempts: 4
+        max-interval: 5000
+        multiplier: 1.5
     openfeign:
       circuitbreaker:
         enabled: true
