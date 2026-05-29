@@ -27,14 +27,38 @@ export class EurekaService implements OnModuleInit, OnApplicationShutdown {
   private heartbeatTimer?: NodeJS.Timeout;
 
   async onModuleInit() {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      this.logger.log('Eureka registration disabled (EUREKA_ENABLED != true)');
+      return;
+    }
 
-    await this.register();
+    await this.registerWithRetry();
     this.heartbeatTimer = setInterval(() => {
       this.heartbeat().catch((error) => {
         this.logger.warn(`Eureka heartbeat failed: ${error.message}`);
       });
     }, 30000);
+  }
+
+  private async registerWithRetry(attempt = 1): Promise<void> {
+    const maxRetries = 8;
+    const delayMs = 5000;
+    try {
+      await this.register();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (attempt >= maxRetries) {
+        this.logger.error(
+          `Eureka registration failed after ${maxRetries} attempts: ${message}. Service will run without discovery.`,
+        );
+        return; // Không throw — service vẫn hoạt động, chỉ không có service discovery
+      }
+      this.logger.warn(
+        `Eureka registration attempt ${attempt}/${maxRetries} failed: ${message}. Retrying in ${delayMs}ms…`,
+      );
+      await new Promise((r) => setTimeout(r, delayMs));
+      return this.registerWithRetry(attempt + 1);
+    }
   }
 
   async onApplicationShutdown() {
@@ -104,6 +128,7 @@ export class EurekaService implements OnModuleInit, OnApplicationShutdown {
     if (!response.ok) {
       throw new Error(`heartbeat returned ${response.status}`);
     }
+    this.logger.debug(`Eureka heartbeat OK for ${this.instanceId}`);
   }
 
   private async unregister() {
@@ -114,6 +139,7 @@ export class EurekaService implements OnModuleInit, OnApplicationShutdown {
     if (!response.ok && response.status !== 404) {
       throw new Error(`unregister returned ${response.status}`);
     }
+    this.logger.log(`Deregistered ${this.instanceId} from Eureka`);
   }
 
   private normalizeEurekaUrl(url: string) {
