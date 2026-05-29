@@ -78,6 +78,13 @@ public class OrderPaymentEventConsumer {
                                 CONSUMER_NAME);
                         break;
                     }
+                    // Idempotent guard: skip if order is already CONFIRMED or beyond
+                    // to avoid state machine errors from duplicate PAYMENT_COMPLETED events
+                    if (!orderService.hasStatus(event.getOrderId(), OrderStatus.PENDING)) {
+                        log.info("Duplicate PAYMENT_COMPLETED ignored — order is no longer PENDING: orderId={}",
+                                event.getOrderId());
+                        break;
+                    }
                     orderService.updateOrderStatus(event.getOrderId(), OrderStatus.CONFIRMED);
                     auditLogService.logEvent("PAYMENT_COMPLETED_RECEIVED", "Order",
                             event.getOrderId().toString(),
