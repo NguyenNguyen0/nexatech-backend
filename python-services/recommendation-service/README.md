@@ -150,3 +150,30 @@ Recommended runtime metrics to monitor:
 - TRAINING_TIMEZONE=Asia/Ho_Chi_Minh
 - TRAINING_CRON_HOUR=2
 - TRAINING_CRON_MINUTE=0
+
+## Service Graph
+
+```mermaid
+flowchart LR
+	A[recommendation-service]
+	B[product-service]
+	C[mongodb]
+	D[redis]
+	E[kafka]
+	F[discovery-server]
+	G[api-gateway]
+
+	A --> B
+	A --> C
+	A --> D
+	A --> E
+	A --> F
+	G --> A
+```
+
+## Dependencies
+
+- Product enrichment: [product-service](../../product-service/README.md)
+- Exposed through: [api-gateway](../../api-gateway/README.md)
+- Service discovery: [discovery-server](../../discovery-server/README.md)
+- Infra: MongoDB, Redis, Kafka

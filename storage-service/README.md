@@ -167,3 +167,28 @@ These URLs are served by the `GET /api/v1/files/{bucket}/{key}` endpoint, routed
    curl -X POST http://localhost:8088/internal/files/upload \
      -F "file=@test-image.jpg"
    ```
+
+## Service Graph
+
+```mermaid
+flowchart LR
+    A[storage-service]
+    B[minio]
+    C[config-server]
+    D[discovery-server]
+    E[api-gateway]
+    F[product-service]
+
+    A --> B
+    A --> C
+    A --> D
+    E --> A
+    F --> A
+```
+
+## Dependencies
+
+- Used by: [product-service](../product-service/README.md)
+- Exposed through: [api-gateway](../api-gateway/README.md)
+- Shared platform: [config-server](../config-server/README.md), [discovery-server](../discovery-server/README.md)
+- Infra: MinIO

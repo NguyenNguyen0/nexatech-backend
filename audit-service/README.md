@@ -275,7 +275,32 @@ Response chuẩn:
 
 ## 10. Mở rộng
 
-- Thêm endpoint export CSV/Excel: dùng quyền `AUDIT_EXPORT`.
-- Thêm TTL index trên `timestamp` để tự động xoá log cũ (tuỳ chính sách retention).
-- Thêm Outbox Pattern phía producer để tránh mất event khi Kafka down.
-- Bật tracing (Spring Cloud Sleuth + Jaeger) — `application.yml` chung đã set `management.tracing.sampling.probability: 1.0`.
+
+
+---
+
+## Service Graph
+
+```mermaid
+flowchart LR
+  A[audit-service]
+  B[kafka]
+  C[mongodb]
+  D[keycloak]
+  E[config-server]
+  F[discovery-server]
+  G[api-gateway]
+
+  A --> B
+  A --> C
+  A --> D
+  A --> E
+  A --> F
+  G --> A
+```
+
+## Dependencies
+
+- Exposed through: [api-gateway](../api-gateway/README.md)
+- Shared platform: [config-server](../config-server/README.md), [discovery-server](../discovery-server/README.md)
+- Infra: Kafka, MongoDB, Keycloak

@@ -16,6 +16,10 @@ spring:
     gateway:
       server:
         webmvc:
+          default-filters:
+            - RemoveResponseHeader=Access-Control-Allow-Origin
+            - RemoveResponseHeader=Access-Control-Allow-Credentials
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_LAST
           routes:
             # Identity — AuthController /auth/**
             - id: identity-auth

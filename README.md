@@ -119,39 +119,29 @@
 
 ## Services
 
-### Java / Spring Services
+Mỗi service có README riêng theo dạng graph dependency. Bảng dưới đây tổng hợp service hiện tại và link trực tiếp tới README của từng service.
 
-| Service | Port | Main Store | Responsibility |
-|---|---:|---|---|
-| `api-gateway` | 8080 | - | Spring Cloud Gateway, JWT resource server, route aggregation |
-| `discovery-server` | 8761 | - | Eureka service registry |
-| `config-server` | 8888 | - | Centralized native config from `config-server/src/main/resources/configs` |
-| `identity-service` | 8082 | Keycloak + Redis | Login/session façade, Keycloak admin integration, auth events |
-| `user-service` | 8083 | PostgreSQL | User profiles, addresses, roles, permissions and groups |
-| `order-service` | 8084 | PostgreSQL + Redis | Cart, checkout, orders, returns |
-| `inventory-service` | 8085 | PostgreSQL + Redis | Stock, reservations, inventory adjustments |
-| `payment-service` | 8086 | PostgreSQL | Payment lifecycle and VNPay integration |
-| `notification-service` | 8087 | PostgreSQL | Notification APIs and Kafka/email consumers |
-| `storage-service` | 8088 | MinIO | File upload/retrieval, product image storage |
-| `chat-service` | 8089 | PostgreSQL + MongoDB + Redis | Chat rooms/messages and typing/WebSocket support |
-| `product-service` | 8090 | MongoDB | Catalog, categories, brands, images, reviews, wishlist |
-| `shipping-service` | 8091 | PostgreSQL | Shipping quote/order flow, mock or GHN provider |
-| `news-service` | 8092 | PostgreSQL + S3-compatible storage | News/blog content command and query APIs |
-| `audit-service` | 8096 | MongoDB | Central audit log ingestion and admin audit search |
-
-### Node.js Service
-
-| Service | Port | Main Store | Responsibility |
-|---|---:|---|---|
-| `promotion-service` | 8093 default / configurable | PostgreSQL + Redis + Kafka | Promotions, coupons, flash sales, Redis stock reservation and outbox publishing |
-
-### Python / FastAPI Services
-
-| Service | Port | Main Store | Responsibility |
-|---|---:|---|---|
-| `agent-service` | 8093 | - | Agent-oriented APIs, Eureka registration |
-| `mcp-server` | 8094 | - | MCP integration APIs, Eureka registration |
-| `recommendation-service` | 8095 | MongoDB + Redis + Kafka | Hybrid recommendation endpoints and product/behavior event collection |
+| Service | Runtime | Port | Main Store | Depends On (Service Links) | README |
+|---|---|---:|---|---|---|
+| `api-gateway` | Spring Cloud Gateway | 8080 | - | [identity-service](identity-service/README.md), [user-service](user-service/README.md), [product-service](product-service/README.md), [order-service](order-service/README.md), [inventory-service](inventory-service/README.md), [payment-service](payment-service/README.md), [shipping-service](shipping-service/README.md), [notification-service](notification-service/README.md), [chat-service](chat-service/README.md), [storage-service](storage-service/README.md), [news-service](news-service/README.md), [promotion-service](promotion-service/README.md), [audit-service](audit-service/README.md), [agent-service](python-services/agent-service/README.md), [mcp-server](python-services/mcp-server/README.md), [recommendation-service](python-services/recommendation-service/README.md), [discovery-server](discovery-server/README.md) | [api-gateway/README.md](api-gateway/README.md) |
+| `discovery-server` | Spring Boot (Eureka) | 8761 | - | Platform registry for all services | [discovery-server/README.md](discovery-server/README.md) |
+| `config-server` | Spring Boot (Config Server) | 8888 | Native config repo | [discovery-server](discovery-server/README.md) | [config-server/README.md](config-server/README.md) |
+| `identity-service` | Spring Boot | 8082 | Redis | [user-service](user-service/README.md), [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [identity-service/README.md](identity-service/README.md) |
+| `user-service` | Spring Boot | 8083 | PostgreSQL | [identity-service](identity-service/README.md), [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [user-service/README.md](user-service/README.md) |
+| `product-service` | Spring Boot | 8090 | MongoDB | [storage-service](storage-service/README.md), [order-service](order-service/README.md), [inventory-service](inventory-service/README.md), [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [product-service/README.md](product-service/README.md) |
+| `order-service` | Spring Boot | 8084 | PostgreSQL + Redis | [product-service](product-service/README.md), [inventory-service](inventory-service/README.md), [payment-service](payment-service/README.md), [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [order-service/README.md](order-service/README.md) |
+| `inventory-service` | Spring Boot | 8085 | PostgreSQL + Redis | [product-service](product-service/README.md), [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [inventory-service/README.md](inventory-service/README.md) |
+| `payment-service` | Spring Boot | 8086 | PostgreSQL | [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [payment-service/README.md](payment-service/README.md) |
+| `shipping-service` | Spring Boot | 8091 | PostgreSQL | [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [shipping-service/README.md](shipping-service/README.md) |
+| `notification-service` | Spring Boot | 8087 | PostgreSQL | [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [notification-service/README.md](notification-service/README.md) |
+| `chat-service` | Spring Boot | 8089 | PostgreSQL + MongoDB + Redis | [user-service](user-service/README.md), [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [chat-service/README.md](chat-service/README.md) |
+| `storage-service` | Spring Boot | 8088 | MinIO | [product-service](product-service/README.md), [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [storage-service/README.md](storage-service/README.md) |
+| `news-service` | Spring Boot | 8092 | PostgreSQL + Redis + S3 | [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [news-service/README.md](news-service/README.md) |
+| `audit-service` | Spring Boot | 8096 | MongoDB | [api-gateway](api-gateway/README.md), [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [audit-service/README.md](audit-service/README.md) |
+| `promotion-service` | NestJS | 8093 | PostgreSQL + Redis + Kafka | [api-gateway](api-gateway/README.md), [discovery-server](discovery-server/README.md) | [promotion-service/README.md](promotion-service/README.md) |
+| `agent-service` | FastAPI | 8093 | - | [api-gateway](api-gateway/README.md), [discovery-server](discovery-server/README.md) | [python-services/agent-service/README.md](python-services/agent-service/README.md) |
+| `mcp-server` | FastAPI | 8094 | - | [api-gateway](api-gateway/README.md), [discovery-server](discovery-server/README.md) | [python-services/mcp-server/README.md](python-services/mcp-server/README.md) |
+| `recommendation-service` | FastAPI | 8095 | MongoDB + Redis + Kafka | [product-service](product-service/README.md), [api-gateway](api-gateway/README.md), [discovery-server](discovery-server/README.md) | [python-services/recommendation-service/README.md](python-services/recommendation-service/README.md) |
 
 ---
 
