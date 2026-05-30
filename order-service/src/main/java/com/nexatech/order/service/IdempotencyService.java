@@ -7,11 +7,13 @@ import com.nexatech.order.model.OrderIdempotencyKey;
 import com.nexatech.order.repository.OrderIdempotencyKeyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,6 +25,10 @@ public class IdempotencyService {
     private final OrderIdempotencyKeyRepository idempotencyKeyRepository;
     private final ObjectMapper objectMapper;
 
+    @Value("${order.idempotency.processing-timeout-seconds:120}")
+    private long processingTimeoutSeconds;
+
+    @Transactional
     public Optional<String> checkAndGetCached(String idempotencyKey, String operation) {
         Optional<OrderIdempotencyKey> recordOptional = idempotencyKeyRepository.findByIdempotencyKey(idempotencyKey);
         if (recordOptional.isEmpty()) {
@@ -40,6 +46,15 @@ public class IdempotencyService {
         if (record.getStatus() == IdempotencyStatus.FAILED) {
             return Optional.empty();
         }
+        if (isProcessingExpired(record)) {
+            log.warn("Stale idempotency key reset: key={} operation={} updatedAt={}",
+                    idempotencyKey, operation, record.getUpdatedAt());
+            record.setOrderId(null);
+            record.setResponsePayload(null);
+            record.setStatus(IdempotencyStatus.FAILED);
+            idempotencyKeyRepository.save(record);
+            return Optional.empty();
+        }
         throw new ConflictException("Request is being processed. Please wait before retrying.");
     }
 
@@ -51,7 +66,7 @@ public class IdempotencyService {
             if (!record.getOperation().equals(operation)) {
                 throw new ConflictException("Idempotency key was used for a different operation.");
             }
-            if (record.getStatus() == IdempotencyStatus.FAILED) {
+            if (record.getStatus() == IdempotencyStatus.FAILED || isProcessingExpired(record)) {
                 record.setOrderId(null);
                 record.setResponsePayload(null);
                 record.setStatus(IdempotencyStatus.PROCESSING);
@@ -93,5 +108,14 @@ public class IdempotencyService {
             record.setStatus(IdempotencyStatus.FAILED);
             idempotencyKeyRepository.save(record);
         });
+    }
+
+    private boolean isProcessingExpired(OrderIdempotencyKey record) {
+        if (record.getStatus() != IdempotencyStatus.PROCESSING) {
+            return false;
+        }
+        Instant lastTouched = record.getUpdatedAt() != null ? record.getUpdatedAt() : record.getCreatedAt();
+        return lastTouched != null
+                && lastTouched.plusSeconds(Math.max(1, processingTimeoutSeconds)).isBefore(Instant.now());
     }
 }

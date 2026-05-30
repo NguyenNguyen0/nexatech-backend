@@ -10,6 +10,8 @@ import java.util.List;
 public class StockCheckRequest {
 
     private List<Item> items;
+    private String reference;
+    private String reason;
 
     @Data
     public static class Item {

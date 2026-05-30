@@ -51,6 +51,13 @@ spring:
               uri: lb://payment-service
               predicates:
                 - Path=/api/v1/payments,/api/v1/payments/**,/api/v1/admin/payments,/api/v1/admin/payments/**,/api/v1/admin/audit/payments,/api/v1/admin/audit/payments/**
+            - id: payment-service-vnpay-legacy-callback
+              uri: lb://payment-service
+              predicates:
+                - Path=/payment/vnpay/ipn,/payment/vnpay/return
+              filters:
+                - StripPrefix=1
+                - PrefixPath=/api/v1/payments
             - id: shipping-service
               uri: lb://shipping-service
               predicates:

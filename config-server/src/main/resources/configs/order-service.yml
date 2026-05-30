@@ -41,6 +41,8 @@ spring:
         enabled: true
 
 order:
+  idempotency:
+    processing-timeout-seconds: ${ORDER_IDEMPOTENCY_PROCESSING_TIMEOUT_SECONDS:120}
   payment:
     pending-timeout-minutes: ${ORDER_PAYMENT_PENDING_TIMEOUT_MINUTES:20}
     pending-timeout-scan-delay-ms: ${ORDER_PAYMENT_PENDING_TIMEOUT_SCAN_DELAY_MS:60000}

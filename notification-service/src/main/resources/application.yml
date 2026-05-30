@@ -12,6 +12,7 @@ spring:
         max-interval: 5000
         multiplier: 1.5
   datasource:
+
 app:
   admin-user-id: ${ADMIN_USER_ID:00000000-0000-0000-0000-000000000001}
   frontend-url: ${FRONTEND_URL:http://localhost:3000}

@@ -11,6 +11,7 @@ import com.nexatech.shipping.service.AuditLogService;
 import com.nexatech.shipping.service.ShippingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
@@ -33,6 +34,12 @@ public class OrderEventConsumer {
     private final ProcessedEventRepository processedEventRepository;
     private final AuditLogService auditLogService;
     private final GhnProperties ghnProperties;
+
+    @Value("${shipping.creation.max-attempts:3}")
+    private int shipmentCreationMaxAttempts;
+
+    @Value("${shipping.creation.retry-delay-ms:1500}")
+    private long shipmentCreationRetryDelayMs;
 
     @Transactional
     @KafkaListener(topics = "order.events", groupId = "shipping-service-group")
@@ -76,12 +83,15 @@ public class OrderEventConsumer {
                     auditLogService.log("ORDER_CANCELLED_RECEIVED", "Shipment", event.getOrderId().toString(),
                             "cancel shipment if present", CONSUMER_NAME);
                 }
-                case "ORDER_STATUS_UPDATED" -> {
-                    if ("CONFIRMED".equals(event.getStatus())) {
-                        auditLogService.log("ORDER_CONFIRMED_RECEIVED", "Shipment", event.getOrderId().toString(),
-                                "order confirmed — creating shipment", CONSUMER_NAME);
-                        createShipmentFromEvent(event);
-                    }
+                case "ORDER_OUT_OF_STOCK", "ORDER_SHIPPING_FAILED", "ORDER_REFUND_PENDING" -> {
+                    shippingService.cancelShipmentByOrderIdIfPresent(event.getOrderId().toString(), CONSUMER_NAME);
+                    auditLogService.log("ORDER_COMPENSATION_RECEIVED", "Shipment", event.getOrderId().toString(),
+                            "cancel shipment if present", CONSUMER_NAME);
+                }
+                case "ORDER_READY_FOR_SHIPPING" -> {
+                    auditLogService.log("ORDER_READY_FOR_SHIPPING_RECEIVED", "Shipment", event.getOrderId().toString(),
+                            "inventory finalized - creating shipment", CONSUMER_NAME);
+                    createShipmentFromEvent(event);
                 }
                 default -> log.debug("OrderEvent ignored by shipping-service: type={}", event.getEventType());
             }
@@ -101,7 +111,7 @@ public class OrderEventConsumer {
         if (eventId != null) {
             processedEventRepository.save(ProcessedEvent.builder()
                     .eventId(eventId)
-                    .eventType(event.getEventType())
+                    .eventType(event.getEventType() != null ? event.getEventType() : "UNKNOWN")
                     .consumerName(CONSUMER_NAME)
                     .aggregateId(event.getOrderId().toString())
                     .build());
@@ -164,11 +174,41 @@ public class OrderEventConsumer {
                 .build();
 
         log.info("Tạo shipment cho orderId={} customer={} phone={}", event.getOrderId(), customerName, customerPhone);
+        int maxAttempts = Math.max(1, shipmentCreationMaxAttempts);
+        String lastError = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                shippingService.createShipment(shipmentRequest);
+                if (attempt > 1) {
+                    log.info("Shipment creation recovered after retry: orderId={} attempt={}/{}",
+                            event.getOrderId(), attempt, maxAttempts);
+                }
+                return;
+            } catch (Exception ex) {
+                lastError = ex.getMessage();
+                log.warn("Shipment creation attempt failed: orderId={} attempt={}/{} error={} ({})",
+                        event.getOrderId(), attempt, maxAttempts, ex.getMessage(), ex.getClass().getSimpleName());
+                if (attempt < maxAttempts && !sleepBeforeRetry(event.getOrderId())) {
+                    break;
+                }
+            }
+        }
+
+        log.error("Tạo shipment thất bại sau retry cho orderId={}: {}", event.getOrderId(), lastError);
+        shippingService.publishShipmentCreationFailed(event.getOrderId().toString(), lastError, CONSUMER_NAME);
+    }
+
+    private boolean sleepBeforeRetry(UUID orderId) {
+        if (shipmentCreationRetryDelayMs <= 0) {
+            return true;
+        }
         try {
-            shippingService.createShipment(shipmentRequest);
-        } catch (Exception ex) {
-            log.error("Tạo shipment thất bại cho orderId={}: {} ({})", event.getOrderId(), ex.getMessage(), ex.getClass().getSimpleName(), ex);
-            throw ex;
+            Thread.sleep(shipmentCreationRetryDelayMs);
+            return true;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            log.warn("Shipment creation retry interrupted for orderId={}", orderId);
+            return false;
         }
     }
 }

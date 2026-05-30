@@ -18,6 +18,7 @@ import com.nexatech.product.util.MongoIdUtils;
 import com.nexatech.product.util.TextUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -39,7 +40,10 @@ public class ProductCommandHandler {
     private final ProductResponseEnricher productResponseEnricher;
     private final MongoTemplate mongoTemplate;
 
-    @CacheEvict(value = "products", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public ProductResponse handle(CreateProductCommand command) {
         validateCategory(command.primaryCategoryId());
         validateCategoryIds(command.categoryIds());
@@ -59,7 +63,10 @@ public class ProductCommandHandler {
         return productResponseEnricher.enrichCatalogResponse(productMapper.toResponse(saved));
     }
 
-    @CacheEvict(value = "products", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public ProductResponse handle(UpdateProductCommand command) {
         Product product = getActiveProduct(command.id());
         validateCategory(command.primaryCategoryId());
@@ -82,7 +89,10 @@ public class ProductCommandHandler {
         return productResponseEnricher.enrichCatalogResponse(productMapper.toResponse(saved));
     }
 
-    @CacheEvict(value = "products", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public void handle(DeleteProductCommand command) {
         Product product = getActiveProduct(command.id());
         product.setActive(false);
@@ -90,7 +100,10 @@ public class ProductCommandHandler {
         publishEvent(saved, "PRODUCT_DELETED");
     }
 
-    @CacheEvict(value = "products", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public ProductResponse handle(RestoreProductCommand command) {
         Product product = getProductById(command.id());
         if (product.isActive()) {

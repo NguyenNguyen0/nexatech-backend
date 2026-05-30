@@ -43,6 +43,11 @@ public class OrderResponse {
     private Instant estimatedDelivery;
     private Instant shippedAt;
     private Instant deliveredAt;
+    private String compensationReason;
+    private String refundBankName;
+    private String refundAccountNumber;
+    private String refundAccountHolder;
+    private Instant refundInfoSubmittedAt;
 
     @Data
     @Builder

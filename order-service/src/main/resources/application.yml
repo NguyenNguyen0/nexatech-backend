@@ -49,3 +49,7 @@ eureka:
       defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://discovery-server:8761/eureka/}
     fetch-registry: true
     register-with-eureka: true
+
+order:
+  idempotency:
+    processing-timeout-seconds: ${ORDER_IDEMPOTENCY_PROCESSING_TIMEOUT_SECONDS:120}
