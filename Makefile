@@ -7,6 +7,7 @@ DOCKER_INFRA = docker-compose.infra.yml
 DOCKER_FULL = docker-compose.yml
 DOCKER_CORE = _realms/docker-compose-order-payment.yml
 MVN = mvn
+SHELL := /bin/bash
 
 # Load .env.ec2 và set env vars trong cùng một PowerShell process
 # Load .env (service credentials: GHN, VNPay, MinIO, v.v.)
@@ -130,6 +131,14 @@ logs-full:
 	docker compose -f $(DOCKER_FULL) logs -f
 
 # --- Run Individual Services (from root, PowerShell compatible) ---
+spring-service:
+	@test -f "$(ENV_FILE)" || (echo "ENV_FILE not found: $(ENV_FILE)" && exit 1)
+	@echo "Starting $(SERVICE) with $(ENV_FILE)"
+	@set -a && \
+	. ./$(ENV_FILE) && \
+	set +a && \
+	$(MVN) -pl $(SERVICE) spring-boot:run
+
 run-discovery:
 	$(MVN) -pl discovery-server spring-boot:run
 
@@ -165,6 +174,9 @@ run-chat:
 
 run-audit:
 	$(MVN) -pl audit-service spring-boot:run
+
+run-news:
+	$(MVN) -pl news-service spring-boot:run
 
 run-storage:
 	$(MVN) -pl storage-service spring-boot:run
