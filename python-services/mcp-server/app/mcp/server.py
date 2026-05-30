@@ -3,6 +3,4 @@ from __future__ import annotations
 from fastmcp import FastMCP
 
 
-mcp = FastMCP(
-    "NexaTech MCP Skeleton",
-)
+mcp = FastMCP("NexaTech MCP")

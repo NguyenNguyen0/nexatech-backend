@@ -6,6 +6,14 @@ from app.services.base import BaseServiceApi
 
 
 class PaymentServiceApi(BaseServiceApi):
+    async def create_payment(self, order_id: str, method: str, idempotency_key: str | None = None) -> object:
+        headers = {"Idempotency-Key": idempotency_key} if idempotency_key else {}
+        return await self.client.request(
+            "POST", "/api/v1/payments",
+            json={"orderId": order_id, "method": method},
+            headers=headers,
+        )
+
     async def get_payment(self, payment_id: str) -> object:
         return await self.client.request("GET", f"/api/v1/payments/{payment_id}")
 
@@ -14,6 +22,9 @@ class PaymentServiceApi(BaseServiceApi):
 
     async def my_payments(self) -> object:
         return await self.client.request("GET", "/api/v1/payments/my")
+
+    async def refund(self, payment_id: str) -> object:
+        return await self.client.request("POST", f"/api/v1/payments/{payment_id}/refund")
 
     async def stats(self) -> object:
         return await self.client.request("GET", "/api/v1/admin/payments/stats")

@@ -23,4 +23,20 @@ TOOL_SENSITIVITY: dict[str, str] = {
     "release_stock": "high",
     "bulk_import_inventory": "high",
     "update_warehouse_info": "medium",
+    # ── Payment tools ──────────────────────────────────────────────
+    "get_payment": "low",
+    "get_payment_by_order": "low",
+    "get_my_payments": "low",
+    "get_payment_stats": "low",
+    "create_payment": "medium",
+    "refund_payment": "high",
+    # ── Order tools ────────────────────────────────────────────────
+    "get_order": "low",
+    "get_my_orders": "low",
+    "get_order_stats": "low",
+    "check_purchased": "low",
+    "get_order_trace": "low",
+    "cancel_order": "high",
+    "continue_order_payment": "medium",
 }
+

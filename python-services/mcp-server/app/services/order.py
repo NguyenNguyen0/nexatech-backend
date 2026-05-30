@@ -12,11 +12,17 @@ class OrderServiceApi(BaseServiceApi):
     async def my_orders(self) -> object:
         return await self.client.request("GET", "/api/v1/orders/my")
 
-    async def check_purchased(self, product_id: str) -> object:
-        return await self.client.request("GET", "/api/v1/orders/check-purchased", params={"productId": product_id})
+    async def check_purchased(self, user_id: str, product_id: str) -> object:
+        return await self.client.request("GET", "/api/v1/orders/check-purchased", params={"userId": user_id, "productId": product_id})
 
     async def stats(self) -> object:
         return await self.client.request("GET", "/api/v1/admin/orders/stats")
+
+    async def cancel_order(self, order_id: str) -> object:
+        return await self.client.request("POST", f"/api/v1/orders/{order_id}/cancel")
+
+    async def continue_payment(self, order_id: str) -> object:
+        return await self.client.request("POST", f"/api/v1/orders/{order_id}/continue-payment")
 
     async def trace_by_correlation(self, correlation_id: str) -> object:
         return await self.client.request("GET", f"/api/v1/admin/audit/trace/{correlation_id}")

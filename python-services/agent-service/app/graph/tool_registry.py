@@ -170,6 +170,137 @@ TOOL_DESCRIPTORS: tuple[ToolDescriptor, ...] = (
         tool_args={"params": {}},
         rationale="Use audit log search when the request asks for audit history or traces.",
     ),
+    # ── Payment tools ──────────────────────────────────────────────
+    ToolDescriptor(
+        tool_name="get_my_payments",
+        keywords=(
+            "payment",
+            "payments",
+            "thanh toán",
+            "thanh toan",
+            "lịch sử thanh toán",
+            "lich su thanh toan",
+            "hóa đơn",
+            "hoa don",
+            "giao dịch",
+            "giao dich",
+        ),
+        rationale="Use my-payments listing when the request asks for payment history or invoices of the current user.",
+    ),
+    ToolDescriptor(
+        tool_name="get_payment",
+        keywords=("payment id", "mã thanh toán", "ma thanh toan", "chi tiết thanh toán", "chi tiet thanh toan"),
+        rationale="Use single payment lookup when the request provides a payment id.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_payment_by_order",
+        keywords=(
+            "payment order",
+            "thanh toán đơn hàng",
+            "thanh toan don hang",
+            "thanh toán của đơn",
+            "thanh toan cua don",
+        ),
+        rationale="Use payment-by-order lookup when the request asks for payment info of a specific order.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_payment_stats",
+        keywords=(
+            "payment stats",
+            "thống kê thanh toán",
+            "thong ke thanh toan",
+            "báo cáo thanh toán",
+            "bao cao thanh toan",
+        ),
+        rationale="Use payment stats when the request asks for payment statistics or summaries.",
+    ),
+    ToolDescriptor(
+        tool_name="create_payment",
+        keywords=("create payment", "tạo thanh toán", "tao thanh toan"),
+        rationale="Use payment creation when the request asks to create a new payment for an order.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="refund_payment",
+        keywords=("refund", "hoàn tiền", "hoan tien", "hoàn thanh toán", "hoan thanh toan"),
+        rationale="Use refund when the request asks to refund a completed payment.",
+        heuristic_enabled=False,
+    ),
+    # ── Order tools ────────────────────────────────────────────────
+    ToolDescriptor(
+        tool_name="get_my_orders",
+        keywords=(
+            "order",
+            "orders",
+            "đơn hàng",
+            "don hang",
+            "lịch sử đơn hàng",
+            "lich su don hang",
+            "đơn đặt hàng",
+            "don dat hang",
+        ),
+        rationale="Use my-orders listing when the request asks for order history of the current user.",
+    ),
+    ToolDescriptor(
+        tool_name="get_order",
+        keywords=("order id", "mã đơn hàng", "ma don hang", "chi tiết đơn hàng", "chi tiet don hang"),
+        rationale="Use single order lookup when the request provides an order id.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_order_stats",
+        keywords=(
+            "order stats",
+            "thống kê đơn hàng",
+            "thong ke don hang",
+            "báo cáo đơn hàng",
+            "bao cao don hang",
+        ),
+        rationale="Use order stats when the request asks for order statistics or summaries.",
+    ),
+    ToolDescriptor(
+        tool_name="check_purchased",
+        keywords=(
+            "check purchased",
+            "kiểm tra mua hàng",
+            "kiem tra mua hang",
+            "đã mua chưa",
+            "da mua chua",
+        ),
+        rationale="Use purchase check when the request asks whether a user has purchased a specific product.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="cancel_order",
+        keywords=("cancel order", "hủy đơn", "huy don", "hủy đơn hàng", "huy don hang"),
+        rationale="Use order cancellation when the request asks to cancel an existing order.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="continue_order_payment",
+        keywords=(
+            "continue payment",
+            "tiếp tục thanh toán",
+            "tiep tuc thanh toan",
+            "thanh toán lại",
+            "thanh toan lai",
+        ),
+        rationale="Use continue-payment when the request asks to resume VNPay payment for a pending order.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_order_trace",
+        keywords=(
+            "order trace",
+            "truy vết đơn hàng",
+            "truy vet don hang",
+            "trace đơn hàng",
+        ),
+        rationale="Use order trace when the request provides a correlation ID to trace an order across services.",
+        heuristic_enabled=False,
+    ),
 )
 
 
