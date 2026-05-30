@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from langgraph.graph import END, START, StateGraph
 
 from app.graph.edges import (
@@ -22,7 +24,7 @@ from app.graph.nodes import (
 from app.graph.state import AgentState
 
 
-def compile_graph():
+def compile_graph(checkpointer: Any | None = None):
     workflow = StateGraph(AgentState)
 
     workflow.add_node("classify_request", classify_request)
@@ -80,4 +82,6 @@ def compile_graph():
     workflow.add_edge("execute_tool", "format_response")
     workflow.add_edge("format_response", END)
 
-    return workflow.compile()
+    if checkpointer is None:
+        return workflow.compile()
+    return workflow.compile(checkpointer=checkpointer)

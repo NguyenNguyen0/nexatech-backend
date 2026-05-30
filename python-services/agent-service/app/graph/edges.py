@@ -16,6 +16,8 @@ def route_after_agent_think(state: dict[str, Any]) -> str:
 
 
 def route_after_needs_approval(state: dict[str, Any]) -> str:
+    if state.get("response_text"):
+        return "format_response"
     sensitivity = (state.get("request_sensitivity") or "low").lower()
     if sensitivity == "low":
         return "execute_tool"

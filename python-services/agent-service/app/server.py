@@ -4,21 +4,25 @@ import logging
 import uuid
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Any
 
 try:
     import py_eureka_client.eureka_client as eureka_client
 except ImportError:  # pragma: no cover
     eureka_client = None
 
+from pydantic import BaseModel, ConfigDict, Field
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from langgraph.types import Command, Interrupt
 
 from app.config import configure_runtime_environment
 from app.core.logging import configure_logging, correlation_id_ctx
 from app.core.settings import SETTINGS
 from app.graph.agent import compile_graph
 from app.runtime.copilotkit import attach_copilotkit_middleware
+from app.runtime.checkpointer import close_checkpointer, initialize_checkpointer
 
 
 configure_runtime_environment()
@@ -27,12 +31,88 @@ logger = logging.getLogger(SETTINGS.service_name)
 
 READINESS_CHECKS: dict[str, str] = {
     "service": "ok",
+    "checkpointer": "pending",
     "eureka": "pending",
     "graph": "pending",
     "copilotkit": "pending",
 }
 
-COMPILED_GRAPH = compile_graph()
+COMPILED_GRAPH: Any | None = None
+
+
+class AgentRunRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    message: str
+    thread_id: str | None = Field(default=None, alias="threadId")
+    caller: dict[str, Any] = Field(default_factory=lambda: {"roles": ["operator"]})
+    required_role: str | None = Field(default=None, alias="requiredRole")
+    request_sensitivity: str | None = Field(default=None, alias="requestSensitivity")
+    selected_tool: str | None = Field(default=None, alias="selectedTool")
+    selected_tool_args: dict[str, Any] | None = Field(default=None, alias="selectedToolArgs")
+
+
+class AgentResumeRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    thread_id: str = Field(alias="threadId")
+    decision: str | dict[str, Any]
+
+
+def _json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if hasattr(value, "model_dump"):
+        return _json_safe(value.model_dump())
+    if hasattr(value, "_asdict"):
+        return _json_safe(value._asdict())
+    if hasattr(value, "__dict__"):
+        return _json_safe(vars(value))
+    return str(value)
+
+
+def _serialize_interrupts(interrupts: tuple[Interrupt, ...]) -> list[dict[str, Any]]:
+    return [{"id": interrupt.id, "value": _json_safe(interrupt.value)} for interrupt in interrupts]
+
+
+def _graph_config(thread_id: str) -> dict[str, Any]:
+    return {"configurable": {"thread_id": thread_id}}
+
+
+async def _invoke_graph(graph_input: Any, *, thread_id: str) -> dict[str, Any]:
+    graph = getattr(app.state, "compiled_graph", None)
+    if graph is None:
+        raise HTTPException(status_code=503, detail="Graph runtime is not initialized")
+
+    config = _graph_config(thread_id)
+    result = await graph.ainvoke(graph_input, config=config, durability="exit", version="v2")
+    interrupts = getattr(result, "interrupts", ())
+    if READINESS_CHECKS.get("checkpointer") == "ok":
+        snapshot = await graph.aget_state(config)
+        state_payload = {
+            "values": _json_safe(snapshot.values),
+            "next": list(snapshot.next),
+            "interrupts": _serialize_interrupts(snapshot.interrupts),
+        }
+    else:
+        output_value = _json_safe(result.value)
+        state_payload = {
+            "values": output_value,
+            "next": [],
+            "interrupts": _serialize_interrupts(interrupts),
+        }
+
+    return {
+        "threadId": thread_id,
+        "status": "interrupted" if interrupts else "completed",
+        "output": _json_safe(result.value),
+        "interrupts": _serialize_interrupts(interrupts),
+        "state": state_payload,
+    }
 
 
 def _utc_timestamp() -> str:
@@ -67,6 +147,37 @@ async def _register_eureka() -> None:
         logger.warning("[STARTUP] - Eureka: registration failed (%s)", exc.__class__.__name__)
 
 
+def _initialize_graph_runtime(app: FastAPI) -> None:
+    global COMPILED_GRAPH
+
+    try:
+        checkpointer = initialize_checkpointer(SETTINGS.agent_db_url)
+        if checkpointer is None:
+            READINESS_CHECKS["checkpointer"] = "disabled"
+            logger.info("[STARTUP] - LangGraph checkpointer: disabled")
+        else:
+            READINESS_CHECKS["checkpointer"] = "ok"
+        COMPILED_GRAPH = compile_graph(checkpointer=checkpointer)
+        app.state.compiled_graph = COMPILED_GRAPH
+        READINESS_CHECKS["graph"] = "ok"
+    except Exception as exc:
+        COMPILED_GRAPH = compile_graph()
+        app.state.compiled_graph = COMPILED_GRAPH
+        READINESS_CHECKS["checkpointer"] = f"error: {exc.__class__.__name__}"
+        READINESS_CHECKS["graph"] = "ok"
+        logger.warning("[STARTUP] - LangGraph checkpointer: initialization failed (%s)", exc.__class__.__name__)
+
+    if attach_copilotkit_middleware(
+        app,
+        agent_name=SETTINGS.agui_agent_name,
+        agent_description=SETTINGS.agui_agent_description,
+        graph=COMPILED_GRAPH,
+    ):
+        READINESS_CHECKS["copilotkit"] = "ok"
+    else:
+        READINESS_CHECKS["copilotkit"] = "unavailable"
+
+
 async def _deregister_eureka() -> None:
     if not SETTINGS.eureka_enabled or eureka_client is None:
         return
@@ -81,26 +192,17 @@ async def _deregister_eureka() -> None:
 async def lifespan(app: FastAPI):
     app.state.settings = SETTINGS
     app.state.readiness_checks = READINESS_CHECKS
+    _initialize_graph_runtime(app)
 
     await _register_eureka()
     try:
         yield
     finally:
         await _deregister_eureka()
+        close_checkpointer()
 
 
 app = FastAPI(title="Agent Service", version="0.1.0", lifespan=lifespan)
-
-READINESS_CHECKS["graph"] = "ok"
-if attach_copilotkit_middleware(
-    app,
-    agent_name=SETTINGS.agui_agent_name,
-    agent_description=SETTINGS.agui_agent_description,
-    graph=COMPILED_GRAPH,
-):
-    READINESS_CHECKS["copilotkit"] = "ok"
-else:
-    READINESS_CHECKS["copilotkit"] = "unavailable"
 
 
 @app.middleware("http")
@@ -223,4 +325,54 @@ def root() -> dict[str, object]:
             "app/mcp_client.py",
             "app/config.py",
         ],
+    }
+
+
+@app.post("/api/v1/agent/runs")
+async def run_agent(request: AgentRunRequest) -> dict[str, Any]:
+    thread_id = request.thread_id or str(uuid.uuid4())
+    graph_input = {
+        "messages": [{"role": "user", "content": request.message}],
+        "caller": request.caller,
+        "checkpointer_enabled": READINESS_CHECKS.get("checkpointer") == "ok",
+        "required_role": request.required_role,
+        "request_sensitivity": request.request_sensitivity,
+        "selected_tool": request.selected_tool,
+        "selected_tool_args": request.selected_tool_args,
+        "tool_results": [],
+        "tool_errors": [],
+        "thread_id": thread_id,
+        "request_id": correlation_id_ctx.get(),
+    }
+    return await _invoke_graph(graph_input, thread_id=thread_id)
+
+
+@app.post("/api/v1/agent/runs/resume")
+async def resume_agent(request: AgentResumeRequest) -> dict[str, Any]:
+    if READINESS_CHECKS.get("checkpointer") != "ok":
+        raise HTTPException(status_code=503, detail="Resume requires the LangGraph checkpointer")
+    return await _invoke_graph(Command(resume=request.decision), thread_id=request.thread_id)
+
+
+@app.get("/api/v1/agent/runs/{thread_id}")
+async def get_agent_run_state(thread_id: str) -> dict[str, Any]:
+    if READINESS_CHECKS.get("checkpointer") != "ok":
+        raise HTTPException(status_code=503, detail="Run state requires the LangGraph checkpointer")
+
+    graph = getattr(app.state, "compiled_graph", None)
+    if graph is None:
+        raise HTTPException(status_code=503, detail="Graph runtime is not initialized")
+
+    try:
+        snapshot = await graph.aget_state(_graph_config(thread_id))
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"Run state not found: {exc.__class__.__name__}") from exc
+
+    return {
+        "threadId": thread_id,
+        "state": {
+            "values": _json_safe(snapshot.values),
+            "next": list(snapshot.next),
+            "interrupts": _serialize_interrupts(snapshot.interrupts),
+        },
     }
