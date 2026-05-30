@@ -14,6 +14,7 @@ FastAPI skeleton service for NexaTech agent orchestration. This setup introduces
 - `POST /api/v1/agent/runs`
 - `POST /api/v1/agent/runs/resume`
 - `GET /api/v1/agent/runs/{threadId}`
+- `GET /api/v1/agent/conversations?userId=...`
 - `GET /api/v1/agent/conversations/{threadId}`
 
 ## Run
@@ -88,3 +89,5 @@ Key variables:
 
 - CopilotKit objects are initialized in runtime state (`app.state`) for compatibility with the current package API.
 - Conversation sessions are persisted in MongoDB when `CONVERSATION_STORE_ENABLED=true` and `MONGO_URI` is reachable.
+- User context headers (`X-User-Id`, `X-User-Role`, `X-User-Email`) are consumed when available and propagated to MCP calls.
+- Service supports both prefixed and stripped routes (`/api/v1/agent/...` and `/runs`, `/conversations`, ...) for gateway compatibility.

@@ -18,7 +18,13 @@ from fastapi.responses import JSONResponse
 from langgraph.types import Command, Interrupt
 
 from app.config import configure_runtime_environment
-from app.core.logging import configure_logging, correlation_id_ctx
+from app.core.logging import (
+    configure_logging,
+    correlation_id_ctx,
+    user_email_ctx,
+    user_id_ctx,
+    user_role_ctx,
+)
 from app.core.settings import SETTINGS
 from app.graph.agent import compile_graph
 from app.runtime.copilotkit import attach_copilotkit_middleware
@@ -130,9 +136,13 @@ async def _persist_conversation_event(
 
     correlation_id = None
     user_id = None
+    user_role = None
+    user_email = None
     if request is not None:
         correlation_id = getattr(request.state, "correlation_id", None)
         user_id = request.headers.get("X-User-Id")
+        user_role = request.headers.get("X-User-Role")
+        user_email = request.headers.get("X-User-Email")
 
     try:
         await store.append_event(
@@ -141,9 +151,42 @@ async def _persist_conversation_event(
             payload=payload,
             correlation_id=correlation_id,
             user_id=user_id,
+            user_role=user_role,
+            user_email=user_email,
         )
     except Exception as exc:  # pragma: no cover
         logger.warning("Failed to persist conversation event (%s): %s", event_type, exc)
+
+
+def _extract_roles_from_header(raw_roles: str | None) -> list[str]:
+    if not raw_roles:
+        return []
+    normalized = raw_roles.replace(";", ",")
+    return [item.strip().lower() for item in normalized.split(",") if item.strip()]
+
+
+def _build_caller_context(request: AgentRunRequest, raw_request: Request) -> dict[str, Any]:
+    caller = dict(request.caller or {})
+    caller_roles = caller.get("roles") if isinstance(caller.get("roles"), list) else []
+    normalized_roles = [str(item).strip().lower() for item in caller_roles if str(item).strip()]
+
+    header_roles = _extract_roles_from_header(raw_request.headers.get("X-User-Role"))
+    merged_roles: list[str] = []
+    for role in [*normalized_roles, *header_roles]:
+        if role not in merged_roles:
+            merged_roles.append(role)
+
+    caller["roles"] = merged_roles or ["operator"]
+
+    user_id = raw_request.headers.get("X-User-Id")
+    if user_id and not caller.get("userId"):
+        caller["userId"] = user_id
+
+    user_email = raw_request.headers.get("X-User-Email")
+    if user_email and not caller.get("email"):
+        caller["email"] = user_email
+
+    return caller
 
 
 def _utc_timestamp() -> str:
@@ -264,13 +307,23 @@ app = FastAPI(title="Agent Service", version="0.1.0", lifespan=lifespan)
 @app.middleware("http")
 async def correlation_id_middleware(request: Request, call_next):
     correlation_id = request.headers.get("X-Correlation-Id") or str(uuid.uuid4())
-    token = correlation_id_ctx.set(correlation_id)
+    user_id = request.headers.get("X-User-Id") or "-"
+    user_role = request.headers.get("X-User-Role") or "-"
+    user_email = request.headers.get("X-User-Email") or "-"
+
+    correlation_token = correlation_id_ctx.set(correlation_id)
+    user_id_token = user_id_ctx.set(user_id)
+    user_role_token = user_role_ctx.set(user_role)
+    user_email_token = user_email_ctx.set(user_email)
     request.state.correlation_id = correlation_id
 
     try:
         response = await call_next(request)
     finally:
-        correlation_id_ctx.reset(token)
+        correlation_id_ctx.reset(correlation_token)
+        user_id_ctx.reset(user_id_token)
+        user_role_ctx.reset(user_role_token)
+        user_email_ctx.reset(user_email_token)
 
     response.headers["X-Correlation-Id"] = correlation_id
     return response
@@ -384,12 +437,14 @@ def root() -> dict[str, object]:
     }
 
 
+@app.post("/runs")
 @app.post("/api/v1/agent/runs")
 async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str, Any]:
     thread_id = request.thread_id or str(uuid.uuid4())
+    caller = _build_caller_context(request, raw_request)
     graph_input = {
         "messages": [{"role": "user", "content": request.message}],
-        "caller": request.caller,
+        "caller": caller,
         "checkpointer_enabled": READINESS_CHECKS.get("checkpointer") == "ok",
         "required_role": request.required_role,
         "request_sensitivity": request.request_sensitivity,
@@ -405,7 +460,7 @@ async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str,
         event_type="user_message",
         payload={
             "message": request.message,
-            "caller": request.caller,
+            "caller": caller,
         },
         request=raw_request,
     )
@@ -423,6 +478,7 @@ async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str,
     return result
 
 
+@app.post("/runs/resume")
 @app.post("/api/v1/agent/runs/resume")
 async def resume_agent(request: AgentResumeRequest, raw_request: Request) -> dict[str, Any]:
     if READINESS_CHECKS.get("checkpointer") != "ok":
@@ -447,6 +503,7 @@ async def resume_agent(request: AgentResumeRequest, raw_request: Request) -> dic
     return result
 
 
+@app.get("/runs/{thread_id}")
 @app.get("/api/v1/agent/runs/{thread_id}")
 async def get_agent_run_state(thread_id: str) -> dict[str, Any]:
     if READINESS_CHECKS.get("checkpointer") != "ok":
@@ -471,6 +528,7 @@ async def get_agent_run_state(thread_id: str) -> dict[str, Any]:
     }
 
 
+@app.get("/conversations/{thread_id}")
 @app.get("/api/v1/agent/conversations/{thread_id}")
 async def get_conversation_thread(
     thread_id: str,
@@ -484,3 +542,26 @@ async def get_conversation_thread(
     if thread is None:
         raise HTTPException(status_code=404, detail="Conversation thread not found")
     return thread
+
+
+@app.get("/conversations")
+@app.get("/api/v1/agent/conversations")
+async def list_conversation_threads(
+    request: Request,
+    user_id: str | None = Query(default=None, alias="userId"),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> dict[str, Any]:
+    store = getattr(app.state, "conversation_store", None)
+    if store is None:
+        raise HTTPException(status_code=503, detail="Conversation store is not available")
+
+    effective_user_id = user_id or request.headers.get("X-User-Id")
+    if not effective_user_id:
+        raise HTTPException(status_code=400, detail="userId is required when X-User-Id is not provided")
+
+    threads = await store.list_threads_by_user(user_id=effective_user_id, limit=limit)
+    return {
+        "userId": effective_user_id,
+        "count": len(threads),
+        "threads": threads,
+    }

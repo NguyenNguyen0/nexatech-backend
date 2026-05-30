@@ -25,6 +25,8 @@ class MongoConversationStore:
         payload: dict[str, Any],
         correlation_id: str | None,
         user_id: str | None,
+        user_role: str | None,
+        user_email: str | None,
     ) -> None:
         now = datetime.now(UTC)
         event = {
@@ -33,25 +35,42 @@ class MongoConversationStore:
             "eventType": event_type,
             "correlationId": correlation_id,
             "userId": user_id,
+            "userRole": user_role,
+            "userEmail": user_email,
             "payload": payload,
         }
+        set_payload: dict[str, Any] = {
+            "updatedAt": now,
+        }
+        add_to_set: dict[str, Any] = {}
+        if user_id:
+            set_payload["lastUserId"] = user_id
+            add_to_set["userIds"] = user_id
+        if user_role:
+            set_payload["lastUserRole"] = user_role
+            add_to_set["userRoles"] = user_role
+        if user_email:
+            set_payload["lastUserEmail"] = user_email
+
+        update: dict[str, Any] = {
+            "$setOnInsert": {
+                "service": "agent-service",
+                "createdAt": now,
+            },
+            "$set": set_payload,
+            "$push": {
+                "events": {
+                    "$each": [event],
+                    "$slice": -self.max_events,
+                }
+            },
+        }
+        if add_to_set:
+            update["$addToSet"] = add_to_set
+
         await self._collection.update_one(
             {"_id": thread_id},
-            {
-                "$setOnInsert": {
-                    "service": "agent-service",
-                    "createdAt": now,
-                },
-                "$set": {
-                    "updatedAt": now,
-                },
-                "$push": {
-                    "events": {
-                        "$each": [event],
-                        "$slice": -self.max_events,
-                    }
-                },
-            },
+            update,
             upsert=True,
         )
 
@@ -69,6 +88,11 @@ class MongoConversationStore:
             "service": document.get("service", "agent-service"),
             "createdAt": _to_iso(document.get("createdAt")),
             "updatedAt": _to_iso(document.get("updatedAt")),
+            "lastUserId": document.get("lastUserId"),
+            "lastUserRole": document.get("lastUserRole"),
+            "lastUserEmail": document.get("lastUserEmail"),
+            "userIds": document.get("userIds") or [],
+            "userRoles": document.get("userRoles") or [],
             "events": [
                 {
                     "id": item.get("id"),
@@ -76,11 +100,37 @@ class MongoConversationStore:
                     "eventType": item.get("eventType"),
                     "correlationId": item.get("correlationId"),
                     "userId": item.get("userId"),
+                    "userRole": item.get("userRole"),
+                    "userEmail": item.get("userEmail"),
                     "payload": item.get("payload"),
                 }
                 for item in events
             ],
         }
+
+    async def list_threads_by_user(self, *, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        cursor = self._collection.find(
+            {"userIds": user_id},
+            {
+                "events": 0,
+            },
+        ).sort("updatedAt", -1).limit(limit)
+        documents = await cursor.to_list(length=limit)
+
+        return [
+            {
+                "threadId": item.get("_id"),
+                "service": item.get("service", "agent-service"),
+                "createdAt": _to_iso(item.get("createdAt")),
+                "updatedAt": _to_iso(item.get("updatedAt")),
+                "lastUserId": item.get("lastUserId"),
+                "lastUserRole": item.get("lastUserRole"),
+                "lastUserEmail": item.get("lastUserEmail"),
+                "userIds": item.get("userIds") or [],
+                "userRoles": item.get("userRoles") or [],
+            }
+            for item in documents
+        ]
 
     async def close(self) -> None:
         self.client.close()
@@ -116,12 +166,15 @@ async def initialize_conversation_store(
     try:
         client = AsyncIOMotorClient(mongo_uri, serverSelectionTimeoutMS=1500)
         await client.admin.command("ping")
-        return MongoConversationStore(
+        store = MongoConversationStore(
             client,
             mongo_database,
             mongo_collection,
             max_events=max_events,
         )
+        await store._collection.create_index("updatedAt")
+        await store._collection.create_index("userIds")
+        return store
     except Exception as exc:  # pragma: no cover
         logger.warning("Mongo conversation store initialization failed: %s", exc)
         return None

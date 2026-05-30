@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.settings import SETTINGS
 from app.core.http import ServiceClient, ServiceDefinition
+from app.core.logging import user_email_ctx, user_id_ctx, user_role_ctx
 from app.server import READINESS_CHECKS, app
 
 
@@ -87,3 +88,34 @@ async def test_service_client_returns_structured_error_after_retries() -> None:
     assert result["ok"] is False
     assert result["error"]["statusCode"] == 503
     assert result["error"]["tag"] == "PRD-503"
+
+
+@pytest.mark.asyncio
+async def test_service_client_forwards_user_headers_from_context() -> None:
+    seen_headers: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_headers["X-User-Id"] = request.headers.get("X-User-Id", "")
+        seen_headers["X-User-Role"] = request.headers.get("X-User-Role", "")
+        seen_headers["X-User-Email"] = request.headers.get("X-User-Email", "")
+        return httpx.Response(200, json={"result": {"ok": True}})
+
+    client = ServiceClient(
+        ServiceDefinition(name="demo-service", base_url="http://example.test", retry_attempts=1),
+        transport=httpx.MockTransport(handler),
+    )
+
+    token_user_id = user_id_ctx.set("user-abc")
+    token_user_role = user_role_ctx.set("manager")
+    token_user_email = user_email_ctx.set("user@nexatech.local")
+    try:
+        result = await client.request("GET", "/health")
+    finally:
+        user_id_ctx.reset(token_user_id)
+        user_role_ctx.reset(token_user_role)
+        user_email_ctx.reset(token_user_email)
+
+    assert result == {"ok": True}
+    assert seen_headers["X-User-Id"] == "user-abc"
+    assert seen_headers["X-User-Role"] == "manager"
+    assert seen_headers["X-User-Email"] == "user@nexatech.local"

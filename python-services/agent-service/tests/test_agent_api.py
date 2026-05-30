@@ -50,3 +50,41 @@ def test_resume_agent_requires_checkpointer() -> None:
 
     assert response.status_code == 503
     assert response.json()["message"] == "Resume requires the LangGraph checkpointer"
+
+
+def test_run_agent_accepts_gateway_style_path_and_merges_header_roles(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_invoke_graph(graph_input: object, *, thread_id: str) -> dict[str, object]:
+        assert isinstance(graph_input, dict)
+        captured["caller"] = graph_input.get("caller")
+        return {
+            "threadId": thread_id,
+            "status": "completed",
+            "output": {"selected_tool": "list_promotions"},
+            "interrupts": [],
+            "state": {"values": {}, "next": [], "interrupts": []},
+        }
+
+    monkeypatch.setattr("app.server._invoke_graph", fake_invoke_graph)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/runs",
+            json={
+                "message": "liet ke khuyen mai",
+                "caller": {"roles": ["operator"]},
+            },
+            headers={
+                "X-User-Id": "user-123",
+                "X-User-Role": "manager,operator",
+                "X-User-Email": "admin@nexatech.local",
+            },
+        )
+
+    assert response.status_code == 200
+    assert captured["caller"] == {
+        "roles": ["operator", "manager"],
+        "userId": "user-123",
+        "email": "admin@nexatech.local",
+    }

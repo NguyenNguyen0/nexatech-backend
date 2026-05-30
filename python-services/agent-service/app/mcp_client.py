@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx
 
-from app.core.logging import correlation_id_ctx
+from app.core.logging import correlation_id_ctx, user_email_ctx, user_id_ctx, user_role_ctx
 from app.core.settings import SETTINGS
 
 
@@ -25,6 +25,15 @@ class MCPClient:
         headers = {"Accept": "application/json"}
         if correlation_id and correlation_id != "-":
             headers["X-Correlation-Id"] = correlation_id
+        user_id = user_id_ctx.get()
+        if user_id and user_id != "-":
+            headers["X-User-Id"] = user_id
+        user_role = user_role_ctx.get()
+        if user_role and user_role != "-":
+            headers["X-User-Role"] = user_role
+        user_email = user_email_ctx.get()
+        if user_email and user_email != "-":
+            headers["X-User-Email"] = user_email
         return headers
 
     def _extract_tool_data(self, result: Any) -> Any:

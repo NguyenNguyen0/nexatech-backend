@@ -13,6 +13,7 @@ FastAPI + FastMCP service for NexaTech with a resilient shared client layer, per
 - `GET /` with a skeleton layout summary
 - `FastMCP` mounted at `/mcp`
 - correlation ID middleware and basic error envelopes
+- user context propagation (`X-User-Id`, `X-User-Role`, `X-User-Email`) for downstream calls
 - optional Eureka registration at startup
 - retry-aware downstream HTTP client with structured error payloads
 - per-service internal APIs under `app/services/`

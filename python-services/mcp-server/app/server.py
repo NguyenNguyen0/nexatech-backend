@@ -14,7 +14,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.core.logging import configure_logging, correlation_id_ctx
+from app.core.logging import (
+    configure_logging,
+    correlation_id_ctx,
+    user_email_ctx,
+    user_id_ctx,
+    user_role_ctx,
+)
 from app.core.settings import SETTINGS
 from app.mcp.server import mcp
 from app.tools import audit as _audit_tools  # noqa: F401
@@ -97,13 +103,23 @@ app.mount("/mcp", mcp.streamable_http_app())
 @app.middleware("http")
 async def correlation_id_middleware(request: Request, call_next):
     correlation_id = request.headers.get("X-Correlation-Id") or str(uuid.uuid4())
-    token = correlation_id_ctx.set(correlation_id)
+    user_id = request.headers.get("X-User-Id") or "-"
+    user_role = request.headers.get("X-User-Role") or "-"
+    user_email = request.headers.get("X-User-Email") or "-"
+
+    correlation_token = correlation_id_ctx.set(correlation_id)
+    user_id_token = user_id_ctx.set(user_id)
+    user_role_token = user_role_ctx.set(user_role)
+    user_email_token = user_email_ctx.set(user_email)
     request.state.correlation_id = correlation_id
 
     try:
         response = await call_next(request)
     finally:
-        correlation_id_ctx.reset(token)
+        correlation_id_ctx.reset(correlation_token)
+        user_id_ctx.reset(user_id_token)
+        user_role_ctx.reset(user_role_token)
+        user_email_ctx.reset(user_email_token)
 
     response.headers["X-Correlation-Id"] = correlation_id
     return response

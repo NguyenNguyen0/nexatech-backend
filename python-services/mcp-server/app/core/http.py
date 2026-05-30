@@ -8,6 +8,7 @@ from urllib.parse import urljoin
 import httpx
 
 from app.core.logging import correlation_id_ctx
+from app.core.logging import user_email_ctx, user_id_ctx, user_role_ctx
 from app.core.resilience import RETRYABLE_STATUS_CODES, retry_async
 
 
@@ -71,12 +72,24 @@ class ServiceClient:
         existing = correlation_id_ctx.get()
         return existing if existing and existing != "-" else "-"
 
-    def _headers(self, user_id: str | None = None, user_email: str | None = None) -> dict[str, str]:
+    def _headers(
+        self,
+        user_id: str | None = None,
+        user_email: str | None = None,
+        user_role: str | None = None,
+    ) -> dict[str, str]:
         headers = {"X-Correlation-Id": self._current_correlation_id()}
-        if user_id:
-            headers["X-User-Id"] = user_id
-        if user_email:
-            headers["X-User-Email"] = user_email
+        effective_user_id = user_id if user_id is not None else user_id_ctx.get()
+        effective_user_email = user_email if user_email is not None else user_email_ctx.get()
+        effective_user_role = user_role if user_role is not None else user_role_ctx.get()
+
+        if effective_user_id and effective_user_id != "-":
+            headers["X-User-Id"] = effective_user_id
+        if effective_user_role and effective_user_role != "-":
+            headers["X-User-Role"] = effective_user_role
+        if effective_user_email and effective_user_email != "-":
+            headers["X-User-Email"] = effective_user_email
+
         return headers
 
     def _should_retry(self, exc: Exception) -> bool:
@@ -111,9 +124,13 @@ class ServiceClient:
         headers: dict[str, str] | None = None,
         user_id: str | None = None,
         user_email: str | None = None,
+        user_role: str | None = None,
     ) -> Any:
         url = self._build_url(path)
-        request_headers = {**self._headers(user_id=user_id, user_email=user_email), **(headers or {})}
+        request_headers = {
+            **self._headers(user_id=user_id, user_email=user_email, user_role=user_role),
+            **(headers or {}),
+        }
         timeout = httpx.Timeout(self.definition.timeout_seconds)
         clean_params = {key: value for key, value in (params or {}).items() if value is not None}
 
