@@ -310,6 +310,32 @@ public class OrderService {
         saveOrderEventToOutbox(order, "ORDER_SHIPMENT_CREATED");
     }
 
+    public OrderResponse requestInventoryFinalizationAfterPayment(UUID orderId, String actor) {
+        Order current = findById(orderId);
+        if (current.getStatus() != OrderStatus.PENDING) {
+            log.info("Skip inventory finalization request because order is no longer PENDING: orderId={} status={}",
+                    orderId, current.getStatus());
+            return orderMapper.toResponse(current);
+        }
+
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            Order order = findById(orderId);
+            if (order.getStatus() != OrderStatus.PENDING) {
+                return orderMapper.toResponse(order);
+            }
+
+            saveOrderEventToOutbox(order, "ORDER_PAYMENT_COMPLETED");
+            auditLogService.logEvent("ORDER_PAYMENT_COMPLETED_PENDING_INVENTORY", "Order", orderId.toString(),
+                    Map.of("orderId", orderId.toString(),
+                            "currentStatus", OrderStatus.PENDING.name(),
+                            "nextStep", "INVENTORY_FINALIZATION",
+                            "actor", actor),
+                    actor);
+            log.info("Payment completed, inventory finalization requested before confirming order: orderId={}", orderId);
+            return orderMapper.toResponse(order);
+        });
+    }
+
     /**
      * Customer tự huỷ đơn hàng.
      *
@@ -418,6 +444,44 @@ public class OrderService {
     public OrderResponse markShippingFailedForCompensation(UUID orderId, String reason, String actor) {
         return markCompensationStatus(orderId, OrderStatus.SHIPPING_FAILED, "ORDER_SHIPPING_FAILED",
                 reason, actor);
+    }
+
+    public OrderResponse markInventoryFinalizedForShipping(UUID orderId, String actor) {
+        Order current = findById(orderId);
+        if (current.getStatus() == OrderStatus.CONFIRMED
+                || current.getStatus() == OrderStatus.PROCESSING
+                || current.getStatus() == OrderStatus.SHIPPED
+                || current.getStatus() == OrderStatus.DELIVERED
+                || current.getStatus() == OrderStatus.COMPLETED) {
+            log.info("Inventory finalized event ignored because order is already confirmed or beyond: orderId={} status={}",
+                    orderId, current.getStatus());
+            return orderMapper.toResponse(current);
+        }
+        if (current.getStatus() != OrderStatus.PENDING) {
+            log.warn("Inventory finalized event ignored because order is not PENDING: orderId={} status={}",
+                    orderId, current.getStatus());
+            return orderMapper.toResponse(current);
+        }
+
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            Order order = findById(orderId);
+            if (order.getStatus() != OrderStatus.PENDING) {
+                return orderMapper.toResponse(order);
+            }
+
+            OrderStatus oldStatus = order.getStatus();
+            order.setStatus(OrderStatus.CONFIRMED);
+            Order saved = orderRepository.save(order);
+            saveOrderEventToOutbox(saved, "ORDER_READY_FOR_SHIPPING");
+            auditLogService.logEvent("INVENTORY_FINALIZED_FOR_SHIPPING", "Order", orderId.toString(),
+                    Map.of("orderId", orderId.toString(),
+                            "previousStatus", oldStatus.name(),
+                            "newStatus", OrderStatus.CONFIRMED.name(),
+                            "actor", actor),
+                    actor);
+            log.info("Order confirmed and ready for shipping after inventory finalization: orderId={}", orderId);
+            return orderMapper.toResponse(saved);
+        });
     }
 
     public OrderResponse submitRefundBankInfo(UUID orderId, RefundBankInfoRequest request) {

@@ -88,12 +88,10 @@ public class OrderEventConsumer {
                     auditLogService.log("ORDER_COMPENSATION_RECEIVED", "Shipment", event.getOrderId().toString(),
                             "cancel shipment if present", CONSUMER_NAME);
                 }
-                case "ORDER_STATUS_UPDATED" -> {
-                    if ("CONFIRMED".equals(event.getStatus())) {
-                        auditLogService.log("ORDER_CONFIRMED_RECEIVED", "Shipment", event.getOrderId().toString(),
-                                "order confirmed — creating shipment", CONSUMER_NAME);
-                        createShipmentFromEvent(event);
-                    }
+                case "ORDER_READY_FOR_SHIPPING" -> {
+                    auditLogService.log("ORDER_READY_FOR_SHIPPING_RECEIVED", "Shipment", event.getOrderId().toString(),
+                            "inventory finalized - creating shipment", CONSUMER_NAME);
+                    createShipmentFromEvent(event);
                 }
                 default -> log.debug("OrderEvent ignored by shipping-service: type={}", event.getEventType());
             }

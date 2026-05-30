@@ -126,6 +126,21 @@ public class OrderShippingEventConsumer {
             return;
         }
 
+        if (!orderService.hasStatus(orderId, OrderStatus.CONFIRMED)
+                && !orderService.hasStatus(orderId, OrderStatus.PROCESSING)
+                && !orderService.hasStatus(orderId, OrderStatus.SHIPPED)
+                && !orderService.hasStatus(orderId, OrderStatus.DELIVERED)
+                && !orderService.hasStatus(orderId, OrderStatus.COMPLETED)) {
+            log.warn("Premature SHIPMENT_CREATED ignored because inventory has not finalized order yet: orderId={} trackingCode={}",
+                    orderId, event.getTrackingCode());
+            auditLogService.logEvent("SHIPMENT_CREATED_IGNORED_BEFORE_INVENTORY_FINALIZED", "Order", orderId.toString(),
+                    Map.of("orderId", orderId.toString(),
+                            "trackingNumber", event.getTrackingCode(),
+                            "triggeredBy", "kafka:shipping.events"),
+                    CONSUMER_NAME);
+            return;
+        }
+
         UpdateShippingRequest request = new UpdateShippingRequest();
         request.setTrackingNumber(event.getTrackingCode());
         request.setCarrierName(resolveCarrierName(event.getProvider()));
@@ -133,9 +148,6 @@ public class OrderShippingEventConsumer {
         // estimatedDelivery không có trong ShippingEvent, để null
 
         orderService.updateShipping(orderId, request);
-        if (orderService.hasStatus(orderId, OrderStatus.CONFIRMED)) {
-            orderService.updateOrderStatus(orderId, OrderStatus.PROCESSING);
-        }
         orderService.publishShipmentCreatedEvent(orderId);
         auditLogService.logEvent("SHIPMENT_CREATED_RECEIVED", "Order", orderId.toString(),
                 Map.of("orderId", orderId.toString(),

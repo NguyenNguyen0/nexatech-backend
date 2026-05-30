@@ -91,18 +91,19 @@ public class OrderPaymentEventConsumer {
                                 CONSUMER_NAME);
                         break;
                     }
-                    // Idempotent guard: skip if order is already CONFIRMED or beyond
-                    // to avoid state machine errors from duplicate PAYMENT_COMPLETED events
+                    // Payment is completed, but the order is not confirmed until inventory finalizes stock.
+                    // Duplicate events are ignored once the order has left PENDING.
                     if (!orderService.hasStatus(event.getOrderId(), OrderStatus.PENDING)) {
                         log.info("Duplicate PAYMENT_COMPLETED ignored — order is no longer PENDING: orderId={}",
                                 event.getOrderId());
                         break;
                     }
-                    orderService.updateOrderStatus(event.getOrderId(), OrderStatus.CONFIRMED);
+                    orderService.requestInventoryFinalizationAfterPayment(event.getOrderId(), CONSUMER_NAME);
                     auditLogService.logEvent("PAYMENT_COMPLETED_RECEIVED", "Order",
                             event.getOrderId().toString(),
                             Map.of("orderId", event.getOrderId().toString(),
-                                    "newStatus", "CONFIRMED",
+                                    "currentStatus", "PENDING",
+                                    "nextStep", "INVENTORY_FINALIZATION",
                                     "triggeredBy", "kafka:payment.events"),
                             CONSUMER_NAME);
                 }

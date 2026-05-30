@@ -54,6 +54,8 @@ public class CacheConfig implements CachingConfigurer {
         return RedisCacheManager.builder(factory)
                 .cacheDefaults(defaults)
                 .withCacheConfiguration("products", defaults.entryTtl(Duration.ofMinutes(5)))
+                .withCacheConfiguration("productPages", defaults.entryTtl(Duration.ofMinutes(5)))
+                .withCacheConfiguration("productStock", defaults.entryTtl(Duration.ofMinutes(3)))
                 .withCacheConfiguration("categories", defaults.entryTtl(Duration.ofMinutes(30)))
                 .withCacheConfiguration("reviews", defaults.entryTtl(Duration.ofMinutes(3)))
                 .build();

@@ -53,6 +53,8 @@ public class OrderInventoryEventConsumer {
                         event.getOrderId(),
                         event.getReason() != null ? event.getReason() : event.getMessage(),
                         CONSUMER_NAME);
+            } else if ("INVENTORY_SALE_FINALIZED".equals(event.getEventType())) {
+                orderService.markInventoryFinalizedForShipping(event.getOrderId(), CONSUMER_NAME);
             } else {
                 log.debug("InventoryEvent ignored by order-service: type={}", event.getEventType());
             }

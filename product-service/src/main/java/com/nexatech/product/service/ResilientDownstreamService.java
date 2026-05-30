@@ -10,6 +10,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -44,6 +45,7 @@ public class ResilientDownstreamService {
 
     @CircuitBreaker(name = "inventoryService", fallbackMethod = "getStockFallback")
     @Retry(name = "inventoryService")
+    @Cacheable(value = "productStock", key = "#productId", unless = "#result == null || #result.data == null")
     public InventoryStockResponse getStock(String productId) {
         return inventoryClient.getStock(productId);
     }

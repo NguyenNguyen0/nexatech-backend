@@ -60,6 +60,7 @@ public class InventoryEventConsumer {
                 case "ORDER_CANCELLED" -> handleOrderCancelled(event);
                 case "ORDER_OUT_OF_STOCK", "ORDER_SHIPPING_FAILED", "ORDER_REFUND_PENDING" -> handleOrderCompensation(event);
                 case "ORDER_DELIVERED" -> handleOrderDelivered(event);
+                case "ORDER_PAYMENT_COMPLETED" -> handleOrderPaymentCompleted(event);
                 case "ORDER_STATUS_UPDATED" -> {
                     if ("CONFIRMED".equals(event.getStatus())) {
                         handleOrderConfirmed(event);
@@ -130,11 +131,16 @@ public class InventoryEventConsumer {
     }
 
     private void handleOrderConfirmed(OrderEventDto event) {
+        handleOrderPaymentCompleted(event);
+    }
+
+    private void handleOrderPaymentCompleted(OrderEventDto event) {
         StockCheckRequest request = buildStockCheckRequest(event);
         try {
             inventoryService.finalizeSale(request, "ORDER:" + event.getOrderId());
+            inventoryService.publishOrderStockFinalizedEvent(event);
         } catch (BadRequestException | ResourceNotFoundException e) {
-            log.warn("Inventory finalization failed for confirmed orderId={}: {}",
+            log.warn("Inventory finalization failed for paid orderId={}: {}",
                     event.getOrderId(), e.getMessage());
             inventoryService.publishOrderOutOfStockEvent(event, e.getMessage());
         }
