@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import sys
 from pathlib import Path
@@ -16,6 +18,7 @@ from app.core.logging import (
     user_role_ctx,
 )
 from app.services.audit import AuditServiceApi
+from app.services.inventory import InventoryServiceApi
 from app.services.news import NewsServiceApi
 from app.services.promotion import PromotionServiceApi
 from app.server import READINESS_CHECKS, app
@@ -337,6 +340,140 @@ async def test_news_api_uses_real_news_service_endpoints() -> None:
         ("GET", "/api/v1/news/draft", ""),
         ("GET", "/api/v1/news/news-1/images", ""),
         ("GET", "/api/v1/news/images/image-1", ""),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_inventory_api_uses_real_inventory_service_endpoints() -> None:
+    seen_requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_requests.append(request)
+        if request.url.path == "/api/v1/inventory/list":
+            assert request.url.params.get("keyword") == "phone"
+            assert request.url.params.get("ignored") is None
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "data": {"content": [{"productId": "product-1"}], "totalElements": 1},
+                },
+            )
+        if request.url.path == "/api/v1/inventory/product-1":
+            return httpx.Response(
+                200,
+                json={"success": True, "data": {"productId": "product-1", "quantity": 10}},
+            )
+        if request.url.path == "/api/v1/inventory/product-1/movements":
+            assert request.url.params.get("page") == "0"
+            return httpx.Response(
+                200,
+                json={"success": True, "data": {"content": [{"id": "move-1"}]}},
+            )
+        if request.url.path == "/api/v1/inventory" and request.method == "PUT":
+            assert json.loads(request.content) == {
+                "productId": "product-1",
+                "sku": "SKU-1",
+                "quantity": 12,
+                "reason": "manual",
+            }
+            return httpx.Response(
+                200,
+                json={"success": True, "data": {"productId": "product-1", "quantity": 12}},
+            )
+        if request.url.path == "/api/v1/inventory/check":
+            return httpx.Response(200, json={"success": True, "data": True})
+        if request.url.path == "/api/v1/inventory/reserve":
+            return httpx.Response(200, json={"success": True, "data": None})
+        if request.url.path == "/api/v1/inventory/release":
+            return httpx.Response(200, json={"success": True, "data": None})
+        if request.url.path == "/api/v1/inventory/low-stock":
+            return httpx.Response(
+                200,
+                json={"success": True, "data": [{"productId": "low-1"}]},
+            )
+        if request.url.path == "/api/v1/inventory/bulk-import":
+            assert json.loads(request.content) == [{"productId": "product-1", "quantity": 12}]
+            return httpx.Response(
+                200,
+                json={"success": True, "data": {"successCount": 1, "failureCount": 0}},
+            )
+        if request.url.path == "/api/v1/inventory/product-1/warehouse":
+            assert json.loads(request.content) == {
+                "warehouseLocation": "A1",
+                "reorderLevel": 5,
+            }
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "data": {
+                        "productId": "product-1",
+                        "warehouseLocation": "A1",
+                        "reorderLevel": 5,
+                    },
+                },
+            )
+        return httpx.Response(404, json={"tag": "INV-404", "message": "not found"})
+
+    api = InventoryServiceApi(
+        ServiceClient(
+            ServiceDefinition(name="inventory-service", base_url="http://example.test"),
+            transport=httpx.MockTransport(handler),
+        )
+    )
+
+    inventory = await api.list_inventory({"keyword": "phone", "ignored": "drop-me"})
+    stock = await api.get_inventory("product-1")
+    movements = await api.get_inventory_movements(
+        "product-1",
+        {"page": 0, "ignored": "drop-me"},
+    )
+    updated = await api.update_stock(
+        {
+            "productId": "product-1",
+            "sku": "SKU-1",
+            "quantity": 12,
+            "reason": "manual",
+        }
+    )
+    available = await api.check_inventory(
+        {"items": [{"productId": "product-1", "quantity": 1}]}
+    )
+    reserved = await api.reserve_stock(
+        {"items": [{"productId": "product-1", "quantity": 1}]}
+    )
+    released = await api.release_stock(
+        {"items": [{"productId": "product-1", "quantity": 1}]}
+    )
+    low_stock = await api.low_stock_items()
+    imported = await api.bulk_import([{"productId": "product-1", "quantity": 12}])
+    warehouse = await api.update_warehouse_info(
+        "product-1",
+        {"warehouseLocation": "A1", "reorderLevel": 5},
+    )
+
+    assert inventory["content"] == [{"productId": "product-1"}]
+    assert stock == {"productId": "product-1", "quantity": 10}
+    assert movements == {"content": [{"id": "move-1"}]}
+    assert updated["quantity"] == 12
+    assert available is True
+    assert reserved is None
+    assert released is None
+    assert low_stock == [{"productId": "low-1"}]
+    assert imported == {"successCount": 1, "failureCount": 0}
+    assert warehouse["warehouseLocation"] == "A1"
+    assert [(request.method, request.url.path) for request in seen_requests] == [
+        ("GET", "/api/v1/inventory/list"),
+        ("GET", "/api/v1/inventory/product-1"),
+        ("GET", "/api/v1/inventory/product-1/movements"),
+        ("PUT", "/api/v1/inventory"),
+        ("POST", "/api/v1/inventory/check"),
+        ("POST", "/api/v1/inventory/reserve"),
+        ("POST", "/api/v1/inventory/release"),
+        ("GET", "/api/v1/inventory/low-stock"),
+        ("POST", "/api/v1/inventory/bulk-import"),
+        ("PATCH", "/api/v1/inventory/product-1/warehouse"),
     ]
 
 

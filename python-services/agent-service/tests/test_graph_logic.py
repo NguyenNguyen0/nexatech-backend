@@ -49,6 +49,21 @@ def test_required_arg_news_tools_are_reserved_for_llm_planner() -> None:
     assert plan.tool_name == "list_news"
 
 
+def test_plan_tool_call_matches_inventory_listing() -> None:
+    plan = plan_tool_call("Liệt kê tồn kho hiện tại")
+
+    assert plan is not None
+    assert plan.tool_name == "list_inventory"
+    assert plan.tool_args == {"params": {}}
+
+
+def test_plan_tool_call_matches_low_stock_listing() -> None:
+    plan = plan_tool_call("Sản phẩm nào sắp hết hàng?")
+
+    assert plan is not None
+    assert plan.tool_name == "get_low_stock_items"
+
+
 @pytest.mark.asyncio
 async def test_news_tool_catalog_includes_detail_tools() -> None:
     catalog = await _build_tool_catalog(
@@ -67,6 +82,35 @@ async def test_news_tool_catalog_includes_detail_tools() -> None:
     assert "get_public_news_by_slug" in catalog
     assert "get_news_images" in catalog
     assert "get_news_image" in catalog
+
+
+@pytest.mark.asyncio
+async def test_inventory_tool_catalog_includes_read_and_write_tools() -> None:
+    catalog = await _build_tool_catalog(
+        [
+            "list_inventory",
+            "get_inventory",
+            "get_inventory_movements",
+            "check_inventory",
+            "get_low_stock_items",
+            "update_stock",
+            "reserve_stock",
+            "release_stock",
+            "bulk_import_inventory",
+            "update_warehouse_info",
+        ]
+    )
+
+    assert "list_inventory" in catalog
+    assert "get_inventory" in catalog
+    assert "get_inventory_movements" in catalog
+    assert "check_inventory" in catalog
+    assert "get_low_stock_items" in catalog
+    assert "update_stock" in catalog
+    assert "reserve_stock" in catalog
+    assert "release_stock" in catalog
+    assert "bulk_import_inventory" in catalog
+    assert "update_warehouse_info" in catalog
 
 
 @pytest.mark.asyncio
