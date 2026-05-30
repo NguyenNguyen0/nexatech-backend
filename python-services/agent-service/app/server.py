@@ -12,7 +12,7 @@ except ImportError:  # pragma: no cover
     eureka_client = None
 
 from pydantic import BaseModel, ConfigDict, Field
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from langgraph.types import Command, Interrupt
@@ -23,6 +23,7 @@ from app.core.settings import SETTINGS
 from app.graph.agent import compile_graph
 from app.runtime.copilotkit import attach_copilotkit_middleware
 from app.runtime.checkpointer import close_checkpointer, initialize_checkpointer
+from app.runtime.conversation_store import initialize_conversation_store
 
 
 configure_runtime_environment()
@@ -32,6 +33,7 @@ logger = logging.getLogger(SETTINGS.service_name)
 READINESS_CHECKS: dict[str, str] = {
     "service": "ok",
     "checkpointer": "pending",
+    "conversation_store": "pending",
     "eureka": "pending",
     "graph": "pending",
     "copilotkit": "pending",
@@ -115,6 +117,35 @@ async def _invoke_graph(graph_input: Any, *, thread_id: str) -> dict[str, Any]:
     }
 
 
+async def _persist_conversation_event(
+    *,
+    thread_id: str,
+    event_type: str,
+    payload: dict[str, Any],
+    request: Request | None,
+) -> None:
+    store = getattr(app.state, "conversation_store", None)
+    if store is None:
+        return
+
+    correlation_id = None
+    user_id = None
+    if request is not None:
+        correlation_id = getattr(request.state, "correlation_id", None)
+        user_id = request.headers.get("X-User-Id")
+
+    try:
+        await store.append_event(
+            thread_id=thread_id,
+            event_type=event_type,
+            payload=payload,
+            correlation_id=correlation_id,
+            user_id=user_id,
+        )
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Failed to persist conversation event (%s): %s", event_type, exc)
+
+
 def _utc_timestamp() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
@@ -178,6 +209,27 @@ def _initialize_graph_runtime(app: FastAPI) -> None:
         READINESS_CHECKS["copilotkit"] = "unavailable"
 
 
+async def _initialize_conversation_runtime(app: FastAPI) -> None:
+    store = await initialize_conversation_store(
+        enabled=SETTINGS.conversation_store_enabled,
+        mongo_uri=SETTINGS.mongo_uri,
+        mongo_database=SETTINGS.mongo_database,
+        mongo_collection=SETTINGS.mongo_conversation_collection,
+        max_events=SETTINGS.conversation_history_max_events,
+    )
+    app.state.conversation_store = store
+
+    if not SETTINGS.conversation_store_enabled:
+        READINESS_CHECKS["conversation_store"] = "disabled"
+        logger.info("[STARTUP] - Conversation store: disabled")
+    elif store is None:
+        READINESS_CHECKS["conversation_store"] = "unavailable"
+        logger.warning("[STARTUP] - Conversation store: unavailable")
+    else:
+        READINESS_CHECKS["conversation_store"] = "ok"
+        logger.info("[STARTUP] + Conversation store: mongodb configured")
+
+
 async def _deregister_eureka() -> None:
     if not SETTINGS.eureka_enabled or eureka_client is None:
         return
@@ -193,6 +245,7 @@ async def lifespan(app: FastAPI):
     app.state.settings = SETTINGS
     app.state.readiness_checks = READINESS_CHECKS
     _initialize_graph_runtime(app)
+    await _initialize_conversation_runtime(app)
 
     await _register_eureka()
     try:
@@ -200,6 +253,9 @@ async def lifespan(app: FastAPI):
     finally:
         await _deregister_eureka()
         close_checkpointer()
+        conversation_store = getattr(app.state, "conversation_store", None)
+        if conversation_store is not None:
+            await conversation_store.close()
 
 
 app = FastAPI(title="Agent Service", version="0.1.0", lifespan=lifespan)
@@ -329,7 +385,7 @@ def root() -> dict[str, object]:
 
 
 @app.post("/api/v1/agent/runs")
-async def run_agent(request: AgentRunRequest) -> dict[str, Any]:
+async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str, Any]:
     thread_id = request.thread_id or str(uuid.uuid4())
     graph_input = {
         "messages": [{"role": "user", "content": request.message}],
@@ -344,14 +400,51 @@ async def run_agent(request: AgentRunRequest) -> dict[str, Any]:
         "thread_id": thread_id,
         "request_id": correlation_id_ctx.get(),
     }
-    return await _invoke_graph(graph_input, thread_id=thread_id)
+    await _persist_conversation_event(
+        thread_id=thread_id,
+        event_type="user_message",
+        payload={
+            "message": request.message,
+            "caller": request.caller,
+        },
+        request=raw_request,
+    )
+    result = await _invoke_graph(graph_input, thread_id=thread_id)
+    await _persist_conversation_event(
+        thread_id=thread_id,
+        event_type="agent_result",
+        payload={
+            "status": result.get("status"),
+            "output": result.get("output"),
+            "interrupts": result.get("interrupts"),
+        },
+        request=raw_request,
+    )
+    return result
 
 
 @app.post("/api/v1/agent/runs/resume")
-async def resume_agent(request: AgentResumeRequest) -> dict[str, Any]:
+async def resume_agent(request: AgentResumeRequest, raw_request: Request) -> dict[str, Any]:
     if READINESS_CHECKS.get("checkpointer") != "ok":
         raise HTTPException(status_code=503, detail="Resume requires the LangGraph checkpointer")
-    return await _invoke_graph(Command(resume=request.decision), thread_id=request.thread_id)
+    await _persist_conversation_event(
+        thread_id=request.thread_id,
+        event_type="approval_decision",
+        payload={"decision": request.decision},
+        request=raw_request,
+    )
+    result = await _invoke_graph(Command(resume=request.decision), thread_id=request.thread_id)
+    await _persist_conversation_event(
+        thread_id=request.thread_id,
+        event_type="agent_result",
+        payload={
+            "status": result.get("status"),
+            "output": result.get("output"),
+            "interrupts": result.get("interrupts"),
+        },
+        request=raw_request,
+    )
+    return result
 
 
 @app.get("/api/v1/agent/runs/{thread_id}")
@@ -376,3 +469,18 @@ async def get_agent_run_state(thread_id: str) -> dict[str, Any]:
             "interrupts": _serialize_interrupts(snapshot.interrupts),
         },
     }
+
+
+@app.get("/api/v1/agent/conversations/{thread_id}")
+async def get_conversation_thread(
+    thread_id: str,
+    limit: int = Query(default=100, ge=1, le=1000),
+) -> dict[str, Any]:
+    store = getattr(app.state, "conversation_store", None)
+    if store is None:
+        raise HTTPException(status_code=503, detail="Conversation store is not available")
+
+    thread = await store.get_thread(thread_id=thread_id, limit=limit)
+    if thread is None:
+        raise HTTPException(status_code=404, detail="Conversation thread not found")
+    return thread

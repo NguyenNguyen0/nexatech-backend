@@ -11,6 +11,10 @@ FastAPI skeleton service for NexaTech agent orchestration. This setup introduces
 - `GET /health`
 - `GET /ready`
 - `GET /` (returns skeleton layout summary)
+- `POST /api/v1/agent/runs`
+- `POST /api/v1/agent/runs/resume`
+- `GET /api/v1/agent/runs/{threadId}`
+- `GET /api/v1/agent/conversations/{threadId}`
 
 ## Run
 
@@ -74,8 +78,13 @@ Key variables:
 - `AGUI_AGENT_NAME`
 - `AGUI_AGENT_DESCRIPTION`
 - `AGENT_DB_URL`
+- `CONVERSATION_STORE_ENABLED`
+- `MONGO_URI`
+- `MONGO_DATABASE`
+- `MONGO_CONVERSATION_COLLECTION`
+- `CONVERSATION_HISTORY_MAX_EVENTS`
 
 ## Notes
 
 - CopilotKit objects are initialized in runtime state (`app.state`) for compatibility with the current package API.
-- LangGraph checkpointer and full CopilotKit endpoint bridging are intentionally deferred to the next implementation phase.
+- Conversation sessions are persisted in MongoDB when `CONVERSATION_STORE_ENABLED=true` and `MONGO_URI` is reachable.

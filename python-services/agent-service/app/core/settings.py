@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     agui_agent_description: str = "NexaTech admin agent — news, analytics, audit, promotions"
 
     agent_db_url: str | None = None
+    conversation_store_enabled: bool = True
+    mongo_uri: str | None = "mongodb://nexatech:nexatech123@localhost:27017/?authSource=admin"
+    mongo_database: str = "nexatech_agent"
+    mongo_conversation_collection: str = "conversation_sessions"
+    conversation_history_max_events: int = Field(default=500, ge=50, le=10000)
+
     approval_timeout_seconds: int = Field(default=600, ge=60)
     escalation_timeout_seconds: int = Field(default=900, ge=60)
 
