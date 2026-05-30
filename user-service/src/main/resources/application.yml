@@ -23,7 +23,6 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       # Không block startup nếu DB chưa sẵn sàng — pool sẽ retry khi có request đầu tiên
-      initialization-fail-timeout: -1
       connection-timeout: 10000
       validation-timeout: 3000
   jpa:

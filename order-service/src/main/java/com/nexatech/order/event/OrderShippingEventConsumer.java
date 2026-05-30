@@ -91,6 +91,7 @@ public class OrderShippingEventConsumer {
             switch (event.getEventType()) {
                 case "SHIPMENT_CREATED" -> handleShipmentCreated(orderId, event);
                 case "SHIPMENT_STATUS_UPDATED" -> handleShipmentStatusUpdated(orderId, event);
+                case "SHIPMENT_CREATION_FAILED" -> handleShipmentCreationFailed(orderId, event);
                 case "SHIPMENT_CANCELLED" ->
                         log.info("Shipment CANCELLED cho order {}, không cần cập nhật thêm", orderId);
                 default -> log.debug("Bỏ qua ShippingEvent không xử lý: {}", event.getEventType());
@@ -132,6 +133,9 @@ public class OrderShippingEventConsumer {
         // estimatedDelivery không có trong ShippingEvent, để null
 
         orderService.updateShipping(orderId, request);
+        if (orderService.hasStatus(orderId, OrderStatus.CONFIRMED)) {
+            orderService.updateOrderStatus(orderId, OrderStatus.PROCESSING);
+        }
         orderService.publishShipmentCreatedEvent(orderId);
         auditLogService.logEvent("SHIPMENT_CREATED_RECEIVED", "Order", orderId.toString(),
                 Map.of("orderId", orderId.toString(),
@@ -144,7 +148,34 @@ public class OrderShippingEventConsumer {
     }
 
     private void handleShipmentStatusUpdated(UUID orderId, ShippingEventDto event) {
+        if ("FAILED".equals(event.getStatus())) {
+            orderService.markShippingFailedForCompensation(orderId,
+                    "Shipment status FAILED", CONSUMER_NAME);
+            auditLogService.logEvent("SHIPMENT_FAILED_RECEIVED", "Order", orderId.toString(),
+                    Map.of("orderId", orderId.toString(),
+                            "newStatus", "SHIPPING_FAILED",
+                            "triggeredBy", "kafka:shipping.events"),
+                    CONSUMER_NAME);
+            return;
+        }
+
+        if ("PICKED_UP".equals(event.getStatus()) || "IN_TRANSIT".equals(event.getStatus())) {
+            if (orderService.hasStatus(orderId, OrderStatus.CONFIRMED)) {
+                orderService.updateOrderStatus(orderId, OrderStatus.PROCESSING);
+            }
+            if (orderService.hasStatus(orderId, OrderStatus.PROCESSING)) {
+                orderService.updateOrderStatus(orderId, OrderStatus.SHIPPED);
+            }
+            return;
+        }
+
         if ("DELIVERED".equals(event.getStatus())) {
+            if (orderService.hasStatus(orderId, OrderStatus.CONFIRMED)) {
+                orderService.updateOrderStatus(orderId, OrderStatus.PROCESSING);
+            }
+            if (orderService.hasStatus(orderId, OrderStatus.PROCESSING)) {
+                orderService.updateOrderStatus(orderId, OrderStatus.SHIPPED);
+            }
             orderService.updateOrderStatus(orderId, OrderStatus.DELIVERED);
             auditLogService.logEvent("SHIPMENT_DELIVERED_RECEIVED", "Order", orderId.toString(),
                     Map.of("orderId", orderId.toString(),
@@ -153,6 +184,18 @@ public class OrderShippingEventConsumer {
                     CONSUMER_NAME);
             log.info("Order {} cập nhật sang DELIVERED từ shipping event", orderId);
         }
+    }
+
+    private void handleShipmentCreationFailed(UUID orderId, ShippingEventDto event) {
+        orderService.markShippingFailedForCompensation(orderId,
+                event.getFailureReason() != null ? event.getFailureReason() : "Shipment creation failed",
+                CONSUMER_NAME);
+        auditLogService.logEvent("SHIPMENT_CREATION_FAILED_RECEIVED", "Order", orderId.toString(),
+                Map.of("orderId", orderId.toString(),
+                        "newStatus", "SHIPPING_FAILED",
+                        "reason", event.getFailureReason() != null ? event.getFailureReason() : "",
+                        "triggeredBy", "kafka:shipping.events"),
+                CONSUMER_NAME);
     }
 
     private String resolveCarrierName(String provider) {

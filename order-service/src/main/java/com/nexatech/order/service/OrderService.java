@@ -10,6 +10,7 @@ import com.nexatech.order.client.dto.VNPayInfo;
 import com.nexatech.order.dto.ContinuePaymentResponse;
 import com.nexatech.order.dto.CreateOrderRequest;
 import com.nexatech.order.dto.OrderResponse;
+import com.nexatech.order.dto.RefundBankInfoRequest;
 import com.nexatech.order.dto.UpdateShippingRequest;
 import com.nexatech.order.enums.OrderStatus;
 import com.nexatech.order.enums.PaymentMethod;
@@ -135,6 +136,8 @@ public class OrderService {
 
         // 4. Giữ hàng sau khi transaction DB đã commit — tránh orphan reservation
         try {
+            stockRequest.setReference(orderReference(saved.getId()));
+            stockRequest.setReason("Reserve stock for order " + saved.getOrderNumber());
             inventoryClient.reserveStock(stockRequest);
         } catch (Exception e) {
             log.error("Giữ hàng thất bại cho đơn hàng {}: {}", saved.getId(), e.getMessage());
@@ -269,7 +272,9 @@ public class OrderService {
 
         // Snapshot tại các mốc quan trọng để tối ưu point-in-time query
         if (newStatus == OrderStatus.DELIVERED || newStatus == OrderStatus.COMPLETED
-                || newStatus == OrderStatus.RETURNED || newStatus == OrderStatus.CANCELLED) {
+                || newStatus == OrderStatus.RETURNED || newStatus == OrderStatus.CANCELLED
+                || newStatus == OrderStatus.OUT_OF_STOCK || newStatus == OrderStatus.SHIPPING_FAILED
+                || newStatus == OrderStatus.REFUND_PENDING) {
             snapshotService.takeSnapshot("Order", orderId,
                     Map.of("orderId", orderId.toString(),
                             "status", newStatus.name(),
@@ -405,6 +410,43 @@ public class OrderService {
         });
     }
 
+    public OrderResponse markOutOfStockForCompensation(UUID orderId, String reason, String actor) {
+        return markCompensationStatus(orderId, OrderStatus.OUT_OF_STOCK, "ORDER_OUT_OF_STOCK",
+                reason, actor);
+    }
+
+    public OrderResponse markShippingFailedForCompensation(UUID orderId, String reason, String actor) {
+        return markCompensationStatus(orderId, OrderStatus.SHIPPING_FAILED, "ORDER_SHIPPING_FAILED",
+                reason, actor);
+    }
+
+    public OrderResponse submitRefundBankInfo(UUID orderId, RefundBankInfoRequest request) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            Order order = findById(orderId);
+            if (order.getStatus() != OrderStatus.OUT_OF_STOCK
+                    && order.getStatus() != OrderStatus.SHIPPING_FAILED
+                    && order.getStatus() != OrderStatus.REFUND_PENDING) {
+                throw new BadRequestException("Refund bank information is only accepted for compensation orders");
+            }
+
+            OrderStatus oldStatus = order.getStatus();
+            order.setRefundBankName(request.getBankName().trim());
+            order.setRefundAccountNumber(request.getAccountNumber().trim());
+            order.setRefundAccountHolder(request.getAccountHolder().trim());
+            order.setRefundInfoSubmittedAt(Instant.now());
+            order.setStatus(OrderStatus.REFUND_PENDING);
+            Order saved = orderRepository.save(order);
+            saveOrderEventToOutbox(saved, "ORDER_REFUND_PENDING");
+            auditLogService.logEvent("REFUND_BANK_INFO_SUBMITTED", "Order", orderId.toString(),
+                    Map.of("orderId", orderId.toString(),
+                            "previousStatus", oldStatus.name(),
+                            "newStatus", OrderStatus.REFUND_PENDING.name(),
+                            "bankName", saved.getRefundBankName()),
+                    "customer");
+            return orderMapper.toResponse(saved);
+        });
+    }
+
     public boolean hasStatus(UUID orderId, OrderStatus status) {
         return findById(orderId).getStatus() == status;
     }
@@ -421,6 +463,59 @@ public class OrderService {
     }
 
     // ==================== Private helpers ====================
+
+    private OrderResponse markCompensationStatus(UUID orderId,
+                                                 OrderStatus compensationStatus,
+                                                 String eventType,
+                                                 String reason,
+                                                 String actor) {
+        Order current = findById(orderId);
+        if (current.getStatus() == OrderStatus.REFUNDED) {
+            log.info("Order already refunded, skip compensation status: orderId={} status={}", orderId, compensationStatus);
+            return orderMapper.toResponse(current);
+        }
+        if (current.getStatus() == compensationStatus || current.getStatus() == OrderStatus.REFUND_PENDING) {
+            log.info("Order already in compensation flow: orderId={} currentStatus={}", orderId, current.getStatus());
+            return orderMapper.toResponse(current);
+        }
+        if (current.getStatus() == OrderStatus.COMPLETED) {
+            log.warn("Skip compensation for completed order: orderId={} targetStatus={}", orderId, compensationStatus);
+            return orderMapper.toResponse(current);
+        }
+
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            Order order = findById(orderId);
+            if (order.getStatus() == OrderStatus.REFUNDED
+                    || order.getStatus() == compensationStatus
+                    || order.getStatus() == OrderStatus.REFUND_PENDING) {
+                return orderMapper.toResponse(order);
+            }
+            if (order.getStatus() == OrderStatus.COMPLETED) {
+                return orderMapper.toResponse(order);
+            }
+
+            OrderStatus oldStatus = order.getStatus();
+            order.setStatus(compensationStatus);
+            order.setCompensationReason(reason);
+            Order saved = orderRepository.save(order);
+            saveOrderEventToOutbox(saved, eventType);
+            auditLogService.logEvent(eventType, "Order", orderId.toString(),
+                    Map.of("orderId", orderId.toString(),
+                            "previousStatus", oldStatus.name(),
+                            "newStatus", compensationStatus.name(),
+                            "reason", reason != null ? reason : "",
+                            "actor", actor),
+                    actor);
+            snapshotService.takeSnapshot("Order", orderId,
+                    Map.of("orderId", orderId.toString(),
+                            "status", compensationStatus.name(),
+                            "previousStatus", oldStatus.name(),
+                            "snapshotReason", reason != null ? reason : eventType));
+            log.warn("Order moved to compensation: orderId={} status={} reason={}",
+                    orderId, compensationStatus, reason);
+            return orderMapper.toResponse(saved);
+        });
+    }
 
     private Order findById(UUID orderId) {
         return orderRepository.findById(orderId)
@@ -490,6 +585,10 @@ public class OrderService {
         return StockOperationRequest.builder().items(stockItems).build();
     }
 
+    private String orderReference(UUID orderId) {
+        return "ORDER:" + orderId;
+    }
+
     /**
      * Xây dựng StockOperationRequest từ các OrderItem đã lưu (dùng khi huỷ đơn).
      */
@@ -500,7 +599,11 @@ public class OrderService {
                         .quantity(item.getQuantity())
                         .build())
                 .collect(Collectors.toList());
-        return StockOperationRequest.builder().items(stockItems).build();
+        return StockOperationRequest.builder()
+                .items(stockItems)
+                .reference(orderReference(order.getId()))
+                .reason("Release stock for order " + order.getOrderNumber())
+                .build();
     }
 
     /**
@@ -529,6 +632,10 @@ public class OrderService {
                 .guestName(order.getGuestName())
                 .guestPhone(order.getGuestPhone())
                 .note(order.getNote())
+                .compensationReason(order.getCompensationReason())
+                .refundBankName(order.getRefundBankName())
+                .refundAccountNumber(order.getRefundAccountNumber())
+                .refundAccountHolder(order.getRefundAccountHolder())
                 .items(order.getItems().stream()
                         .map(item -> OrderEvent.OrderItemEvent.builder()
                                 .productId(item.getProductId())
