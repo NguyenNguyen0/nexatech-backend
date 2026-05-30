@@ -74,7 +74,7 @@ async def build_preview(state: dict[str, Any]) -> dict[str, Any]:
             "tool_name": selected_tool,
             "tool_args": state.get("selected_tool_args") or {},
             "sensitivity": state.get("request_sensitivity") or "low",
-        }
+        },
     }
 
 
@@ -115,7 +115,8 @@ async def execute_tool(state: dict[str, Any]) -> dict[str, Any]:
     return {
         "tool_results": existing_results,
         "tool_errors": existing_errors,
-        "response_text": result.get("message") or f"Tool execution failed for {tool_name}.",
+        "response_text": result.get("message")
+        or f"Tool execution failed for {tool_name}.",
         "final_status": "tool_error",
     }
 

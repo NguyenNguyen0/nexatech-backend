@@ -16,7 +16,9 @@ class ApprovalRequest(BaseModel):
     timeout_seconds: int = 600
 
 
-async def wait_for_approval(decision_future: asyncio.Future[str], timeout_seconds: int) -> str:
+async def wait_for_approval(
+    decision_future: asyncio.Future[str], timeout_seconds: int
+) -> str:
     try:
         return await asyncio.wait_for(decision_future, timeout=timeout_seconds)
     except asyncio.TimeoutError:

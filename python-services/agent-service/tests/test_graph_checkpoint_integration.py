@@ -14,18 +14,29 @@ from app.graph.agent import compile_graph
 
 
 @pytest.mark.asyncio
-async def test_graph_interrupt_and_resume_with_postgres_checkpointer(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_graph_interrupt_and_resume_with_postgres_checkpointer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     database_url = os.getenv("AGENT_DB_URL")
     if not database_url:
-        pytest.skip("AGENT_DB_URL is not configured for Postgres checkpointer integration test")
+        pytest.skip(
+            "AGENT_DB_URL is not configured for Postgres checkpointer integration test"
+        )
 
     try:
         from langgraph.checkpoint.postgres import PostgresSaver
     except Exception:
         pytest.skip("langgraph postgres checkpointer dependencies are unavailable")
 
-    async def fake_invoke_tool(tool_name: str, tool_args: dict[str, object]) -> dict[str, object]:
-        return {"ok": True, "tool": tool_name, "data": {"tool_args": tool_args}, "raw": {"tool": tool_name}}
+    async def fake_invoke_tool(
+        tool_name: str, tool_args: dict[str, object]
+    ) -> dict[str, object]:
+        return {
+            "ok": True,
+            "tool": tool_name,
+            "data": {"tool_args": tool_args},
+            "raw": {"tool": tool_name},
+        }
 
     monkeypatch.setattr("app.graph.nodes.MCP_CLIENT.invoke_tool", fake_invoke_tool)
 
@@ -44,10 +55,14 @@ async def test_graph_interrupt_and_resume_with_postgres_checkpointer(monkeypatch
             "tool_errors": [],
         }
 
-        first_result = await graph.ainvoke(initial_state, config=config, durability="sync", version="v2")
+        first_result = await graph.ainvoke(
+            initial_state, config=config, durability="sync", version="v2"
+        )
         assert getattr(first_result, "interrupts", ())
 
-        resumed_result = await graph.ainvoke(Command(resume="approved"), config=config, durability="sync", version="v2")
+        resumed_result = await graph.ainvoke(
+            Command(resume="approved"), config=config, durability="sync", version="v2"
+        )
         resumed_output = resumed_result.value
 
         assert resumed_output.get("approval_result") == "approved"

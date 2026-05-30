@@ -25,7 +25,16 @@ class ToolDescriptor:
 TOOL_DESCRIPTORS: tuple[ToolDescriptor, ...] = (
     ToolDescriptor(
         tool_name="list_promotions",
-        keywords=("promotion", "promotions", "khuyến mãi", "khuyến mại", "khuyen mai", "ưu đãi", "uu dai", "voucher"),
+        keywords=(
+            "promotion",
+            "promotions",
+            "khuyến mãi",
+            "khuyến mại",
+            "khuyen mai",
+            "ưu đãi",
+            "uu dai",
+            "voucher",
+        ),
         rationale="Use promotion listing when the request asks for current campaigns or promotions.",
     ),
     ToolDescriptor(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
@@ -8,7 +9,34 @@ from app.core.logging import correlation_id_ctx, user_email_ctx, user_id_ctx, us
 from app.core.settings import SETTINGS
 
 
+logger = logging.getLogger("agent-mcp")
+
+
 class MCPClient:
+    async def list_available_tools(self) -> list[str]:
+        """Query MCP server for available tool names (tools that are actually registered and callable)."""
+        async with httpx.AsyncClient(
+            timeout=self.timeout,
+            transport=self.transport,
+            follow_redirects=True,
+        ) as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/mcp/",
+                    json={
+                        "jsonrpc": "2.0",
+                        "id": correlation_id_ctx.get() or "agent-service",
+                        "method": "tools/list",
+                        "params": {},
+                    },
+                    headers=self._build_headers(),
+                )
+                response.raise_for_status()
+                return self._extract_tool_names(response.json())
+            except Exception as exc:
+                logger.warning("[MCP-TOOLS] Failed to fetch available tools: %s", exc)
+                return []
+
     def __init__(
         self,
         base_url: str,
@@ -22,7 +50,7 @@ class MCPClient:
 
     def _build_headers(self) -> dict[str, str]:
         correlation_id = correlation_id_ctx.get()
-        headers = {"Accept": "application/json"}
+        headers = {"Accept": "application/json, text/event-stream"}
         if correlation_id and correlation_id != "-":
             headers["X-Correlation-Id"] = correlation_id
         user_id = user_id_ctx.get()
@@ -35,6 +63,31 @@ class MCPClient:
         if user_email and user_email != "-":
             headers["X-User-Email"] = user_email
         return headers
+
+    def _extract_tool_names(self, response_body: Any) -> list[str]:
+        if not isinstance(response_body, dict):
+            return []
+
+        result = response_body.get("result", response_body)
+        if not isinstance(result, dict):
+            return []
+
+        tools = result.get("tools")
+        if not isinstance(tools, list):
+            return []
+
+        names: list[str] = []
+        for tool in tools:
+            name = None
+            if isinstance(tool, dict):
+                name = tool.get("name")
+            else:
+                name = getattr(tool, "name", None)
+
+            if isinstance(name, str) and name and name not in names:
+                names.append(name)
+
+        return names
 
     def _extract_tool_data(self, result: Any) -> Any:
         if not isinstance(result, dict):

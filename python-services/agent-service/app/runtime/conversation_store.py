@@ -10,7 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class MongoConversationStore:
-    def __init__(self, client: Any, database: str, collection: str, *, max_events: int) -> None:
+    def __init__(
+        self, client: Any, database: str, collection: str, *, max_events: int
+    ) -> None:
         self.client = client
         self.database = database
         self.collection = collection
@@ -74,7 +76,9 @@ class MongoConversationStore:
             upsert=True,
         )
 
-    async def get_thread(self, *, thread_id: str, limit: int = 100) -> dict[str, Any] | None:
+    async def get_thread(
+        self, *, thread_id: str, limit: int = 100
+    ) -> dict[str, Any] | None:
         document = await self._collection.find_one({"_id": thread_id})
         if document is None:
             return None
@@ -108,13 +112,19 @@ class MongoConversationStore:
             ],
         }
 
-    async def list_threads_by_user(self, *, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
-        cursor = self._collection.find(
-            {"userIds": user_id},
-            {
-                "events": 0,
-            },
-        ).sort("updatedAt", -1).limit(limit)
+    async def list_threads_by_user(
+        self, *, user_id: str, limit: int = 20
+    ) -> list[dict[str, Any]]:
+        cursor = (
+            self._collection.find(
+                {"userIds": user_id},
+                {
+                    "events": 0,
+                },
+            )
+            .sort("updatedAt", -1)
+            .limit(limit)
+        )
         documents = await cursor.to_list(length=limit)
 
         return [

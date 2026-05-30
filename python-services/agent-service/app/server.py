@@ -29,7 +29,6 @@ from app.core.logging import (
 )
 from app.core.settings import SETTINGS
 from app.graph.agent import compile_graph
-from app.graph.tool_registry import TOOL_DESCRIPTORS
 from app.mcp_client import MCP_CLIENT
 from app.runtime.copilotkit import attach_copilotkit_middleware
 from app.runtime.checkpointer import close_checkpointer, initialize_checkpointer
@@ -61,7 +60,9 @@ class AgentRunRequest(BaseModel):
     required_role: str | None = Field(default=None, alias="requiredRole")
     request_sensitivity: str | None = Field(default=None, alias="requestSensitivity")
     selected_tool: str | None = Field(default=None, alias="selectedTool")
-    selected_tool_args: dict[str, Any] | None = Field(default=None, alias="selectedToolArgs")
+    selected_tool_args: dict[str, Any] | None = Field(
+        default=None, alias="selectedToolArgs"
+    )
     run_id: str | None = Field(default=None, alias="runId")
 
 
@@ -110,7 +111,10 @@ def _json_safe(value: Any) -> Any:
 
 
 def _serialize_interrupts(interrupts: tuple[Interrupt, ...]) -> list[dict[str, Any]]:
-    return [{"id": interrupt.id, "value": _json_safe(interrupt.value)} for interrupt in interrupts]
+    return [
+        {"id": interrupt.id, "value": _json_safe(interrupt.value)}
+        for interrupt in interrupts
+    ]
 
 
 def _graph_config(thread_id: str) -> dict[str, Any]:
@@ -123,7 +127,9 @@ async def _invoke_graph(graph_input: Any, *, thread_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail="Graph runtime is not initialized")
 
     config = _graph_config(thread_id)
-    result = await graph.ainvoke(graph_input, config=config, durability="exit", version="v2")
+    result = await graph.ainvoke(
+        graph_input, config=config, durability="exit", version="v2"
+    )
     interrupts = getattr(result, "interrupts", ())
     if READINESS_CHECKS.get("checkpointer") == "ok":
         snapshot = await graph.aget_state(config)
@@ -191,10 +197,14 @@ def _extract_roles_from_header(raw_roles: str | None) -> list[str]:
     return [item.strip().lower() for item in normalized.split(",") if item.strip()]
 
 
-def _build_caller_context(request: AgentRunRequest, raw_request: Request) -> dict[str, Any]:
+def _build_caller_context(
+    request: AgentRunRequest, raw_request: Request
+) -> dict[str, Any]:
     caller = dict(request.caller or {})
     caller_roles = caller.get("roles") if isinstance(caller.get("roles"), list) else []
-    normalized_roles = [str(item).strip().lower() for item in caller_roles if str(item).strip()]
+    normalized_roles = [
+        str(item).strip().lower() for item in caller_roles if str(item).strip()
+    ]
 
     header_roles = _extract_roles_from_header(raw_request.headers.get("X-User-Role"))
     merged_roles: list[str] = []
@@ -222,7 +232,9 @@ def _require_user_id(request: Request) -> str:
     return user_id
 
 
-def _run_event(event_type: str, *, run_id: str, thread_id: str, data: dict[str, Any]) -> dict[str, Any]:
+def _run_event(
+    event_type: str, *, run_id: str, thread_id: str, data: dict[str, Any]
+) -> dict[str, Any]:
     return {
         "eventType": event_type,
         "runId": run_id,
@@ -254,10 +266,14 @@ def _extract_text_chunks(result: dict[str, Any], *, chunk_size: int = 80) -> lis
         text_candidates.append(json.dumps(_json_safe(output), ensure_ascii=True))
 
     text = text_candidates[0]
-    return [text[index:index + chunk_size] for index in range(0, len(text), chunk_size)]
+    return [
+        text[index : index + chunk_size] for index in range(0, len(text), chunk_size)
+    ]
 
 
-def _extract_tool_summary(result: dict[str, Any]) -> tuple[str | None, bool, str | None, int | None]:
+def _extract_tool_summary(
+    result: dict[str, Any],
+) -> tuple[str | None, bool, str | None, int | None]:
     output = result.get("output")
     state_values = (result.get("state") or {}).get("values")
 
@@ -297,22 +313,24 @@ def _extract_tool_summary(result: dict[str, Any]) -> tuple[str | None, bool, str
     return selected_tool, has_error, error_message, status_code
 
 
-async def _log_connected_mcp_tools(message: str) -> None:
-    tools = [descriptor.tool_name for descriptor in TOOL_DESCRIPTORS]
+async def _log_connected_mcp_tools(message: str) -> list[str]:
+    """Log and return only tools actually available from MCP server."""
+    available_tools = await MCP_CLIENT.list_available_tools()
     health = await MCP_CLIENT.health()
     if health.get("ok"):
         logger.info(
             "[CHAT] incoming='%s' mcp=connected tools=%s",
             message,
-            tools,
+            available_tools,
         )
     else:
         logger.warning(
             "[CHAT] incoming='%s' mcp=unreachable reason=%s tools=%s",
             message,
             health.get("message") or "unknown",
-            tools,
+            available_tools,
         )
+    return available_tools
 
 
 def _utc_timestamp() -> str:
@@ -328,7 +346,9 @@ async def _register_eureka() -> None:
 
     if eureka_client is None:
         READINESS_CHECKS["eureka"] = "client_missing"
-        logger.warning("[STARTUP] - Eureka: client missing, running without registration")
+        logger.warning(
+            "[STARTUP] - Eureka: client missing, running without registration"
+        )
         return
 
     try:
@@ -344,7 +364,9 @@ async def _register_eureka() -> None:
         logger.info("[STARTUP] + Eureka: registered")
     except Exception as exc:  # pragma: no cover
         READINESS_CHECKS["eureka"] = f"error: {exc.__class__.__name__}"
-        logger.warning("[STARTUP] - Eureka: registration failed (%s)", exc.__class__.__name__)
+        logger.warning(
+            "[STARTUP] - Eureka: registration failed (%s)", exc.__class__.__name__
+        )
 
 
 def _initialize_graph_runtime(app: FastAPI) -> None:
@@ -365,7 +387,10 @@ def _initialize_graph_runtime(app: FastAPI) -> None:
         app.state.compiled_graph = COMPILED_GRAPH
         READINESS_CHECKS["checkpointer"] = f"error: {exc.__class__.__name__}"
         READINESS_CHECKS["graph"] = "ok"
-        logger.warning("[STARTUP] - LangGraph checkpointer: initialization failed (%s)", exc.__class__.__name__)
+        logger.warning(
+            "[STARTUP] - LangGraph checkpointer: initialization failed (%s)",
+            exc.__class__.__name__,
+        )
 
     if attach_copilotkit_middleware(
         app,
@@ -569,7 +594,12 @@ def root() -> dict[str, object]:
 async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str, Any]:
     thread_id = request.thread_id or str(uuid.uuid4())
     caller = _build_caller_context(request, raw_request)
-    await _log_connected_mcp_tools(request.message)
+    available_tools = await _log_connected_mcp_tools(request.message)
+    if not available_tools:
+        raise HTTPException(
+            status_code=503,
+            detail="Không có tool nào khả dụng từ MCP server. Vui lòng kiểm tra lại các service phụ trợ.",
+        )
     graph_input = {
         "messages": [{"role": "user", "content": request.message}],
         "caller": caller,
@@ -582,6 +612,7 @@ async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str,
         "tool_errors": [],
         "thread_id": thread_id,
         "request_id": correlation_id_ctx.get(),
+        "available_tools": available_tools,
     }
     await _persist_conversation_event(
         thread_id=thread_id,
@@ -608,11 +639,51 @@ async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str,
 
 @app.post("/runs/stream")
 @app.post("/api/v1/agent/runs/stream")
-async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> StreamingResponse:
+async def run_agent_stream(
+    request: AgentRunRequest, raw_request: Request
+) -> StreamingResponse:
     run_id = request.run_id or str(uuid.uuid4())
     thread_id = request.thread_id or str(uuid.uuid4())
     caller = _build_caller_context(request, raw_request)
-    await _log_connected_mcp_tools(request.message)
+    available_tools = await _log_connected_mcp_tools(request.message)
+    if not available_tools:
+        error_message = (
+            "Không có tool nào khả dụng từ MCP server. "
+            "Vui lòng kiểm tra lại các service phụ trợ."
+        )
+        await _persist_conversation_event(
+            thread_id=thread_id,
+            event_type="user_message",
+            payload={
+                "message": request.message,
+                "caller": caller,
+                "runId": run_id,
+            },
+            request=raw_request,
+        )
+        await _persist_conversation_event(
+            thread_id=thread_id,
+            event_type="run_error",
+            payload={
+                "runId": run_id,
+                "message": error_message,
+                "reason": "mcp_tools_unavailable",
+            },
+            request=raw_request,
+        )
+
+        async def error_event():
+            yield _sse_frame(
+                "run.error",
+                _run_event(
+                    "run.error",
+                    run_id=run_id,
+                    thread_id=thread_id,
+                    data={"message": error_message},
+                ),
+            )
+
+        return StreamingResponse(error_event(), media_type="text/event-stream")
 
     graph_input = {
         "messages": [{"role": "user", "content": request.message}],
@@ -626,6 +697,7 @@ async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> St
         "tool_errors": [],
         "thread_id": thread_id,
         "request_id": correlation_id_ctx.get(),
+        "available_tools": available_tools,
     }
 
     await _persist_conversation_event(
@@ -640,7 +712,9 @@ async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> St
     )
 
     task = asyncio.create_task(_invoke_graph(graph_input, thread_id=thread_id))
-    active_runs: dict[str, dict[str, Any]] = getattr(app.state, "active_stream_runs", {})
+    active_runs: dict[str, dict[str, Any]] = getattr(
+        app.state, "active_stream_runs", {}
+    )
     active_runs[run_id] = {
         "threadId": thread_id,
         "task": task,
@@ -732,7 +806,9 @@ async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> St
                 request=raw_request,
             )
 
-            selected_tool, has_tool_error, tool_error_message, tool_error_status = _extract_tool_summary(result)
+            selected_tool, has_tool_error, tool_error_message, tool_error_status = (
+                _extract_tool_summary(result)
+            )
             if selected_tool:
                 yield _sse_frame(
                     "tool.started",
@@ -767,7 +843,8 @@ async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> St
                                 "tool": selected_tool,
                                 "toolName": selected_tool,
                                 "name": selected_tool,
-                                "errorMessage": tool_error_message or "Tool execution failed",
+                                "errorMessage": tool_error_message
+                                or "Tool execution failed",
                                 "statusCode": tool_error_status,
                                 "correlationId": correlation_id,
                             },
@@ -843,7 +920,9 @@ async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> St
 @app.post("/runs/{run_id}/cancel")
 @app.post("/api/v1/agent/runs/{run_id}/cancel")
 async def cancel_stream_run(run_id: str) -> dict[str, Any]:
-    active_runs: dict[str, dict[str, Any]] = getattr(app.state, "active_stream_runs", {})
+    active_runs: dict[str, dict[str, Any]] = getattr(
+        app.state, "active_stream_runs", {}
+    )
     run_state = active_runs.get(run_id)
     if run_state is None:
         raise HTTPException(status_code=404, detail="Run not found or already finished")
@@ -862,16 +941,22 @@ async def cancel_stream_run(run_id: str) -> dict[str, Any]:
 
 @app.post("/runs/resume")
 @app.post("/api/v1/agent/runs/resume")
-async def resume_agent(request: AgentResumeRequest, raw_request: Request) -> dict[str, Any]:
+async def resume_agent(
+    request: AgentResumeRequest, raw_request: Request
+) -> dict[str, Any]:
     if READINESS_CHECKS.get("checkpointer") != "ok":
-        raise HTTPException(status_code=503, detail="Resume requires the LangGraph checkpointer")
+        raise HTTPException(
+            status_code=503, detail="Resume requires the LangGraph checkpointer"
+        )
     await _persist_conversation_event(
         thread_id=request.thread_id,
         event_type="approval_decision",
         payload={"decision": request.decision},
         request=raw_request,
     )
-    result = await _invoke_graph(Command(resume=request.decision), thread_id=request.thread_id)
+    result = await _invoke_graph(
+        Command(resume=request.decision), thread_id=request.thread_id
+    )
     await _persist_conversation_event(
         thread_id=request.thread_id,
         event_type="agent_result",
@@ -889,7 +974,10 @@ async def resume_agent(request: AgentResumeRequest, raw_request: Request) -> dic
 @app.post("/api/v1/agent/runs/interrupts")
 async def get_run_interrupts(request: AgentInterruptRequest) -> dict[str, Any]:
     if READINESS_CHECKS.get("checkpointer") != "ok":
-        raise HTTPException(status_code=503, detail="Interrupt state requires the LangGraph checkpointer")
+        raise HTTPException(
+            status_code=503,
+            detail="Interrupt state requires the LangGraph checkpointer",
+        )
 
     graph = getattr(app.state, "compiled_graph", None)
     if graph is None:
@@ -898,7 +986,9 @@ async def get_run_interrupts(request: AgentInterruptRequest) -> dict[str, Any]:
     try:
         snapshot = await graph.aget_state(_graph_config(request.thread_id))
     except Exception as exc:
-        raise HTTPException(status_code=404, detail=f"Run state not found: {exc.__class__.__name__}") from exc
+        raise HTTPException(
+            status_code=404, detail=f"Run state not found: {exc.__class__.__name__}"
+        ) from exc
 
     return {
         "threadId": request.thread_id,
@@ -911,7 +1001,9 @@ async def get_run_interrupts(request: AgentInterruptRequest) -> dict[str, Any]:
 @app.get("/api/v1/agent/runs/{thread_id}")
 async def get_agent_run_state(thread_id: str) -> dict[str, Any]:
     if READINESS_CHECKS.get("checkpointer") != "ok":
-        raise HTTPException(status_code=503, detail="Run state requires the LangGraph checkpointer")
+        raise HTTPException(
+            status_code=503, detail="Run state requires the LangGraph checkpointer"
+        )
 
     graph = getattr(app.state, "compiled_graph", None)
     if graph is None:
@@ -920,7 +1012,9 @@ async def get_agent_run_state(thread_id: str) -> dict[str, Any]:
     try:
         snapshot = await graph.aget_state(_graph_config(thread_id))
     except Exception as exc:
-        raise HTTPException(status_code=404, detail=f"Run state not found: {exc.__class__.__name__}") from exc
+        raise HTTPException(
+            status_code=404, detail=f"Run state not found: {exc.__class__.__name__}"
+        ) from exc
 
     return {
         "threadId": thread_id,
@@ -940,7 +1034,9 @@ async def get_conversation_thread(
 ) -> dict[str, Any]:
     store = getattr(app.state, "conversation_store", None)
     if store is None:
-        raise HTTPException(status_code=503, detail="Conversation store is not available")
+        raise HTTPException(
+            status_code=503, detail="Conversation store is not available"
+        )
 
     thread = await store.get_thread(thread_id=thread_id, limit=limit)
     if thread is None:
@@ -957,7 +1053,9 @@ async def list_conversation_threads(
 ) -> dict[str, Any]:
     store = getattr(app.state, "conversation_store", None)
     if store is None:
-        raise HTTPException(status_code=503, detail="Conversation store is not available")
+        raise HTTPException(
+            status_code=503, detail="Conversation store is not available"
+        )
 
     effective_user_id = request.headers.get("X-User-Id") or user_id
     if not effective_user_id:
@@ -979,7 +1077,9 @@ async def create_conversation_session(
 ) -> dict[str, Any]:
     store = getattr(app.state, "conversation_store", None)
     if store is None:
-        raise HTTPException(status_code=503, detail="Conversation store is not available")
+        raise HTTPException(
+            status_code=503, detail="Conversation store is not available"
+        )
 
     owner_user_id = _require_user_id(request)
     thread_id = payload.thread_id or str(uuid.uuid4())
@@ -1006,7 +1106,9 @@ async def update_conversation_session(
 ) -> dict[str, Any]:
     store = getattr(app.state, "conversation_store", None)
     if store is None:
-        raise HTTPException(status_code=503, detail="Conversation store is not available")
+        raise HTTPException(
+            status_code=503, detail="Conversation store is not available"
+        )
 
     requester_user_id = _require_user_id(request)
     session = await store.update_session(
@@ -1016,7 +1118,9 @@ async def update_conversation_session(
         metadata=payload.metadata,
     )
     if session is None:
-        raise HTTPException(status_code=404, detail="Session not found or access denied")
+        raise HTTPException(
+            status_code=404, detail="Session not found or access denied"
+        )
 
     return {
         "threadId": thread_id,
@@ -1026,15 +1130,23 @@ async def update_conversation_session(
 
 @app.delete("/sessions/{thread_id}")
 @app.delete("/api/v1/agent/sessions/{thread_id}")
-async def delete_conversation_session(thread_id: str, request: Request) -> dict[str, Any]:
+async def delete_conversation_session(
+    thread_id: str, request: Request
+) -> dict[str, Any]:
     store = getattr(app.state, "conversation_store", None)
     if store is None:
-        raise HTTPException(status_code=503, detail="Conversation store is not available")
+        raise HTTPException(
+            status_code=503, detail="Conversation store is not available"
+        )
 
     requester_user_id = _require_user_id(request)
-    deleted = await store.delete_session(thread_id=thread_id, requester_user_id=requester_user_id)
+    deleted = await store.delete_session(
+        thread_id=thread_id, requester_user_id=requester_user_id
+    )
     if not deleted:
-        raise HTTPException(status_code=404, detail="Session not found or access denied")
+        raise HTTPException(
+            status_code=404, detail="Session not found or access denied"
+        )
 
     return {
         "threadId": thread_id,
