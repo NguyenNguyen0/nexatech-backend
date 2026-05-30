@@ -91,7 +91,11 @@ class MCPClient:
         }
 
     async def health(self) -> dict[str, Any]:
-        async with httpx.AsyncClient(timeout=self.timeout, transport=self.transport) as client:
+        async with httpx.AsyncClient(
+            timeout=self.timeout,
+            transport=self.transport,
+            follow_redirects=True,
+        ) as client:
             try:
                 response = await client.get(f"{self.base_url}/health", headers=self._build_headers())
                 response.raise_for_status()
@@ -114,15 +118,44 @@ class MCPClient:
             },
         }
 
-        async with httpx.AsyncClient(timeout=self.timeout, transport=self.transport) as client:
+        async with httpx.AsyncClient(
+            timeout=self.timeout,
+            transport=self.transport,
+            follow_redirects=True,
+        ) as client:
             try:
                 response = await client.post(
-                    f"{self.base_url}/mcp",
+                    f"{self.base_url}/mcp/",
                     json=payload,
                     headers=self._build_headers(),
                 )
                 response.raise_for_status()
                 return self._normalize_rpc_response(response.json(), tool_name=tool_name)
+            except httpx.HTTPStatusError as exc:
+                status_code = exc.response.status_code
+                try:
+                    payload = exc.response.json()
+                    message = payload.get("message") or payload.get("detail") or str(payload)
+                except ValueError:
+                    message = exc.response.text or exc.__class__.__name__
+                correlation_id = self._build_headers().get("X-Correlation-Id")
+                # Log MCP tool call failure with correlationId for grep
+                import logging
+                logging.getLogger("agent-mcp").error(
+                    "[MCP-FAIL][%s] tool=%s status=%s error=%s",
+                    correlation_id or "none",
+                    tool_name,
+                    status_code,
+                    message,
+                )
+                return {
+                    "ok": False,
+                    "tag": "AGT-MCP-TOOL",
+                    "message": f"MCP tool call failed: HTTP {status_code} - {message}",
+                    "tool": tool_name,
+                    "statusCode": status_code,
+                    "correlationId": correlation_id,
+                }
             except Exception as exc:
                 return {
                     "ok": False,

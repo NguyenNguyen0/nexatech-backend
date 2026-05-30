@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from app.core.settings import SETTINGS
+from app.prompts.default import load_default_system_prompt
 from app.graph.tool_registry import TOOL_DESCRIPTORS, ToolPlan
 
 
@@ -48,6 +49,18 @@ def _build_tool_catalog() -> str:
     return "\n".join(lines)
 
 
+def _planner_system_prompt() -> str:
+    base_prompt = load_default_system_prompt()
+    return (
+        f"{base_prompt}\n\n"
+        "[Planner mode] Ban dang o che do tool planner. "
+        "Chi duoc phep chon dung 1 tool phu hop nhat tu danh sach duoc cung cap. "
+        "Bat buoc tra ve DUY NHAT mot JSON object hop le.\n\n"
+        "Dinh dang bat buoc: {\"tool_name\": string|null, \"tool_args\": object, \"required_role\": string, \"rationale\": string}.\n"
+        "Neu khong co tool phu hop thi tra {\"tool_name\": null}."
+    )
+
+
 async def plan_tool_call_with_llm(user_text: str) -> ToolPlan | None:
     if not user_text.strip() or not SETTINGS.groq_api_key:
         return None
@@ -65,13 +78,7 @@ async def plan_tool_call_with_llm(user_text: str) -> ToolPlan | None:
         temperature=0,
     )
 
-    system_prompt = (
-        "You are a strict tool planner for NexaTech admin agent. "
-        "Select exactly one tool from the provided catalog. "
-        "Return ONLY a JSON object with keys: tool_name, tool_args, required_role, rationale. "
-        "If there is no suitable tool, return {\"tool_name\": null}.\n\n"
-        f"Tool catalog:\n{_build_tool_catalog()}"
-    )
+    system_prompt = f"{_planner_system_prompt()}\n\nTool catalog:\n{_build_tool_catalog()}"
 
     try:
         response = await llm.ainvoke(

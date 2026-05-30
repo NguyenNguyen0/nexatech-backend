@@ -29,6 +29,8 @@ from app.core.logging import (
 )
 from app.core.settings import SETTINGS
 from app.graph.agent import compile_graph
+from app.graph.tool_registry import TOOL_DESCRIPTORS
+from app.mcp_client import MCP_CLIENT
 from app.runtime.copilotkit import attach_copilotkit_middleware
 from app.runtime.checkpointer import close_checkpointer, initialize_checkpointer
 from app.runtime.conversation_store import initialize_conversation_store
@@ -255,13 +257,14 @@ def _extract_text_chunks(result: dict[str, Any], *, chunk_size: int = 80) -> lis
     return [text[index:index + chunk_size] for index in range(0, len(text), chunk_size)]
 
 
-def _extract_tool_summary(result: dict[str, Any]) -> tuple[str | None, bool, str | None]:
+def _extract_tool_summary(result: dict[str, Any]) -> tuple[str | None, bool, str | None, int | None]:
     output = result.get("output")
     state_values = (result.get("state") or {}).get("values")
 
     selected_tool: str | None = None
     has_error = False
     error_message: str | None = None
+    status_code: int | None = None
 
     if isinstance(output, dict):
         selected_tool = output.get("selected_tool") or selected_tool
@@ -273,6 +276,9 @@ def _extract_tool_summary(result: dict[str, Any]) -> tuple[str | None, bool, str
                 maybe_error = first_error.get("error")
                 if isinstance(maybe_error, dict):
                     error_message = maybe_error.get("message")
+                    raw_status = maybe_error.get("statusCode")
+                    if isinstance(raw_status, int):
+                        status_code = raw_status
 
     if isinstance(state_values, dict):
         selected_tool = state_values.get("selected_tool") or selected_tool
@@ -284,8 +290,29 @@ def _extract_tool_summary(result: dict[str, Any]) -> tuple[str | None, bool, str
                 maybe_error = first_error.get("error")
                 if isinstance(maybe_error, dict) and not error_message:
                     error_message = maybe_error.get("message")
+                    raw_status = maybe_error.get("statusCode")
+                    if isinstance(raw_status, int):
+                        status_code = raw_status
 
-    return selected_tool, has_error, error_message
+    return selected_tool, has_error, error_message, status_code
+
+
+async def _log_connected_mcp_tools(message: str) -> None:
+    tools = [descriptor.tool_name for descriptor in TOOL_DESCRIPTORS]
+    health = await MCP_CLIENT.health()
+    if health.get("ok"):
+        logger.info(
+            "[CHAT] incoming='%s' mcp=connected tools=%s",
+            message,
+            tools,
+        )
+    else:
+        logger.warning(
+            "[CHAT] incoming='%s' mcp=unreachable reason=%s tools=%s",
+            message,
+            health.get("message") or "unknown",
+            tools,
+        )
 
 
 def _utc_timestamp() -> str:
@@ -542,6 +569,7 @@ def root() -> dict[str, object]:
 async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str, Any]:
     thread_id = request.thread_id or str(uuid.uuid4())
     caller = _build_caller_context(request, raw_request)
+    await _log_connected_mcp_tools(request.message)
     graph_input = {
         "messages": [{"role": "user", "content": request.message}],
         "caller": caller,
@@ -584,6 +612,7 @@ async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> St
     run_id = request.run_id or str(uuid.uuid4())
     thread_id = request.thread_id or str(uuid.uuid4())
     caller = _build_caller_context(request, raw_request)
+    await _log_connected_mcp_tools(request.message)
 
     graph_input = {
         "messages": [{"role": "user", "content": request.message}],
@@ -703,7 +732,7 @@ async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> St
                 request=raw_request,
             )
 
-            selected_tool, has_tool_error, tool_error_message = _extract_tool_summary(result)
+            selected_tool, has_tool_error, tool_error_message, tool_error_status = _extract_tool_summary(result)
             if selected_tool:
                 yield _sse_frame(
                     "tool.started",
@@ -711,10 +740,23 @@ async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> St
                         "tool.started",
                         run_id=run_id,
                         thread_id=thread_id,
-                        data={"tool": selected_tool},
+                        data={
+                            "tool": selected_tool,
+                            "toolName": selected_tool,
+                            "name": selected_tool,
+                        },
                     ),
                 )
+                correlation_id = getattr(raw_request.state, "correlation_id", None)
                 if has_tool_error:
+                    # Log tool call failure with correlationId for grep
+                    logger.error(
+                        "[TOOL-FAIL][%s] tool=%s status=%s error=%s",
+                        correlation_id or "none",
+                        selected_tool,
+                        tool_error_status,
+                        tool_error_message,
+                    )
                     yield _sse_frame(
                         "tool.error",
                         _run_event(
@@ -723,7 +765,11 @@ async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> St
                             thread_id=thread_id,
                             data={
                                 "tool": selected_tool,
-                                "message": tool_error_message or "Tool execution failed",
+                                "toolName": selected_tool,
+                                "name": selected_tool,
+                                "errorMessage": tool_error_message or "Tool execution failed",
+                                "statusCode": tool_error_status,
+                                "correlationId": correlation_id,
                             },
                         ),
                     )
@@ -734,7 +780,12 @@ async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> St
                             "tool.completed",
                             run_id=run_id,
                             thread_id=thread_id,
-                            data={"tool": selected_tool},
+                            data={
+                                "tool": selected_tool,
+                                "toolName": selected_tool,
+                                "name": selected_tool,
+                                "correlationId": correlation_id,
+                            },
                         ),
                     )
 

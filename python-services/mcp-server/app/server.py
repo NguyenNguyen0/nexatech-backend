@@ -30,6 +30,7 @@ from app.tools import news as _news_tools  # noqa: F401
 from app.tools import order as _order_tools  # noqa: F401
 from app.tools import payment as _payment_tools  # noqa: F401
 from app.tools import promotion as _promotion_tools  # noqa: F401
+from app.tools.health import SERVICE_APIS
 
 
 configure_logging(SETTINGS.service_name, SETTINGS.log_level)
@@ -38,6 +39,7 @@ logger = logging.getLogger(SETTINGS.service_name)
 READINESS_CHECKS: dict[str, str] = {
     "service": "ok",
     "eureka": "pending",
+    "dependencies": "pending",
 }
 
 
@@ -83,21 +85,60 @@ async def _deregister_eureka() -> None:
         logger.warning("Failed to deregister from Eureka: %s", exc)
 
 
+async def _log_dependency_connectivity() -> None:
+    connected_services: list[str] = []
+    degraded_services: list[str] = []
+
+    for service_name, api in SERVICE_APIS.items():
+        try:
+            health_result = await api.health()
+            if isinstance(health_result, dict) and health_result.get("ok") is True:
+                connected_services.append(service_name)
+                logger.info("[STARTUP] + %s: reachable", service_name)
+            else:
+                degraded_services.append(service_name)
+                status_code = health_result.get("statusCode") if isinstance(health_result, dict) else None
+                message = health_result.get("message") if isinstance(health_result, dict) else None
+                logger.warning(
+                    "[STARTUP] - %s: unreachable status=%s message=%s",
+                    service_name,
+                    status_code or "unknown",
+                    message or "health check returned non-ok",
+                )
+        except Exception as exc:  # pragma: no cover
+            degraded_services.append(service_name)
+            logger.warning("[STARTUP] - %s: health check failed (%s)", service_name, exc.__class__.__name__)
+
+    READINESS_CHECKS["dependencies"] = "ok" if not degraded_services else "degraded"
+    logger.info(
+        "[STARTUP] dependency summary: connected=%s degraded=%s",
+        connected_services,
+        degraded_services,
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.settings = SETTINGS
     app.state.readiness_checks = READINESS_CHECKS
 
-    async with mcp.session_manager.run():
-        await _register_eureka()
-        try:
-            yield
-        finally:
-            await _deregister_eureka()
+    await _log_dependency_connectivity()
+    await _register_eureka()
+    try:
+        yield
+    finally:
+        await _deregister_eureka()
 
 
 app = FastAPI(title="MCP Server Skeleton", version="0.1.0", lifespan=lifespan)
-app.mount("/mcp", mcp.streamable_http_app())
+app.mount(
+    "/mcp",
+    mcp.http_app(
+        path="/",
+        transport="streamable-http",
+        json_response=True,
+    ),
+)
 
 
 @app.middleware("http")

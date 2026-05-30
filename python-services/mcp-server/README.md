@@ -62,7 +62,7 @@ All downstream calls go through a shared retrying HTTP client and return structu
 The runtime uses the existing Python stack already declared in `pyproject.toml`:
 
 - `fastapi`
-- `mcp[cli]` for `FastMCP`
+- `fastmcp`
 - `httpx`
 - `pydantic-settings`
 - `uvicorn`

@@ -98,3 +98,4 @@ Key variables:
 - User context headers (`X-User-Id`, `X-User-Role`, `X-User-Email`) are consumed when available and propagated to MCP calls.
 - Service supports both prefixed and stripped routes (`/api/v1/agent/...` and `/runs`, `/conversations`, ...) for gateway compatibility.
 - Stream event schema includes: `message.chunk`, `tool.started`, `tool.completed`, `tool.error`, `hitl.interrupt`, `run.completed`, `run.cancelled`, `run.error`.
+- `MCP_SERVER_URL` must point to MCP server base URL (example: `http://localhost:8094`), because agent internally calls `${MCP_SERVER_URL}/mcp`.
