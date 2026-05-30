@@ -14,7 +14,7 @@ MVN = mvn
 .PHONY: help build clean compile dev-up dev-down full-up full-down infra-reset logs-infra logs-full prune \
 	core-up core-down core-build core-logs \
 	run-discovery run-config run-gateway \
-	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-audit run-storage run-promotion run-recommendation \
+	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-audit run-storage run-promotion run-mcp run-recommendation \
 	run-gateway-test run-chat-test \
 	run-gateway-ec2 run-identity-ec2 run-user-ec2 run-product-ec2 run-inventory-ec2 \
 	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-audit-ec2 run-storage-ec2 run-news-ec2 run-promotion-ec2 run-recommendation-ec2 \
@@ -51,6 +51,7 @@ help:
 	@echo "  make run-audit          - Run audit-service"
 	@echo "  make run-storage        - Run storage-service"
 	@echo "  make run-promotion      - Run promotion-service (Node.js, requires .env in promotion-service/)"
+	@echo "  make run-mcp            - Run mcp-server (Python/FastAPI + FastMCP)"
 	@echo "  make run-recommendation - Run recommendation-service (Python/FastAPI)"
 	@echo ""
 	@echo "Run with EC2 infra (loads .env.ec2):"
@@ -170,6 +171,9 @@ run-storage:
 
 run-promotion:
 	powershell -NoProfile -Command "Set-Location promotion-service; npm run start:dev"
+
+run-mcp:
+	cd python-services/mcp-server && uv run main.py
 
 run-recommendation:
 	powershell -NoProfile -Command "Set-Location python-services/recommendation-service; uv run main.py"

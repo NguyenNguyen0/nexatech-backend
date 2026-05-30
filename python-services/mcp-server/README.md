@@ -1,14 +1,19 @@
 # mcp-server
 
-FastAPI service for MCP integration APIs.
+FastAPI + FastMCP skeleton for NexaTech. This iteration focuses on the runtime shell, folder layout, and bootstrap wiring before any business tools are added.
 
-## Default port
+## Default Port
 
-- 8094
+- `8094`
 
-## Health endpoint
+## What Exists Now
 
-- GET /health
+- `GET /health`
+- `GET /ready`
+- `GET /` with a skeleton layout summary
+- `FastMCP` mounted at `/mcp`
+- correlation ID middleware and basic error envelopes
+- optional Eureka registration at startup
 
 ## Run
 
@@ -16,27 +21,45 @@ FastAPI service for MCP integration APIs.
 uv run main.py
 ```
 
-## Environment variables
+From the repository root:
 
-- SERVICE_NAME=mcp-server
-- PORT=8094
-- EUREKA_ENABLED=true
-- EUREKA_SERVER_URL=http://localhost:8761/eureka/
-- EUREKA_INSTANCE_HOSTNAME=127.0.0.1
+```bash
+make run-mcp
+```
 
-## Service Graph
+## Folder Skeleton
 
-```mermaid
-flowchart LR
-	A[mcp-server]
-	B[discovery-server]
-	C[api-gateway]
-
-	A --> B
-	C --> A
+```text
+app/
+    core/
+    mcp/
+    clients/
+    tools/
+    services/
+    schemas/
+    utils/
+tests/
 ```
 
 ## Dependencies
 
-- Exposed through: [api-gateway](../../api-gateway/README.md)
-- Service discovery: [discovery-server](../../discovery-server/README.md)
+The runtime uses the existing Python stack already declared in `pyproject.toml`:
+
+- `fastapi`
+- `mcp[cli]` for `FastMCP`
+- `httpx`
+- `pydantic-settings`
+- `uvicorn`
+- `py-eureka-client`
+
+## MCP Inspector
+
+```bash
+npx -y @modelcontextprotocol/inspector
+```
+
+Connect to:
+
+```text
+http://localhost:8094/mcp
+```
