@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -14,7 +16,7 @@ except ImportError:  # pragma: no cover
 from pydantic import BaseModel, ConfigDict, Field
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from langgraph.types import Command, Interrupt
 
 from app.config import configure_runtime_environment
@@ -58,6 +60,7 @@ class AgentRunRequest(BaseModel):
     request_sensitivity: str | None = Field(default=None, alias="requestSensitivity")
     selected_tool: str | None = Field(default=None, alias="selectedTool")
     selected_tool_args: dict[str, Any] | None = Field(default=None, alias="selectedToolArgs")
+    run_id: str | None = Field(default=None, alias="runId")
 
 
 class AgentResumeRequest(BaseModel):
@@ -65,6 +68,27 @@ class AgentResumeRequest(BaseModel):
 
     thread_id: str = Field(alias="threadId")
     decision: str | dict[str, Any]
+
+
+class AgentInterruptRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    thread_id: str = Field(alias="threadId")
+
+
+class ConversationSessionCreateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    thread_id: str | None = Field(default=None, alias="threadId")
+    title: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class ConversationSessionUpdateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    title: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 def _json_safe(value: Any) -> Any:
@@ -189,6 +213,81 @@ def _build_caller_context(request: AgentRunRequest, raw_request: Request) -> dic
     return caller
 
 
+def _require_user_id(request: Request) -> str:
+    user_id = request.headers.get("X-User-Id")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="X-User-Id header is required")
+    return user_id
+
+
+def _run_event(event_type: str, *, run_id: str, thread_id: str, data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "eventType": event_type,
+        "runId": run_id,
+        "threadId": thread_id,
+        "timestamp": _utc_timestamp(),
+        "data": _json_safe(data),
+    }
+
+
+def _sse_frame(event_name: str, payload: dict[str, Any]) -> str:
+    return f"event: {event_name}\ndata: {json.dumps(payload, ensure_ascii=True)}\n\n"
+
+
+def _extract_text_chunks(result: dict[str, Any], *, chunk_size: int = 80) -> list[str]:
+    text_candidates: list[str] = []
+    output = result.get("output")
+    state_values = (result.get("state") or {}).get("values")
+
+    if isinstance(output, dict):
+        response_text = output.get("response_text")
+        if isinstance(response_text, str) and response_text.strip():
+            text_candidates.append(response_text)
+    if isinstance(state_values, dict):
+        response_text = state_values.get("response_text")
+        if isinstance(response_text, str) and response_text.strip():
+            text_candidates.append(response_text)
+
+    if not text_candidates:
+        text_candidates.append(json.dumps(_json_safe(output), ensure_ascii=True))
+
+    text = text_candidates[0]
+    return [text[index:index + chunk_size] for index in range(0, len(text), chunk_size)]
+
+
+def _extract_tool_summary(result: dict[str, Any]) -> tuple[str | None, bool, str | None]:
+    output = result.get("output")
+    state_values = (result.get("state") or {}).get("values")
+
+    selected_tool: str | None = None
+    has_error = False
+    error_message: str | None = None
+
+    if isinstance(output, dict):
+        selected_tool = output.get("selected_tool") or selected_tool
+        tool_errors = output.get("tool_errors")
+        if isinstance(tool_errors, list) and tool_errors:
+            has_error = True
+            first_error = tool_errors[0]
+            if isinstance(first_error, dict):
+                maybe_error = first_error.get("error")
+                if isinstance(maybe_error, dict):
+                    error_message = maybe_error.get("message")
+
+    if isinstance(state_values, dict):
+        selected_tool = state_values.get("selected_tool") or selected_tool
+        tool_errors = state_values.get("tool_errors")
+        if isinstance(tool_errors, list) and tool_errors:
+            has_error = True
+            first_error = tool_errors[0]
+            if isinstance(first_error, dict):
+                maybe_error = first_error.get("error")
+                if isinstance(maybe_error, dict) and not error_message:
+                    error_message = maybe_error.get("message")
+
+    return selected_tool, has_error, error_message
+
+
 def _utc_timestamp() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
@@ -287,6 +386,7 @@ async def _deregister_eureka() -> None:
 async def lifespan(app: FastAPI):
     app.state.settings = SETTINGS
     app.state.readiness_checks = READINESS_CHECKS
+    app.state.active_stream_runs = {}
     _initialize_graph_runtime(app)
     await _initialize_conversation_runtime(app)
 
@@ -478,6 +578,237 @@ async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str,
     return result
 
 
+@app.post("/runs/stream")
+@app.post("/api/v1/agent/runs/stream")
+async def run_agent_stream(request: AgentRunRequest, raw_request: Request) -> StreamingResponse:
+    run_id = request.run_id or str(uuid.uuid4())
+    thread_id = request.thread_id or str(uuid.uuid4())
+    caller = _build_caller_context(request, raw_request)
+
+    graph_input = {
+        "messages": [{"role": "user", "content": request.message}],
+        "caller": caller,
+        "checkpointer_enabled": READINESS_CHECKS.get("checkpointer") == "ok",
+        "required_role": request.required_role,
+        "request_sensitivity": request.request_sensitivity,
+        "selected_tool": request.selected_tool,
+        "selected_tool_args": request.selected_tool_args,
+        "tool_results": [],
+        "tool_errors": [],
+        "thread_id": thread_id,
+        "request_id": correlation_id_ctx.get(),
+    }
+
+    await _persist_conversation_event(
+        thread_id=thread_id,
+        event_type="user_message",
+        payload={
+            "message": request.message,
+            "caller": caller,
+            "runId": run_id,
+        },
+        request=raw_request,
+    )
+
+    task = asyncio.create_task(_invoke_graph(graph_input, thread_id=thread_id))
+    active_runs: dict[str, dict[str, Any]] = getattr(app.state, "active_stream_runs", {})
+    active_runs[run_id] = {
+        "threadId": thread_id,
+        "task": task,
+        "cancelled": False,
+        "status": "running",
+    }
+
+    async def event_generator():
+        try:
+            yield _sse_frame(
+                "run.started",
+                _run_event(
+                    "run.started",
+                    run_id=run_id,
+                    thread_id=thread_id,
+                    data={"status": "running"},
+                ),
+            )
+
+            while not task.done():
+                run_state = active_runs.get(run_id) or {}
+                if run_state.get("cancelled"):
+                    task.cancel()
+                    active_runs[run_id]["status"] = "cancelled"
+                    await _persist_conversation_event(
+                        thread_id=thread_id,
+                        event_type="run_cancelled",
+                        payload={"runId": run_id},
+                        request=raw_request,
+                    )
+                    yield _sse_frame(
+                        "run.cancelled",
+                        _run_event(
+                            "run.cancelled",
+                            run_id=run_id,
+                            thread_id=thread_id,
+                            data={"reason": "cancelled_by_user"},
+                        ),
+                    )
+                    return
+                await asyncio.sleep(0.05)
+
+            try:
+                result = await task
+            except asyncio.CancelledError:
+                yield _sse_frame(
+                    "run.cancelled",
+                    _run_event(
+                        "run.cancelled",
+                        run_id=run_id,
+                        thread_id=thread_id,
+                        data={"reason": "cancelled_by_user"},
+                    ),
+                )
+                return
+            except Exception as exc:
+                active_runs[run_id]["status"] = "error"
+                await _persist_conversation_event(
+                    thread_id=thread_id,
+                    event_type="run_error",
+                    payload={
+                        "runId": run_id,
+                        "message": f"{exc.__class__.__name__}: {str(exc)}",
+                    },
+                    request=raw_request,
+                )
+                yield _sse_frame(
+                    "run.error",
+                    _run_event(
+                        "run.error",
+                        run_id=run_id,
+                        thread_id=thread_id,
+                        data={
+                            "message": f"{exc.__class__.__name__}: {str(exc)}",
+                        },
+                    ),
+                )
+                return
+
+            await _persist_conversation_event(
+                thread_id=thread_id,
+                event_type="agent_result",
+                payload={
+                    "runId": run_id,
+                    "status": result.get("status"),
+                    "output": result.get("output"),
+                    "interrupts": result.get("interrupts"),
+                },
+                request=raw_request,
+            )
+
+            selected_tool, has_tool_error, tool_error_message = _extract_tool_summary(result)
+            if selected_tool:
+                yield _sse_frame(
+                    "tool.started",
+                    _run_event(
+                        "tool.started",
+                        run_id=run_id,
+                        thread_id=thread_id,
+                        data={"tool": selected_tool},
+                    ),
+                )
+                if has_tool_error:
+                    yield _sse_frame(
+                        "tool.error",
+                        _run_event(
+                            "tool.error",
+                            run_id=run_id,
+                            thread_id=thread_id,
+                            data={
+                                "tool": selected_tool,
+                                "message": tool_error_message or "Tool execution failed",
+                            },
+                        ),
+                    )
+                else:
+                    yield _sse_frame(
+                        "tool.completed",
+                        _run_event(
+                            "tool.completed",
+                            run_id=run_id,
+                            thread_id=thread_id,
+                            data={"tool": selected_tool},
+                        ),
+                    )
+
+            for chunk in _extract_text_chunks(result):
+                yield _sse_frame(
+                    "message.chunk",
+                    _run_event(
+                        "message.chunk",
+                        run_id=run_id,
+                        thread_id=thread_id,
+                        data={"content": chunk},
+                    ),
+                )
+
+            interrupts = result.get("interrupts") or []
+            for interrupt_item in interrupts:
+                yield _sse_frame(
+                    "hitl.interrupt",
+                    _run_event(
+                        "hitl.interrupt",
+                        run_id=run_id,
+                        thread_id=thread_id,
+                        data={"interrupt": interrupt_item},
+                    ),
+                )
+
+            active_runs[run_id]["status"] = result.get("status", "completed")
+            if interrupts:
+                completion_event = "run.interrupted"
+                completion_data = {
+                    "status": result.get("status"),
+                    "interruptCount": len(interrupts),
+                }
+            else:
+                completion_event = "run.completed"
+                completion_data = {
+                    "status": result.get("status"),
+                    "output": result.get("output"),
+                }
+            yield _sse_frame(
+                completion_event,
+                _run_event(
+                    completion_event,
+                    run_id=run_id,
+                    thread_id=thread_id,
+                    data=completion_data,
+                ),
+            )
+        finally:
+            active_runs.pop(run_id, None)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/runs/{run_id}/cancel")
+@app.post("/api/v1/agent/runs/{run_id}/cancel")
+async def cancel_stream_run(run_id: str) -> dict[str, Any]:
+    active_runs: dict[str, dict[str, Any]] = getattr(app.state, "active_stream_runs", {})
+    run_state = active_runs.get(run_id)
+    if run_state is None:
+        raise HTTPException(status_code=404, detail="Run not found or already finished")
+
+    run_state["cancelled"] = True
+    task = run_state.get("task")
+    if isinstance(task, asyncio.Task) and not task.done():
+        task.cancel()
+
+    return {
+        "runId": run_id,
+        "threadId": run_state.get("threadId"),
+        "status": "cancellation_requested",
+    }
+
+
 @app.post("/runs/resume")
 @app.post("/api/v1/agent/runs/resume")
 async def resume_agent(request: AgentResumeRequest, raw_request: Request) -> dict[str, Any]:
@@ -501,6 +832,28 @@ async def resume_agent(request: AgentResumeRequest, raw_request: Request) -> dic
         request=raw_request,
     )
     return result
+
+
+@app.post("/runs/interrupts")
+@app.post("/api/v1/agent/runs/interrupts")
+async def get_run_interrupts(request: AgentInterruptRequest) -> dict[str, Any]:
+    if READINESS_CHECKS.get("checkpointer") != "ok":
+        raise HTTPException(status_code=503, detail="Interrupt state requires the LangGraph checkpointer")
+
+    graph = getattr(app.state, "compiled_graph", None)
+    if graph is None:
+        raise HTTPException(status_code=503, detail="Graph runtime is not initialized")
+
+    try:
+        snapshot = await graph.aget_state(_graph_config(request.thread_id))
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"Run state not found: {exc.__class__.__name__}") from exc
+
+    return {
+        "threadId": request.thread_id,
+        "interrupts": _serialize_interrupts(snapshot.interrupts),
+        "next": list(snapshot.next),
+    }
 
 
 @app.get("/runs/{thread_id}")
@@ -555,13 +908,84 @@ async def list_conversation_threads(
     if store is None:
         raise HTTPException(status_code=503, detail="Conversation store is not available")
 
-    effective_user_id = user_id or request.headers.get("X-User-Id")
+    effective_user_id = request.headers.get("X-User-Id") or user_id
     if not effective_user_id:
-        raise HTTPException(status_code=400, detail="userId is required when X-User-Id is not provided")
+        raise HTTPException(status_code=400, detail="X-User-Id header is required")
 
     threads = await store.list_threads_by_user(user_id=effective_user_id, limit=limit)
     return {
         "userId": effective_user_id,
         "count": len(threads),
         "threads": threads,
+    }
+
+
+@app.post("/sessions")
+@app.post("/api/v1/agent/sessions")
+async def create_conversation_session(
+    request: Request,
+    payload: ConversationSessionCreateRequest,
+) -> dict[str, Any]:
+    store = getattr(app.state, "conversation_store", None)
+    if store is None:
+        raise HTTPException(status_code=503, detail="Conversation store is not available")
+
+    owner_user_id = _require_user_id(request)
+    thread_id = payload.thread_id or str(uuid.uuid4())
+    session = await store.create_session(
+        thread_id=thread_id,
+        owner_user_id=owner_user_id,
+        user_role=request.headers.get("X-User-Role"),
+        user_email=request.headers.get("X-User-Email"),
+        title=payload.title,
+        metadata=payload.metadata,
+    )
+    return {
+        "threadId": thread_id,
+        "session": session,
+    }
+
+
+@app.patch("/sessions/{thread_id}")
+@app.patch("/api/v1/agent/sessions/{thread_id}")
+async def update_conversation_session(
+    thread_id: str,
+    request: Request,
+    payload: ConversationSessionUpdateRequest,
+) -> dict[str, Any]:
+    store = getattr(app.state, "conversation_store", None)
+    if store is None:
+        raise HTTPException(status_code=503, detail="Conversation store is not available")
+
+    requester_user_id = _require_user_id(request)
+    session = await store.update_session(
+        thread_id=thread_id,
+        requester_user_id=requester_user_id,
+        title=payload.title,
+        metadata=payload.metadata,
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found or access denied")
+
+    return {
+        "threadId": thread_id,
+        "session": session,
+    }
+
+
+@app.delete("/sessions/{thread_id}")
+@app.delete("/api/v1/agent/sessions/{thread_id}")
+async def delete_conversation_session(thread_id: str, request: Request) -> dict[str, Any]:
+    store = getattr(app.state, "conversation_store", None)
+    if store is None:
+        raise HTTPException(status_code=503, detail="Conversation store is not available")
+
+    requester_user_id = _require_user_id(request)
+    deleted = await store.delete_session(thread_id=thread_id, requester_user_id=requester_user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found or access denied")
+
+    return {
+        "threadId": thread_id,
+        "deleted": True,
     }

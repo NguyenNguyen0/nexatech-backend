@@ -88,3 +88,72 @@ def test_run_agent_accepts_gateway_style_path_and_merges_header_roles(monkeypatc
         "userId": "user-123",
         "email": "admin@nexatech.local",
     }
+
+
+def test_stream_endpoint_emits_stable_events(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_invoke_graph(graph_input: object, *, thread_id: str) -> dict[str, object]:
+        return {
+            "threadId": thread_id,
+            "status": "completed",
+            "output": {
+                "selected_tool": "list_promotions",
+                "response_text": "Da xu ly yeu cau.",
+                "tool_errors": [],
+            },
+            "interrupts": [],
+            "state": {
+                "values": {
+                    "selected_tool": "list_promotions",
+                    "response_text": "Da xu ly yeu cau.",
+                    "tool_errors": [],
+                },
+                "next": [],
+                "interrupts": [],
+            },
+        }
+
+    monkeypatch.setattr("app.server._invoke_graph", fake_invoke_graph)
+
+    with TestClient(app) as client:
+        with client.stream(
+            "POST",
+            "/api/v1/agent/runs/stream",
+            json={"message": "xin chao", "runId": "run-test-1", "threadId": "thread-test-1"},
+            headers={"X-User-Id": "user-123", "X-User-Role": "operator"},
+        ) as response:
+            payload = response.read().decode("utf-8")
+
+    assert response.status_code == 200
+    assert "event: run.started" in payload
+    assert "event: tool.started" in payload
+    assert "event: tool.completed" in payload
+    assert "event: message.chunk" in payload
+    assert "event: run.completed" in payload
+
+
+def test_interrupt_route_requires_checkpointer() -> None:
+    READINESS_CHECKS["checkpointer"] = "disabled"
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/agent/runs/interrupts",
+            json={"threadId": "demo-thread"},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["message"] == "Interrupt state requires the LangGraph checkpointer"
+
+
+def test_list_conversations_requires_user_header_when_query_missing() -> None:
+    class _FakeStore:
+        async def list_threads_by_user(self, *, user_id: str, limit: int = 20):
+            return []
+
+        async def close(self):
+            return None
+
+    with TestClient(app) as client:
+        client.app.state.conversation_store = _FakeStore()
+        response = client.get("/api/v1/agent/conversations")
+
+    assert response.status_code == 400
+    assert response.json()["message"] == "X-User-Id header is required"

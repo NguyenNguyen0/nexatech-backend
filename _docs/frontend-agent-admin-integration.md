@@ -82,6 +82,67 @@ Notes:
 
 `GET /api/v1/agent/runs/{threadId}`
 
+### Streaming run (AG-UI/CopilotKit)
+
+`POST /api/v1/agent/runs/stream`
+
+- Response: `text/event-stream` (SSE)
+- Stable events:
+  - `run.started`
+  - `message.chunk`
+  - `tool.started`
+  - `tool.completed`
+  - `tool.error`
+  - `hitl.interrupt`
+  - `run.completed`
+  - `run.cancelled`
+  - `run.error`
+
+Sample request:
+
+```json
+{
+  "runId": "optional-run-id",
+  "threadId": "optional-thread-id",
+  "message": "Cho toi xem khuyen mai hom nay"
+}
+```
+
+Sample SSE frame:
+
+```text
+event: message.chunk
+data: {"eventType":"message.chunk","runId":"...","threadId":"...","timestamp":"...","data":{"content":"..."}}
+```
+
+### Cancel an active stream
+
+`POST /api/v1/agent/runs/{runId}/cancel`
+
+- Returns cancellation requested state.
+- Active SSE stream emits `run.cancelled` when cancellation takes effect.
+
+### Get current interrupts for a thread
+
+`POST /api/v1/agent/runs/interrupts`
+
+```json
+{
+  "threadId": "thread-123"
+}
+```
+
+### Resume interrupt decision
+
+`POST /api/v1/agent/runs/resume`
+
+```json
+{
+  "threadId": "thread-123",
+  "decision": "approved"
+}
+```
+
 ### Get conversation thread detail
 
 `GET /api/v1/agent/conversations/{threadId}?limit=100`
@@ -92,8 +153,17 @@ Notes:
 
 Behavior:
 
-- If `userId` query is omitted, backend falls back to `X-User-Id` header.
+- Backend filters by `X-User-Id` header first.
+- If `X-User-Id` is missing, frontend can pass `userId` query for local fallback.
 - Returns metadata list (no full event payload) sorted by latest update.
+
+### Session CRUD
+
+- `POST /api/v1/agent/sessions`
+- `PATCH /api/v1/agent/sessions/{threadId}`
+- `DELETE /api/v1/agent/sessions/{threadId}`
+
+Session endpoints require `X-User-Id` and only allow session owners/participants to update/delete.
 
 ## 4) Conversation Session Data Model (Mongo)
 
@@ -164,12 +234,19 @@ export default api;
 Recommended screens:
 
 1. Agent chat panel:
-   - send message -> `POST /api/v1/agent/runs`
-   - if interrupted -> show approval UI and call resume endpoint
+  - send message -> `POST /api/v1/agent/runs/stream`
+  - render incremental output from `message.chunk`
+  - render tool cards from `tool.started|completed|error`
+  - if interrupted -> show approval UI and call `runs/resume`
+  - cancel button -> `POST /api/v1/agent/runs/{runId}/cancel`
 2. Session history list by current admin user:
-   - `GET /api/v1/agent/conversations?limit=20`
+  - `GET /api/v1/agent/conversations?limit=20` with `X-User-Id`
 3. Session detail drawer:
    - `GET /api/v1/agent/conversations/{threadId}`
+4. Session management actions:
+  - create empty thread: `POST /api/v1/agent/sessions`
+  - rename/edit metadata: `PATCH /api/v1/agent/sessions/{threadId}`
+  - delete thread: `DELETE /api/v1/agent/sessions/{threadId}`
 
 ## 7) Local Readiness Checklist
 
@@ -188,3 +265,4 @@ Before frontend QA:
 - Service also supports stripped routes (`/runs`, `/conversations`, ...) for compatibility with current gateway StripPrefix behavior.
 - If Mongo is unavailable, conversation endpoints return `503` but run/resume still work.
 - If checkpointer is disabled, resume/state endpoints requiring checkpoint return `503`.
+- For stream UX, frontend should implement reconnect/retry and preserve unsent draft in local storage on page reload.

@@ -123,14 +123,99 @@ class MongoConversationStore:
                 "service": item.get("service", "agent-service"),
                 "createdAt": _to_iso(item.get("createdAt")),
                 "updatedAt": _to_iso(item.get("updatedAt")),
+                "title": item.get("title"),
+                "metadata": item.get("metadata") or {},
                 "lastUserId": item.get("lastUserId"),
                 "lastUserRole": item.get("lastUserRole"),
                 "lastUserEmail": item.get("lastUserEmail"),
+                "ownerUserId": item.get("ownerUserId"),
                 "userIds": item.get("userIds") or [],
                 "userRoles": item.get("userRoles") or [],
             }
             for item in documents
         ]
+
+    async def create_session(
+        self,
+        *,
+        thread_id: str,
+        owner_user_id: str,
+        user_role: str | None,
+        user_email: str | None,
+        title: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        now = datetime.now(UTC)
+        add_to_set: dict[str, Any] = {
+            "userIds": owner_user_id,
+        }
+        if user_role:
+            add_to_set["userRoles"] = user_role
+
+        await self._collection.update_one(
+            {"_id": thread_id},
+            {
+                "$setOnInsert": {
+                    "service": "agent-service",
+                    "createdAt": now,
+                    "ownerUserId": owner_user_id,
+                },
+                "$set": {
+                    "updatedAt": now,
+                    "title": title,
+                    "metadata": metadata or {},
+                    "lastUserId": owner_user_id,
+                    "lastUserRole": user_role,
+                    "lastUserEmail": user_email,
+                },
+                "$addToSet": add_to_set,
+            },
+            upsert=True,
+        )
+        session = await self.get_thread(thread_id=thread_id, limit=0)
+        return session or {"threadId": thread_id}
+
+    async def update_session(
+        self,
+        *,
+        thread_id: str,
+        requester_user_id: str,
+        title: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        document = await self._collection.find_one({"_id": thread_id})
+        if document is None:
+            return None
+
+        user_ids = document.get("userIds") or []
+        owner_user_id = document.get("ownerUserId")
+        if requester_user_id not in user_ids and requester_user_id != owner_user_id:
+            return None
+
+        update_fields: dict[str, Any] = {"updatedAt": datetime.now(UTC)}
+        if title is not None:
+            update_fields["title"] = title
+        if metadata is not None:
+            update_fields["metadata"] = metadata
+
+        await self._collection.update_one(
+            {"_id": thread_id},
+            {"$set": update_fields},
+        )
+        return await self.get_thread(thread_id=thread_id, limit=0)
+
+    async def delete_session(self, *, thread_id: str, requester_user_id: str) -> bool:
+        document = await self._collection.find_one({"_id": thread_id})
+        if document is None:
+            return False
+
+        user_ids = document.get("userIds") or []
+        owner_user_id = document.get("ownerUserId")
+        if requester_user_id not in user_ids and requester_user_id != owner_user_id:
+            return False
+
+        result = await self._collection.delete_one({"_id": thread_id})
+        return result.deleted_count == 1
 
     async def close(self) -> None:
         self.client.close()
