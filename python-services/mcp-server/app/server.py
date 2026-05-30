@@ -17,6 +17,13 @@ from fastapi.responses import JSONResponse
 from app.core.logging import configure_logging, correlation_id_ctx
 from app.core.settings import SETTINGS
 from app.mcp.server import mcp
+from app.tools import audit as _audit_tools  # noqa: F401
+from app.tools import health as _health_tools  # noqa: F401
+from app.tools import inventory as _inventory_tools  # noqa: F401
+from app.tools import news as _news_tools  # noqa: F401
+from app.tools import order as _order_tools  # noqa: F401
+from app.tools import payment as _payment_tools  # noqa: F401
+from app.tools import promotion as _promotion_tools  # noqa: F401
 
 
 configure_logging(SETTINGS.service_name, SETTINGS.log_level)

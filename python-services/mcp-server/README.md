@@ -1,6 +1,6 @@
 # mcp-server
 
-FastAPI + FastMCP skeleton for NexaTech. This iteration focuses on the runtime shell, folder layout, and bootstrap wiring before any business tools are added.
+FastAPI + FastMCP service for NexaTech with a resilient shared client layer, per-service internal APIs, and tool groups for read-only operations plus dependency health checks.
 
 ## Default Port
 
@@ -14,6 +14,9 @@ FastAPI + FastMCP skeleton for NexaTech. This iteration focuses on the runtime s
 - `FastMCP` mounted at `/mcp`
 - correlation ID middleware and basic error envelopes
 - optional Eureka registration at startup
+- retry-aware downstream HTTP client with structured error payloads
+- per-service internal APIs under `app/services/`
+- health tools for each dependency and an aggregate dependency health tool
 
 ## Run
 
@@ -40,6 +43,18 @@ app/
     utils/
 tests/
 ```
+
+## Tool Groups
+
+- News: `list_news`, `get_news_by_slug`, `get_public_news_by_slug`, `get_news_images`
+- Inventory: `list_inventory`, `get_inventory`, `get_inventory_movements`, `check_inventory`, `get_low_stock_items`
+- Order: `get_order`, `get_my_orders`, `check_purchased`, `get_order_stats`, `get_order_trace`
+- Payment: `get_payment`, `get_payment_by_order`, `get_my_payments`, `get_payment_stats`
+- Audit: `search_audit_logs`, `get_audit_entry`, `get_audit_trace`
+- Promotion: `list_promotions`, `get_promotion`, `list_flash_sales`, `get_flash_sale`
+- Health: `check_dependency_health`, `check_all_dependency_health`, and per-service health tools
+
+All downstream calls go through a shared retrying HTTP client and return structured errors instead of raising to the top-level MCP server.
 
 ## Dependencies
 
