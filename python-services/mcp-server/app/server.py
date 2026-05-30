@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.core.logging import (
+    authorization_ctx,
     configure_logging,
     correlation_id_ctx,
     user_email_ctx,
@@ -147,11 +148,13 @@ async def correlation_id_middleware(request: Request, call_next):
     user_id = request.headers.get("X-User-Id") or "-"
     user_role = request.headers.get("X-User-Role") or "-"
     user_email = request.headers.get("X-User-Email") or "-"
+    authorization = request.headers.get("Authorization") or "-"
 
     correlation_token = correlation_id_ctx.set(correlation_id)
     user_id_token = user_id_ctx.set(user_id)
     user_role_token = user_role_ctx.set(user_role)
     user_email_token = user_email_ctx.set(user_email)
+    authorization_token = authorization_ctx.set(authorization)
     request.state.correlation_id = correlation_id
 
     try:
@@ -161,6 +164,7 @@ async def correlation_id_middleware(request: Request, call_next):
         user_id_ctx.reset(user_id_token)
         user_role_ctx.reset(user_role_token)
         user_email_ctx.reset(user_email_token)
+        authorization_ctx.reset(authorization_token)
 
     response.headers["X-Correlation-Id"] = correlation_id
     return response

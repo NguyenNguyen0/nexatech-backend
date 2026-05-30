@@ -10,6 +10,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.mcp_client import MCPClient
+from app.core.logging import authorization_ctx
 
 
 @pytest.mark.asyncio
@@ -43,6 +44,28 @@ async def test_list_available_tools_uses_mcp_tools_list_method() -> None:
     assert "application/json" in seen_accept
     assert "text/event-stream" in seen_accept
     assert result == ["list_promotions", "check_dependency_health"]
+
+
+@pytest.mark.asyncio
+async def test_mcp_client_forwards_authorization_header() -> None:
+    seen_authorization = ""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal seen_authorization
+        seen_authorization = request.headers.get("Authorization", "")
+        return httpx.Response(
+            200,
+            json={"jsonrpc": "2.0", "id": "agent-service", "result": {"tools": []}},
+        )
+
+    client = MCPClient("http://example.test", 5, transport=httpx.MockTransport(handler))
+    token = authorization_ctx.set("Bearer token-123")
+    try:
+        await client.list_available_tools()
+    finally:
+        authorization_ctx.reset(token)
+
+    assert seen_authorization == "Bearer token-123"
 
 
 @pytest.mark.asyncio

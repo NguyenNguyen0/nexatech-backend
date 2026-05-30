@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 
 import httpx
 
-from app.core.logging import correlation_id_ctx
+from app.core.logging import authorization_ctx, correlation_id_ctx
 from app.core.logging import user_email_ctx, user_id_ctx, user_role_ctx
 from app.core.resilience import RETRYABLE_STATUS_CODES, retry_async
 
@@ -89,6 +89,9 @@ class ServiceClient:
             headers["X-User-Role"] = effective_user_role
         if effective_user_email and effective_user_email != "-":
             headers["X-User-Email"] = effective_user_email
+        authorization = authorization_ctx.get()
+        if authorization and authorization != "-":
+            headers["Authorization"] = authorization
 
         return headers
 

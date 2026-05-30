@@ -5,7 +5,13 @@ from typing import Any
 
 import httpx
 
-from app.core.logging import correlation_id_ctx, user_email_ctx, user_id_ctx, user_role_ctx
+from app.core.logging import (
+    authorization_ctx,
+    correlation_id_ctx,
+    user_email_ctx,
+    user_id_ctx,
+    user_role_ctx,
+)
 from app.core.settings import SETTINGS
 
 
@@ -62,6 +68,9 @@ class MCPClient:
         user_email = user_email_ctx.get()
         if user_email and user_email != "-":
             headers["X-User-Email"] = user_email
+        authorization = authorization_ctx.get()
+        if authorization and authorization != "-":
+            headers["Authorization"] = authorization
         return headers
 
     def _extract_tool_names(self, response_body: Any) -> list[str]:

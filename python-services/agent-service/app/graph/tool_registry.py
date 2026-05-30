@@ -20,6 +20,7 @@ class ToolDescriptor:
     required_role: str = "operator"
     rationale: str = ""
     tool_args: dict[str, Any] = field(default_factory=dict)
+    heuristic_enabled: bool = True
 
 
 TOOL_DESCRIPTORS: tuple[ToolDescriptor, ...] = (
@@ -39,8 +40,48 @@ TOOL_DESCRIPTORS: tuple[ToolDescriptor, ...] = (
     ),
     ToolDescriptor(
         tool_name="list_flash_sales",
-        keywords=("flash sale", "flash-sales", "sale", "giảm sốc", "giam soc"),
+        keywords=("flash sale", "flash-sales", "giảm sốc", "giam soc"),
         rationale="Use flash-sale listing when the request is about flash sale campaigns.",
+    ),
+    ToolDescriptor(
+        tool_name="list_all_news",
+        keywords=(
+            "all news",
+            "admin news",
+            "tất cả tin tức",
+            "tat ca tin tuc",
+            "toàn bộ tin tức",
+            "toan bo tin tuc",
+            "bản nháp",
+            "ban nhap",
+            "draft",
+        ),
+        tool_args={"page": 0, "size": 20},
+        rationale="Use all-news listing when the request asks for the complete/admin news catalog.",
+    ),
+    ToolDescriptor(
+        tool_name="get_news_by_slug",
+        keywords=("news slug", "admin news slug", "chi tiết tin theo slug"),
+        rationale="Use admin news detail when the request provides a news slug and may include non-public news.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_public_news_by_slug",
+        keywords=("public news slug", "tin công khai theo slug", "tin cong khai theo slug"),
+        rationale="Use public news detail when the request provides a public news slug.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_news_images",
+        keywords=("news images", "ảnh tin tức", "anh tin tuc", "hình tin tức", "hinh tin tuc"),
+        rationale="Use news image listing when the request provides a news id.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_news_image",
+        keywords=("news image", "ảnh tin", "anh tin", "image id"),
+        rationale="Use single news image lookup when the request provides an image id.",
+        heuristic_enabled=False,
     ),
     ToolDescriptor(
         tool_name="list_news",
@@ -91,6 +132,8 @@ def plan_tool_call(user_text: str) -> ToolPlan | None:
         return None
 
     for descriptor in TOOL_DESCRIPTORS:
+        if not descriptor.heuristic_enabled:
+            continue
         if any(keyword in normalized_text for keyword in descriptor.keywords):
             return ToolPlan(
                 tool_name=descriptor.tool_name,

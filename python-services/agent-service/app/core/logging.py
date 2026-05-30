@@ -8,6 +8,7 @@ correlation_id_ctx: ContextVar[str] = ContextVar("correlation_id", default="-")
 user_id_ctx: ContextVar[str] = ContextVar("user_id", default="-")
 user_role_ctx: ContextVar[str] = ContextVar("user_role", default="-")
 user_email_ctx: ContextVar[str] = ContextVar("user_email", default="-")
+authorization_ctx: ContextVar[str] = ContextVar("authorization", default="-")
 
 
 class CorrelationIdFilter(logging.Filter):

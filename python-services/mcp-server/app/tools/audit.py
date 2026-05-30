@@ -19,3 +19,8 @@ async def get_audit_entry(entry_id: str) -> dict[str, Any]:
 @mcp.tool()
 async def get_audit_trace(lookup_id: str) -> dict[str, Any]:
     return await AUDIT_API.trace_by_lookup_id(lookup_id)
+
+
+@mcp.tool()
+async def get_audit_facets() -> dict[str, Any]:
+    return await AUDIT_API.get_audit_facets()
