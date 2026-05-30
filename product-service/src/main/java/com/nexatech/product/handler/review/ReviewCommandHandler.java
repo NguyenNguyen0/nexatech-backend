@@ -13,6 +13,7 @@ import com.nexatech.product.model.Product;
 import com.nexatech.product.model.Review;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.ReviewRepository;
+import com.nexatech.product.service.ResilientDownstreamService;
 import com.nexatech.product.service.ReviewEnrichmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
@@ -26,15 +27,22 @@ public class ReviewCommandHandler {
     private final ProductRepository productRepository;
     private final ReviewMapper reviewMapper;
     private final ReviewEnrichmentService reviewEnrichmentService;
+    private final ResilientDownstreamService resilientDownstreamService;
 
     @CacheEvict(value = "reviews", allEntries = true)
     public ReviewResponse handle(CreateReviewCommand command) {
         Product product = getActiveProductById(command.productId());
 
-        reviewRepository.findByProductIdAndUserId(product.getId(), command.userId())
-                .ifPresent(r -> {
-                    throw new BadRequestException("Bạn đã đánh giá sản phẩm này rồi");
-                });
+        int purchasedCount = resilientDownstreamService.getPurchaseCount(command.userId(), product.getId());
+        if (purchasedCount <= 0) {
+            throw new BadRequestException("Bạn cần mua sản phẩm này trước khi đánh giá");
+        }
+
+        long reviewCount = reviewRepository.countByProductIdAndUserId(product.getId(), command.userId());
+        if (reviewCount >= purchasedCount) {
+            throw new BadRequestException(
+                    "Bạn đã dùng hết số lượt đánh giá cho sản phẩm này (" + reviewCount + "/" + purchasedCount + ")");
+        }
 
         Review review = Review.builder()
                 .productId(product.getId())

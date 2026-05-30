@@ -1,5 +1,6 @@
 package com.nexatech.product.handler.review;
 
+import com.nexatech.product.dto.response.ReviewEligibilityResponse;
 import com.nexatech.product.dto.response.ReviewResponse;
 import com.nexatech.product.exception.BadRequestException;
 import com.nexatech.product.exception.ResourceNotFoundException;
@@ -12,6 +13,7 @@ import com.nexatech.product.query.review.GetReviewsByProductSlugQuery;
 import com.nexatech.product.query.review.GetReviewsForAdminQuery;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.ReviewRepository;
+import com.nexatech.product.service.ResilientDownstreamService;
 import com.nexatech.product.service.ReviewEnrichmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
@@ -41,6 +43,7 @@ public class ReviewQueryHandler {
     private final ReviewMapper reviewMapper;
     private final MongoTemplate mongoTemplate;
     private final ReviewEnrichmentService reviewEnrichmentService;
+    private final ResilientDownstreamService resilientDownstreamService;
 
     @Cacheable(value = "reviews", key = "#query.productId() + ':' + (#query.rating() == null ? 'all' : #query.rating()) + ':' + #pageable.pageNumber + ':' + #pageable.pageSize")
     public Page<ReviewResponse> handle(GetReviewsByProductIdQuery query, Pageable pageable) {
@@ -63,12 +66,26 @@ public class ReviewQueryHandler {
         return handle(new GetReviewsByProductIdQuery(product.getId(), query.rating()), pageable);
     }
 
-    public ReviewResponse handle(GetMyReviewForProductQuery query) {
+    public ReviewEligibilityResponse handle(GetMyReviewForProductQuery query) {
         Product product = getActiveProductById(query.productId());
-        return reviewRepository.findByProductIdAndUserId(product.getId(), query.userId())
+        int purchasedCount = resilientDownstreamService.getPurchaseCount(query.userId(), product.getId());
+        long reviewCount = reviewRepository.countByProductIdAndUserId(product.getId(), query.userId());
+        int remainingCount = Math.max(0, purchasedCount - (int) reviewCount);
+
+        List<ReviewResponse> reviews = reviewRepository
+                .findByProductIdAndUserIdOrderByCreatedAtDesc(product.getId(), query.userId())
+                .stream()
                 .map(reviewMapper::toResponse)
                 .map(reviewEnrichmentService::enrich)
-                .orElseThrow(() -> new ResourceNotFoundException("Review", "productId", product.getId()));
+                .toList();
+
+        return ReviewEligibilityResponse.builder()
+                .purchasedCount(purchasedCount)
+                .reviewCount((int) reviewCount)
+                .remainingCount(remainingCount)
+                .canReview(remainingCount > 0)
+                .reviews(reviews)
+                .build();
     }
 
     public Page<ReviewResponse> handle(GetReviewsForAdminQuery query, Pageable pageable) {

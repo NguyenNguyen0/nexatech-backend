@@ -4,6 +4,7 @@ import com.nexatech.product.command.review.CreateReviewCommand;
 import com.nexatech.product.dto.request.ReviewRequest;
 import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.PageResponse;
+import com.nexatech.product.dto.response.ReviewEligibilityResponse;
 import com.nexatech.product.dto.response.ReviewMediaUploadResponse;
 import com.nexatech.product.dto.response.ReviewResponse;
 import com.nexatech.product.exception.ResourceNotFoundException;
@@ -50,7 +51,7 @@ public class ReviewController {
     }
 
     @GetMapping("/mine")
-    public ApiResponse<ReviewResponse> getMyReview(
+    public ApiResponse<ReviewEligibilityResponse> getMyReview(
             @PathVariable String productId,
             @RequestHeader("X-User-Id") UUID userId) {
         return ApiResponse.ok(reviewQueryHandler.handle(new GetMyReviewForProductQuery(productId, userId)));
