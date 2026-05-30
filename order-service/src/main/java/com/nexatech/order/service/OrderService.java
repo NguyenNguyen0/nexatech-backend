@@ -182,6 +182,15 @@ public class OrderService {
         return orderRepository.existsPurchasedProduct(customerId, productId, PURCHASED_STATUSES);
     }
 
+    @Transactional(readOnly = true)
+    public int countPurchasedProductQuantity(UUID customerId, String productId) {
+        Long total = orderRepository.sumPurchasedProductQuantity(customerId, productId, PURCHASED_STATUSES);
+        if (total == null || total <= 0) {
+            return 0;
+        }
+        return total > Integer.MAX_VALUE ? Integer.MAX_VALUE : total.intValue();
+    }
+
     public ContinuePaymentResponse continueVNPayPayment(UUID customerId, UUID orderId) {
         Order order = findById(orderId);
 

@@ -23,4 +23,6 @@ public class ReviewRequest {
     private String content;
 
     private List<String> images;
+
+    private List<String> videos;
 }

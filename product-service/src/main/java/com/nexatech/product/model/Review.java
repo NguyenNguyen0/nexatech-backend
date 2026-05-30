@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Document(collection = "reviews")
-@CompoundIndex(name = "product_user_unique", def = "{'productId': 1, 'userId': 1}", unique = true)
+@CompoundIndex(name = "product_user_idx", def = "{'productId': 1, 'userId': 1}")
 @Data
 @Builder
 @NoArgsConstructor
@@ -36,6 +36,8 @@ public class Review {
     private String content;
 
     private List<String> images;
+
+    private List<String> videos;
 
     @Builder.Default
     private long helpfulCount = 0L;

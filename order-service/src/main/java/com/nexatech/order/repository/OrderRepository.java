@@ -89,4 +89,16 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
        boolean existsPurchasedProduct(@Param("customerId") UUID customerId,
                      @Param("productId") String productId,
                      @Param("statuses") Set<OrderStatus> statuses);
+
+       @Query("""
+              SELECT COALESCE(SUM(i.quantity), 0)
+              FROM Order o
+              JOIN o.items i
+              WHERE o.customerId = :customerId
+                     AND i.productId = :productId
+                     AND o.status IN :statuses
+       """)
+       Long sumPurchasedProductQuantity(@Param("customerId") UUID customerId,
+                     @Param("productId") String productId,
+                     @Param("statuses") Set<OrderStatus> statuses);
 }

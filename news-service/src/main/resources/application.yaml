@@ -11,6 +11,3 @@ spring:
         max-attempts: 4
         max-interval: 5000
         multiplier: 1.5
-  datasource:
-    hikari:
-      initialization-fail-timeout: -1

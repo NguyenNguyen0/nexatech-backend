@@ -41,11 +41,6 @@ public class OrderController {
         return ApiResponse.ok(orderService.createOrder(customerId, request));
     }
 
-    @GetMapping("/{id}")
-    public ApiResponse<OrderResponse> getOrder(@PathVariable UUID id) {
-        return ApiResponse.ok(orderService.getOrder(id));
-    }
-
     @GetMapping("/my")
     public ApiResponse<PageResponse<OrderResponse>> getMyOrders(
             @RequestHeader("X-User-Id") UUID customerId,
@@ -58,6 +53,18 @@ public class OrderController {
             @RequestParam UUID userId,
             @RequestParam String productId) {
         return ApiResponse.ok(orderService.hasPurchasedProduct(userId, productId));
+    }
+
+    @GetMapping("/product-purchase-count")
+    public ApiResponse<Integer> getProductPurchaseCount(
+            @RequestParam UUID userId,
+            @RequestParam String productId) {
+        return ApiResponse.ok(orderService.countPurchasedProductQuantity(userId, productId));
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<OrderResponse> getOrder(@PathVariable UUID id) {
+        return ApiResponse.ok(orderService.getOrder(id));
     }
 
     @PostMapping("/{id}/cancel")

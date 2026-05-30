@@ -51,7 +51,8 @@ public class ReviewManagementController {
             request.getRating(),
             request.getTitle(),
             request.getContent(),
-            request.getImages())));
+            request.getImages(),
+            request.getVideos())));
     }
 
     @DeleteMapping("/{id}")
