@@ -32,6 +32,18 @@ spring:
       user-registration: user-registration
       user-events: user.events
       audit-log: ${AUDIT_LOG_TOPIC:audit-topic}
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+aws:
+  s3:
+    region: ${AWS_REGION:ap-southeast-1}
+    bucket: ${AWS_S3_BUCKET:}
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
 
 openfeign:
   identity-service:

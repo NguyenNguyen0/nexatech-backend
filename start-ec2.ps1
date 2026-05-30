@@ -129,6 +129,12 @@ switch ($ServiceName) {
         $env:DATASOURCE_USERNAME = $env:DB_USERNAME
         $env:DATASOURCE_PASSWORD = $env:DB_PASSWORD
         $env:KAFKA_GROUP_ID = "user-service-group"
+        Import-DotEnvKeys -Path (Join-Path $PSScriptRoot "user-service/.env") -Keys @(
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_REGION",
+            "AWS_S3_BUCKET"
+        )
     }
     "news-service" {
         $env:SPRING_DATASOURCE_URL = "jdbc:postgresql://$($env:EC2_HOST):5432/nexatech_news"
