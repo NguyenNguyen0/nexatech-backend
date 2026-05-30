@@ -6,11 +6,13 @@ import com.nexatech.product.exception.ResourceNotFoundException;
 import com.nexatech.product.mapper.ReviewMapper;
 import com.nexatech.product.model.Product;
 import com.nexatech.product.model.Review;
+import com.nexatech.product.query.review.GetMyReviewForProductQuery;
 import com.nexatech.product.query.review.GetReviewsByProductIdQuery;
 import com.nexatech.product.query.review.GetReviewsByProductSlugQuery;
 import com.nexatech.product.query.review.GetReviewsForAdminQuery;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.ReviewRepository;
+import com.nexatech.product.service.ReviewEnrichmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -38,16 +40,20 @@ public class ReviewQueryHandler {
     private final ProductRepository productRepository;
     private final ReviewMapper reviewMapper;
     private final MongoTemplate mongoTemplate;
+    private final ReviewEnrichmentService reviewEnrichmentService;
 
     @Cacheable(value = "reviews", key = "#query.productId() + ':' + (#query.rating() == null ? 'all' : #query.rating()) + ':' + #pageable.pageNumber + ':' + #pageable.pageSize")
     public Page<ReviewResponse> handle(GetReviewsByProductIdQuery query, Pageable pageable) {
         Product product = getActiveProductById(query.productId());
+        Page<ReviewResponse> page;
         if (query.rating() != null) {
-            return reviewRepository.findByProductIdAndRating(product.getId(), query.rating(), pageable)
-                    .map(this::toReviewResponse);
+            page = reviewRepository.findByProductIdAndRating(product.getId(), query.rating(), pageable)
+                    .map(reviewMapper::toResponse);
+        } else {
+            page = reviewRepository.findByProductId(product.getId(), pageable)
+                    .map(reviewMapper::toResponse);
         }
-        return reviewRepository.findByProductId(product.getId(), pageable)
-                .map(this::toReviewResponse);
+        return reviewEnrichmentService.enrichPage(page);
     }
 
     public Page<ReviewResponse> handle(GetReviewsByProductSlugQuery query, Pageable pageable) {
@@ -55,6 +61,14 @@ public class ReviewQueryHandler {
                 .filter(Product::isActive)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "slug", query.slug()));
         return handle(new GetReviewsByProductIdQuery(product.getId(), query.rating()), pageable);
+    }
+
+    public ReviewResponse handle(GetMyReviewForProductQuery query) {
+        Product product = getActiveProductById(query.productId());
+        return reviewRepository.findByProductIdAndUserId(product.getId(), query.userId())
+                .map(reviewMapper::toResponse)
+                .map(reviewEnrichmentService::enrich)
+                .orElseThrow(() -> new ResourceNotFoundException("Review", "productId", product.getId()));
     }
 
     public Page<ReviewResponse> handle(GetReviewsForAdminQuery query, Pageable pageable) {
@@ -91,20 +105,11 @@ public class ReviewQueryHandler {
         mongoQuery.with(safePageable);
 
         List<ReviewResponse> content = mongoTemplate.find(mongoQuery, Review.class).stream()
-                .map(this::toReviewResponse)
+                .map(reviewMapper::toResponse)
                 .toList();
         long total = mongoTemplate.count(Query.of(mongoQuery).limit(-1).skip(-1), Review.class);
-        return new PageImpl<>(content, safePageable, total);
-    }
-
-    private ReviewResponse toReviewResponse(Review review) {
-        ReviewResponse response = reviewMapper.toResponse(review);
-        productRepository.findById(review.getProductId()).ifPresent(product -> {
-            response.setProductName(product.getName());
-            response.setProductSlug(product.getSlug());
-            response.setProductThumbnail(product.getThumbnail());
-        });
-        return response;
+        Page<ReviewResponse> page = new PageImpl<>(content, safePageable, total);
+        return reviewEnrichmentService.enrichPage(page);
     }
 
     private Product getActiveProductById(String productId) {

@@ -8,8 +8,6 @@ spring:
     username: ${DB_USERNAME:nexatech}
     password: ${DB_PASSWORD:nexatech123}
     driver-class-name: org.postgresql.Driver
-    hikari:
-      initialization-fail-timeout: -1
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:

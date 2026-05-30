@@ -9,4 +9,5 @@ public record CreateReviewCommand(
         Integer rating,
         String title,
         String content,
-        List<String> images) {}
+        List<String> images,
+        List<String> videos) {}

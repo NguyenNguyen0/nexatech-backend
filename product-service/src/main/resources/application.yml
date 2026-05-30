@@ -2,7 +2,7 @@ spring:
   application:
     name: product-service
   config:
-    import: "optional:file:./.env[.properties],optional:file:./product-service/.env[.properties],optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
+    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/,optional:file:./.env[.properties],optional:file:./product-service/.env[.properties],optional:classpath:local-overrides.yml"
   cloud:
     config:
       fail-fast: false

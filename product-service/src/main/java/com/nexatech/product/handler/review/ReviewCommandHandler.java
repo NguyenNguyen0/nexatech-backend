@@ -13,7 +13,7 @@ import com.nexatech.product.model.Product;
 import com.nexatech.product.model.Review;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.ReviewRepository;
-import com.nexatech.product.service.ResilientDownstreamService;
+import com.nexatech.product.service.ReviewEnrichmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Component;
@@ -25,7 +25,7 @@ public class ReviewCommandHandler {
     private final ReviewRepository reviewRepository;
     private final ProductRepository productRepository;
     private final ReviewMapper reviewMapper;
-    private final ResilientDownstreamService resilientDownstreamService;
+    private final ReviewEnrichmentService reviewEnrichmentService;
 
     @CacheEvict(value = "reviews", allEntries = true)
     public ReviewResponse handle(CreateReviewCommand command) {
@@ -33,13 +33,8 @@ public class ReviewCommandHandler {
 
         reviewRepository.findByProductIdAndUserId(product.getId(), command.userId())
                 .ifPresent(r -> {
-                    throw new BadRequestException("You have already reviewed this product");
+                    throw new BadRequestException("Bạn đã đánh giá sản phẩm này rồi");
                 });
-
-        boolean purchased = Boolean.TRUE.equals(resilientDownstreamService.checkPurchased(command.userId(), product.getId()));
-        if (!purchased) {
-            throw new ForbiddenException("Only buyers can review this product");
-        }
 
         Review review = Review.builder()
                 .productId(product.getId())
@@ -48,10 +43,11 @@ public class ReviewCommandHandler {
                 .title(command.title())
                 .content(command.content())
                 .images(command.images())
+                .videos(command.videos())
                 .helpfulCount(0L)
                 .build();
 
-        return reviewMapper.toResponse(reviewRepository.save(review));
+        return reviewEnrichmentService.enrich(reviewMapper.toResponse(reviewRepository.save(review)));
     }
 
     @CacheEvict(value = "reviews", allEntries = true)
@@ -63,8 +59,9 @@ public class ReviewCommandHandler {
         review.setTitle(command.title());
         review.setContent(command.content());
         review.setImages(command.images());
+        review.setVideos(command.videos());
 
-        return reviewMapper.toResponse(reviewRepository.save(review));
+        return reviewEnrichmentService.enrich(reviewMapper.toResponse(reviewRepository.save(review)));
     }
 
     @CacheEvict(value = "reviews", allEntries = true)
@@ -78,7 +75,7 @@ public class ReviewCommandHandler {
     public ReviewResponse handle(MarkHelpfulCommand command) {
         Review review = findReview(command.id());
         review.setHelpfulCount(review.getHelpfulCount() + 1);
-        return reviewMapper.toResponse(reviewRepository.save(review));
+        return reviewEnrichmentService.enrich(reviewMapper.toResponse(reviewRepository.save(review)));
     }
 
     private Product getActiveProductById(String productId) {

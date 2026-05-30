@@ -37,6 +37,8 @@ public class Review {
 
     private List<String> images;
 
+    private List<String> videos;
+
     @Builder.Default
     private long helpfulCount = 0L;
 
