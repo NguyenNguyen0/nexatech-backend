@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urljoin
 
@@ -112,6 +112,8 @@ class ServiceClient:
     def _normalize_result(self, payload: Any) -> Any:
         if isinstance(payload, dict) and "result" in payload:
             return payload["result"]
+        if isinstance(payload, dict) and payload.get("success") is True and "data" in payload:
+            return payload["data"]
         return payload
 
     async def request(

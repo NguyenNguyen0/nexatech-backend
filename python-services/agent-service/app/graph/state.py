@@ -11,6 +11,7 @@ class AgentState(TypedDict, total=False):
     checkpointer_enabled: NotRequired[bool]
     thread_id: NotRequired[str]
     request_id: NotRequired[str]
+    available_tools: NotRequired[list[str]]
     input_text: NotRequired[str]
     required_role: str | None
     request_sensitivity: str | None
@@ -22,4 +23,5 @@ class AgentState(TypedDict, total=False):
     tool_results: list[dict[str, Any]]
     tool_errors: NotRequired[list[dict[str, Any]]]
     response_text: str | None
+    answer_context: NotRequired[dict[str, Any]]
     final_status: NotRequired[str | None]

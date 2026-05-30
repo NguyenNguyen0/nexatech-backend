@@ -35,6 +35,12 @@ from app.tools.health import SERVICE_APIS
 
 configure_logging(SETTINGS.service_name, SETTINGS.log_level)
 logger = logging.getLogger(SETTINGS.service_name)
+mcp_app = mcp.http_app(
+    path="/",
+    transport="streamable-http",
+    json_response=True,
+    stateless_http=True,
+)
 
 READINESS_CHECKS: dict[str, str] = {
     "service": "ok",
@@ -119,26 +125,20 @@ async def _log_dependency_connectivity() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.settings = SETTINGS
-    app.state.readiness_checks = READINESS_CHECKS
+    async with mcp_app.lifespan(mcp_app):
+        app.state.settings = SETTINGS
+        app.state.readiness_checks = READINESS_CHECKS
 
-    await _log_dependency_connectivity()
-    await _register_eureka()
-    try:
-        yield
-    finally:
-        await _deregister_eureka()
+        await _log_dependency_connectivity()
+        await _register_eureka()
+        try:
+            yield
+        finally:
+            await _deregister_eureka()
 
 
 app = FastAPI(title="MCP Server Skeleton", version="0.1.0", lifespan=lifespan)
-app.mount(
-    "/mcp",
-    mcp.http_app(
-        path="/",
-        transport="streamable-http",
-        json_response=True,
-    ),
-)
+app.mount("/mcp", mcp_app)
 
 
 @app.middleware("http")

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import uuid4
 
 from langgraph.types import interrupt
 
-from app.graph.llm_planner import plan_tool_call_with_llm
+from app.graph.llm_planner import plan_tool_call_with_llm, synthesize_agent_response
 from app.graph.tool_registry import extract_latest_user_text, plan_tool_call
 from app.hitl.sensitivity import TOOL_SENSITIVITY
 from app.mcp_client import MCP_CLIENT
+
+
+logger = logging.getLogger(__name__)
 
 
 async def classify_request(state: dict[str, Any]) -> dict[str, Any]:
@@ -24,11 +28,39 @@ async def permission_gate(state: dict[str, Any]) -> dict[str, Any]:
     roles = state.get("caller", {}).get("roles", [])
     required_role = state.get("required_role")
     if required_role and required_role not in roles:
+        logger.warning(
+            "Permission gate denied request: required_role=%s roles=%s",
+            required_role,
+            roles,
+        )
         return {
             "approval_result": "denied",
-            "response_text": f"Permission denied: missing role '{required_role}'",
+            "final_status": "permission_denied",
+            "answer_context": {
+                "error": "permission_denied",
+                "required_role": required_role,
+                "caller_roles": roles,
+            },
         }
     return {"approval_result": None}
+
+
+def _is_tool_catalog_request(input_text: str) -> bool:
+    normalized = input_text.casefold()
+    tool_terms = ("tool", "tools", "công cụ", "cong cu", "khả năng", "kha nang")
+    list_terms = (
+        "liệt kê",
+        "liet ke",
+        "danh sách",
+        "danh sach",
+        "có thể sử dụng",
+        "co the su dung",
+        "bạn có thể",
+        "ban co the",
+    )
+    return any(term in normalized for term in tool_terms) and any(
+        term in normalized for term in list_terms
+    )
 
 
 async def agent_think(state: dict[str, Any]) -> dict[str, Any]:
@@ -36,14 +68,34 @@ async def agent_think(state: dict[str, Any]) -> dict[str, Any]:
     selected_tool_args = state.get("selected_tool_args") or {}
     if not selected_tool:
         input_text = state.get("input_text") or extract_latest_user_text(state)
+        if _is_tool_catalog_request(input_text):
+            available_tools = state.get("available_tools") or []
+            if not available_tools:
+                logger.error("Tool catalog request received but available_tools is empty.")
+            return {
+                "selected_tool_args": selected_tool_args,
+                "final_status": "tool_catalog",
+                "answer_context": {
+                    "intent": "tool_catalog",
+                    "available_tools": available_tools,
+                },
+            }
         plan = plan_tool_call(input_text)
         if plan is None:
             plan = await plan_tool_call_with_llm(input_text)
         if plan is None:
+            logger.warning(
+                "No matching tool plan for input. available_tools=%s input=%r",
+                state.get("available_tools") or [],
+                input_text,
+            )
             return {
-                "response_text": "I can currently help with promotions, flash sales, news, and audit logs. Please be more specific about one of those areas.",
                 "selected_tool_args": selected_tool_args,
                 "final_status": "no_matching_tool",
+                "answer_context": {
+                    "error": "no_matching_tool",
+                    "available_tools": state.get("available_tools") or [],
+                },
             }
         return {
             "selected_tool": plan.tool_name,
@@ -58,10 +110,20 @@ async def needs_approval(state: dict[str, Any]) -> dict[str, Any]:
     selected_tool = state.get("selected_tool")
     sensitivity = TOOL_SENSITIVITY.get(selected_tool or "", "low")
     if sensitivity != "low" and not state.get("checkpointer_enabled", False):
+        logger.error(
+            "Approval unavailable: tool=%s sensitivity=%s checkpointer_enabled=%s",
+            selected_tool,
+            sensitivity,
+            state.get("checkpointer_enabled", False),
+        )
         return {
             "request_sensitivity": sensitivity,
-            "response_text": "Approval workflow requires the LangGraph checkpointer to be available. Retry after agent persistence is configured.",
             "final_status": "approval_unavailable",
+            "answer_context": {
+                "error": "approval_unavailable",
+                "selected_tool": selected_tool,
+                "sensitivity": sensitivity,
+            },
         }
     return {"request_sensitivity": sensitivity}
 
@@ -91,10 +153,19 @@ async def interrupt_caller(state: dict[str, Any]) -> dict[str, Any]:
 
 
 async def route_escalation(state: dict[str, Any]) -> dict[str, Any]:
+    logger.warning(
+        "Escalating request: selected_tool=%s sensitivity=%s",
+        state.get("selected_tool"),
+        state.get("request_sensitivity"),
+    )
     return {
         "approval_result": "escalated",
         "final_status": "escalated",
-        "response_text": "Escalation flow is configured in skeleton mode.",
+        "answer_context": {
+            "status": "escalated",
+            "selected_tool": state.get("selected_tool"),
+            "request_sensitivity": state.get("request_sensitivity"),
+        },
     }
 
 
@@ -112,23 +183,29 @@ async def execute_tool(state: dict[str, Any]) -> dict[str, Any]:
         return {"tool_results": existing_results, "final_status": "executed"}
 
     existing_errors.append({"tool": tool_name, "error": result})
+    logger.error(
+        "MCP tool execution failed: tool=%s status=%s tag=%s message=%s",
+        tool_name,
+        result.get("statusCode"),
+        result.get("tag"),
+        result.get("message"),
+    )
     return {
         "tool_results": existing_results,
         "tool_errors": existing_errors,
-        "response_text": result.get("message")
-        or f"Tool execution failed for {tool_name}.",
         "final_status": "tool_error",
+        "answer_context": {
+            "error": "tool_error",
+            "selected_tool": tool_name,
+            "tool_error": result,
+        },
     }
 
 
 async def format_response(state: dict[str, Any]) -> dict[str, Any]:
     if state.get("response_text"):
         return {}
-    tool_results = state.get("tool_results") or []
-    if not tool_results:
-        return {"response_text": "No tool results available yet."}
-    last_result = tool_results[-1]
     return {
-        "response_text": f"Executed tool '{last_result['tool']}' successfully.",
+        "response_text": await synthesize_agent_response(state),
         "final_status": state.get("final_status") or "completed",
     }

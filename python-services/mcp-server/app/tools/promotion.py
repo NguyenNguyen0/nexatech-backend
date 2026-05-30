@@ -7,8 +7,8 @@ from app.services.promotion import PROMOTION_API
 
 
 @mcp.tool()
-async def list_promotions() -> dict[str, Any]:
-    return await PROMOTION_API.list_promotions()
+async def list_promotions(status: str | None = None) -> dict[str, Any]:
+    return await PROMOTION_API.list_promotions(status=status)
 
 
 @mcp.tool()

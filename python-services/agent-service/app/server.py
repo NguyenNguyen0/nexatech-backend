@@ -318,11 +318,17 @@ async def _log_connected_mcp_tools(message: str) -> list[str]:
     available_tools = await MCP_CLIENT.list_available_tools()
     health = await MCP_CLIENT.health()
     if health.get("ok"):
-        logger.info(
-            "[CHAT] incoming='%s' mcp=connected tools=%s",
-            message,
-            available_tools,
-        )
+        if available_tools:
+            logger.info(
+                "[CHAT] incoming='%s' mcp=connected tools=%s",
+                message,
+                available_tools,
+            )
+        else:
+            logger.error(
+                "[CHAT] incoming='%s' mcp=connected tools=[] error=empty_tool_catalog",
+                message,
+            )
     else:
         logger.warning(
             "[CHAT] incoming='%s' mcp=unreachable reason=%s tools=%s",
@@ -595,11 +601,6 @@ async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str,
     thread_id = request.thread_id or str(uuid.uuid4())
     caller = _build_caller_context(request, raw_request)
     available_tools = await _log_connected_mcp_tools(request.message)
-    if not available_tools:
-        raise HTTPException(
-            status_code=503,
-            detail="Không có tool nào khả dụng từ MCP server. Vui lòng kiểm tra lại các service phụ trợ.",
-        )
     graph_input = {
         "messages": [{"role": "user", "content": request.message}],
         "caller": caller,
@@ -646,45 +647,6 @@ async def run_agent_stream(
     thread_id = request.thread_id or str(uuid.uuid4())
     caller = _build_caller_context(request, raw_request)
     available_tools = await _log_connected_mcp_tools(request.message)
-    if not available_tools:
-        error_message = (
-            "Không có tool nào khả dụng từ MCP server. "
-            "Vui lòng kiểm tra lại các service phụ trợ."
-        )
-        await _persist_conversation_event(
-            thread_id=thread_id,
-            event_type="user_message",
-            payload={
-                "message": request.message,
-                "caller": caller,
-                "runId": run_id,
-            },
-            request=raw_request,
-        )
-        await _persist_conversation_event(
-            thread_id=thread_id,
-            event_type="run_error",
-            payload={
-                "runId": run_id,
-                "message": error_message,
-                "reason": "mcp_tools_unavailable",
-            },
-            request=raw_request,
-        )
-
-        async def error_event():
-            yield _sse_frame(
-                "run.error",
-                _run_event(
-                    "run.error",
-                    run_id=run_id,
-                    thread_id=thread_id,
-                    data={"message": error_message},
-                ),
-            )
-
-        return StreamingResponse(error_event(), media_type="text/event-stream")
-
     graph_input = {
         "messages": [{"role": "user", "content": request.message}],
         "caller": caller,
@@ -843,8 +805,7 @@ async def run_agent_stream(
                                 "tool": selected_tool,
                                 "toolName": selected_tool,
                                 "name": selected_tool,
-                                "errorMessage": tool_error_message
-                                or "Tool execution failed",
+                                "errorMessage": tool_error_message,
                                 "statusCode": tool_error_status,
                                 "correlationId": correlation_id,
                             },

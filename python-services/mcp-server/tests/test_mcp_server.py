@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.settings import SETTINGS
 from app.core.http import ServiceClient, ServiceDefinition
 from app.core.logging import user_email_ctx, user_id_ctx, user_role_ctx
+from app.services.promotion import PromotionServiceApi
 from app.server import READINESS_CHECKS, app
 
 
@@ -88,6 +89,84 @@ async def test_service_client_returns_structured_error_after_retries() -> None:
     assert result["ok"] is False
     assert result["error"]["statusCode"] == 503
     assert result["error"]["tag"] == "PRD-503"
+
+
+@pytest.mark.asyncio
+async def test_service_client_unwraps_nest_success_data_envelope() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "success": True,
+                "data": {"items": [{"id": "flash-1"}], "total": 1},
+                "correlationId": "corr-1",
+            },
+        )
+
+    client = ServiceClient(
+        ServiceDefinition(name="demo-service", base_url="http://example.test"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = await client.request("GET", "/api/v1/demo")
+
+    assert result == {"items": [{"id": "flash-1"}], "total": 1}
+
+
+@pytest.mark.asyncio
+async def test_promotion_api_uses_real_flash_sale_endpoints() -> None:
+    seen_requests: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_requests.append((request.method, request.url.path))
+        if request.url.path == "/api/v1/admin/flash-sales":
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "data": {
+                        "items": [
+                            {
+                                "id": "flash-1",
+                                "promotionId": "promo-1",
+                                "code": "FLASH-001",
+                            }
+                        ],
+                        "total": 1,
+                    },
+                },
+            )
+        if request.url.path == "/api/v1/flash-sales":
+            return httpx.Response(
+                200,
+                json={
+                    "success": True,
+                    "data": {"items": [{"id": "flash-active"}], "total": 1},
+                },
+            )
+        return httpx.Response(404, json={"tag": "PRO-404", "message": "not found"})
+
+    api = PromotionServiceApi(
+        ServiceClient(
+            ServiceDefinition(name="promotion-service", base_url="http://example.test"),
+            transport=httpx.MockTransport(handler),
+        )
+    )
+
+    promotions = await api.list_promotions()
+    active_flash_sales = await api.list_flash_sales()
+    promotion = await api.get_promotion("promo-1")
+    flash_sale = await api.get_flash_sale("flash-1")
+
+    assert promotions == {
+        "items": [{"id": "flash-1", "promotionId": "promo-1", "code": "FLASH-001"}],
+        "total": 1,
+    }
+    assert active_flash_sales == {"items": [{"id": "flash-active"}], "total": 1}
+    assert promotion["promotionId"] == "promo-1"
+    assert flash_sale["id"] == "flash-1"
+    assert ("GET", "/api/v1/promotions") not in seen_requests
+    assert ("GET", "/api/v1/flash-sales/flash-1") not in seen_requests
 
 
 @pytest.mark.asyncio

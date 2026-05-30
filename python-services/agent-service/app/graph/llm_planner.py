@@ -6,8 +6,9 @@ import re
 from typing import Any
 
 from app.core.settings import SETTINGS
-from app.prompts.default import load_default_system_prompt
 from app.graph.tool_registry import TOOL_DESCRIPTORS, ToolPlan
+from app.mcp_client import MCP_CLIENT
+from app.prompts.default import load_default_system_prompt
 
 
 logger = logging.getLogger(__name__)
@@ -60,9 +61,6 @@ def _planner_system_prompt() -> str:
         'Dinh dang bat buoc: {"tool_name": string|null, "tool_args": object, "required_role": string, "rationale": string}.\n'
         'Neu khong co tool phu hop thi tra {"tool_name": null}.'
     )
-
-
-from app.mcp_client import MCP_CLIENT
 
 
 async def plan_tool_call_with_llm(user_text: str) -> ToolPlan | None:
@@ -137,3 +135,70 @@ async def plan_tool_call_with_llm(user_text: str) -> ToolPlan | None:
         required_role=required_role,
         rationale=rationale,
     )
+
+
+async def synthesize_agent_response(state: dict[str, Any]) -> str:
+    if not SETTINGS.groq_api_key:
+        logger.error("LLM response synthesis is unavailable: GROQ_API_KEY is not configured.")
+        raise RuntimeError("LLM response synthesis unavailable: GROQ_API_KEY is not configured")
+
+    try:
+        from langchain_core.messages import HumanMessage, SystemMessage
+        from langchain_groq import ChatGroq
+    except Exception as exc:  # pragma: no cover
+        logger.exception("LLM response synthesis dependencies are unavailable.")
+        raise RuntimeError(
+            f"LLM response synthesis dependencies unavailable: {exc.__class__.__name__}"
+        ) from exc
+
+    user_text = state.get("input_text") or ""
+    response_context = {
+        "user_text": user_text,
+        "final_status": state.get("final_status"),
+        "available_tools": state.get("available_tools") or [],
+        "selected_tool": state.get("selected_tool"),
+        "selected_tool_args": state.get("selected_tool_args") or {},
+        "tool_results": state.get("tool_results") or [],
+        "tool_errors": state.get("tool_errors") or [],
+        "approval_result": state.get("approval_result"),
+        "request_sensitivity": state.get("request_sensitivity"),
+        "answer_context": state.get("answer_context") or {},
+    }
+
+    llm = ChatGroq(
+        model=SETTINGS.groq_model,
+        api_key=SETTINGS.groq_api_key,
+        temperature=0,
+    )
+    system_prompt = (
+        f"{load_default_system_prompt()}\n\n"
+        "[Response mode] Hãy tự tạo câu trả lời cuối cùng cho quản trị viên dựa trên context JSON. "
+        "Không dùng template cố định. Không bịa dữ liệu. Nếu context chứa lỗi hoặc thiếu tool, "
+        "nói rõ giới hạn dựa trên chính context đó. Nếu có tool_results, tóm tắt dữ liệu thật từ tool_results."
+    )
+
+    try:
+        response = await llm.ainvoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(
+                    content=json.dumps(
+                        response_context,
+                        ensure_ascii=False,
+                        indent=2,
+                        default=str,
+                    )
+                ),
+            ]
+        )
+    except Exception as exc:  # pragma: no cover
+        logger.exception("LLM response synthesis call failed.")
+        raise RuntimeError(
+            f"LLM response synthesis failed: {exc.__class__.__name__}"
+        ) from exc
+
+    content = getattr(response, "content", "") or ""
+    if not isinstance(content, str) or not content.strip():
+        logger.error("LLM response synthesis returned an empty response.")
+        raise RuntimeError("LLM response synthesis returned an empty response")
+    return content.strip()

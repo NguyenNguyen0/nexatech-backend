@@ -152,7 +152,7 @@ def test_stream_endpoint_emits_stable_events(monkeypatch: pytest.MonkeyPatch) ->
 
 
 @pytest.mark.asyncio
-async def test_stream_endpoint_persists_conversation_when_mcp_has_no_tools(
+async def test_stream_endpoint_lets_graph_handle_empty_tool_catalog(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _FakeStore:
@@ -193,7 +193,31 @@ async def test_stream_endpoint_persists_conversation_when_mcp_has_no_tools(
     async def no_available_tools(_: str) -> list[str]:
         return []
 
+    async def fake_invoke_graph(
+        graph_input: object, *, thread_id: str
+    ) -> dict[str, object]:
+        assert isinstance(graph_input, dict)
+        assert graph_input["available_tools"] == []
+        return {
+            "threadId": thread_id,
+            "status": "completed",
+            "output": {
+                "response_text": "LLM synthesized response",
+                "tool_errors": [],
+            },
+            "interrupts": [],
+            "state": {
+                "values": {
+                    "response_text": "LLM synthesized response",
+                    "tool_errors": [],
+                },
+                "next": [],
+                "interrupts": [],
+            },
+        }
+
     monkeypatch.setattr("app.server._log_connected_mcp_tools", no_available_tools)
+    monkeypatch.setattr("app.server._invoke_graph", fake_invoke_graph)
     app.state.conversation_store = _FakeStore()
     raw_request = SimpleNamespace(
         headers={
@@ -214,10 +238,10 @@ async def test_stream_endpoint_persists_conversation_when_mcp_has_no_tools(
     payload = "".join([chunk async for chunk in response.body_iterator])
     conversation = await get_conversation_thread("thread-no-tools", limit=100)
 
-    assert "event: run.error" in payload
+    assert "event: run.completed" in payload
+    assert "LLM synthesized response" in payload
     events = conversation["events"]
-    assert [event["eventType"] for event in events] == ["user_message", "run_error"]
-    assert events[1]["payload"]["reason"] == "mcp_tools_unavailable"
+    assert [event["eventType"] for event in events] == ["user_message", "agent_result"]
 
 
 def test_interrupt_route_requires_checkpointer() -> None:
