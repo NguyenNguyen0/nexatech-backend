@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from langgraph.types import interrupt
 
+from app.graph.llm_planner import plan_tool_call_with_llm
 from app.graph.tool_registry import extract_latest_user_text, plan_tool_call
 from app.hitl.sensitivity import TOOL_SENSITIVITY
 from app.mcp_client import MCP_CLIENT
@@ -36,6 +37,8 @@ async def agent_think(state: dict[str, Any]) -> dict[str, Any]:
     if not selected_tool:
         input_text = state.get("input_text") or extract_latest_user_text(state)
         plan = plan_tool_call(input_text)
+        if plan is None:
+            plan = await plan_tool_call_with_llm(input_text)
         if plan is None:
             return {
                 "response_text": "I can currently help with promotions, flash sales, news, and audit logs. Please be more specific about one of those areas.",

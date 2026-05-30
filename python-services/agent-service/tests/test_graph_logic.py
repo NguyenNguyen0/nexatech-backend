@@ -33,6 +33,26 @@ async def test_agent_think_selects_news_listing_tool() -> None:
     assert result["selected_tool_args"] == {"page": 0, "size": 10}
 
 
+@pytest.mark.asyncio
+async def test_agent_think_uses_llm_fallback_when_heuristic_misses(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_llm_plan(_: str):
+        from app.graph.tool_registry import ToolPlan
+
+        return ToolPlan(tool_name="list_promotions", tool_args={}, required_role="operator", rationale="llm")
+
+    monkeypatch.setattr("app.graph.nodes.plan_tool_call_with_llm", fake_llm_plan)
+
+    result = await agent_think(
+        {
+            "messages": [{"role": "user", "content": "Giúp tôi chọn hành động marketing phù hợp"}],
+            "caller": {"roles": ["operator"]},
+        }
+    )
+
+    assert result["selected_tool"] == "list_promotions"
+    assert result["selected_tool_args"] == {}
+
+
 def test_compile_graph_without_checkpointer() -> None:
     graph = compile_graph()
 
