@@ -48,6 +48,9 @@ eureka:
 
 shipping:
   provider: ghn # mock | ghn
+  creation:
+    max-attempts: ${SHIPPING_CREATION_MAX_ATTEMPTS:3}
+    retry-delay-ms: ${SHIPPING_CREATION_RETRY_DELAY_MS:1500}
   ghn:
     base-url: ${GHN_BASE_URL:https://dev-online-gateway.ghn.vn/shiip/public-api}
     token: ${GHN_TOKEN:}

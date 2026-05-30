@@ -12,6 +12,7 @@ import com.nexatech.inventory.dto.StockUpdateRequest;
 import com.nexatech.inventory.dto.WarehouseUpdateRequest;
 import com.nexatech.inventory.event.InventoryEvent;
 import com.nexatech.inventory.event.InventoryEventProducer;
+import com.nexatech.inventory.event.OrderEventDto;
 import com.nexatech.inventory.exception.BadRequestException;
 import com.nexatech.inventory.exception.ResourceNotFoundException;
 import com.nexatech.inventory.model.InventoryItem;
@@ -53,6 +54,7 @@ public class InventoryService {
     private final StockMovementRepository stockMovementRepository;
     private final InventoryEventProducer inventoryEventProducer;
     private final ProductClient productClient;
+    private final InventoryCacheInvalidationService cacheInvalidationService;
 
     public InventoryResponse getStock(String productId) {
         InventoryItem item = inventoryItemRepository.findByProductId(productId)
@@ -83,8 +85,8 @@ public class InventoryService {
 
         item.setSku(resolveSku(request, item.getSku(), productSummary));
 
-        if (request.getQuantity() < item.getReservedQuantity()) {
-            throw new BadRequestException("Quantity cannot be lower than reserved quantity");
+        if (request.getQuantity() < 0) {
+            throw new BadRequestException("Quantity cannot be negative");
         }
 
         int oldQuantity = item.getQuantity();
@@ -97,6 +99,8 @@ public class InventoryService {
                     "MANUAL_UPDATE", request.getReason(), null);
         }
 
+        publishStockChangedEvent(saved, "INVENTORY_STOCK_UPDATED",
+                StringUtils.hasText(request.getReason()) ? request.getReason() : "Manual stock update");
         publishLowStockEventIfNeeded(saved);
         return toResponse(saved);
     }
@@ -119,12 +123,20 @@ public class InventoryService {
 
     @Transactional
     public void reserveStock(StockCheckRequest request) {
-        reserveStock(request, "API_RESERVE", "Stock reserved from API");
+        reserveStock(
+                request,
+                resolveReference(request, "API_RESERVE"),
+                resolveReason(request, "Stock reserved from API")
+        );
     }
 
     @Transactional
     public void releaseStock(StockCheckRequest request) {
-        releaseStock(request, "API_RELEASE", "Stock released from API");
+        releaseStock(
+                request,
+                resolveReference(request, "API_RELEASE"),
+                resolveReason(request, "Stock released from API")
+        );
     }
 
     public List<InventoryResponse> getLowStockItems() {
@@ -193,6 +205,7 @@ public class InventoryService {
         item.setReorderLevel(request.getReorderLevel());
 
         InventoryItem saved = inventoryItemRepository.save(item);
+        publishStockChangedEvent(saved, "INVENTORY_STOCK_UPDATED", "Warehouse information updated");
         publishLowStockEventIfNeeded(saved);
         return toResponse(saved);
     }
@@ -205,8 +218,8 @@ public class InventoryService {
         }
 
         for (StockCheckRequest.Item itemRequest : request.getItems()) {
-            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.SALE, reference)) {
-                log.info("Skip duplicate sale finalization: productId={} reference={}", itemRequest.getProductId(), reference);
+            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RESERVED, reference)) {
+                log.info("Skip duplicate stock reservation: productId={} reference={}", itemRequest.getProductId(), reference);
                 continue;
             }
 
@@ -219,6 +232,7 @@ public class InventoryService {
 
             recordMovement(saved.getProductId(), StockMovement.MovementType.RESERVED,
                     itemRequest.getQuantity(), reference, reason, null);
+            publishStockChangedEvent(saved, "INVENTORY_STOCK_RESERVED", reason);
             publishLowStockEventIfNeeded(saved);
         }
     }
@@ -228,8 +242,8 @@ public class InventoryService {
         validateItems(request);
 
         for (StockCheckRequest.Item itemRequest : request.getItems()) {
-            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RETURN, reference)) {
-                log.info("Skip duplicate return restock: productId={} reference={}", itemRequest.getProductId(), reference);
+            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RELEASED, reference)) {
+                log.info("Skip duplicate stock release: productId={} reference={}", itemRequest.getProductId(), reference);
                 continue;
             }
 
@@ -247,6 +261,50 @@ public class InventoryService {
 
             recordMovement(item.getProductId(), StockMovement.MovementType.RELEASED,
                     itemRequest.getQuantity(), reference, reason, null);
+            publishStockChangedEvent(item, "INVENTORY_STOCK_RELEASED", reason);
+        }
+    }
+
+    @Transactional
+    public void releaseOrRestock(StockCheckRequest request, String reference, String reason) {
+        validateItems(request);
+
+        for (StockCheckRequest.Item itemRequest : request.getItems()) {
+            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Inventory item", "productId", itemRequest.getProductId()));
+
+            boolean wasSold = hasMovement(itemRequest.getProductId(), StockMovement.MovementType.SALE, reference);
+
+            if (wasSold) {
+                if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RETURN, reference)) {
+                    log.info("Skip duplicate restock for reference={}: productId={}", reference, itemRequest.getProductId());
+                    continue;
+                }
+                item.setQuantity(item.getQuantity() + itemRequest.getQuantity());
+                InventoryItem saved = inventoryItemRepository.save(item);
+                recordMovement(item.getProductId(), StockMovement.MovementType.RETURN,
+                        itemRequest.getQuantity(), reference, reason + " (Restocked from finalized sale)", null);
+                publishStockChangedEvent(saved, "INVENTORY_STOCK_RESTOCKED", reason);
+            } else {
+                if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RELEASED, reference)) {
+                    log.info("Skip duplicate release for reference={}: productId={}", reference, itemRequest.getProductId());
+                    continue;
+                }
+                if (item.getReservedQuantity() >= itemRequest.getQuantity()) {
+                    item.setReservedQuantity(item.getReservedQuantity() - itemRequest.getQuantity());
+                    InventoryItem saved = inventoryItemRepository.save(item);
+                    publishStockChangedEvent(saved, "INVENTORY_STOCK_RELEASED", reason);
+                } else {
+                    log.warn("Reserved quantity underflow for reference={}, productId={}, reserved={}, release={}",
+                            reference, itemRequest.getProductId(), item.getReservedQuantity(), itemRequest.getQuantity());
+                    item.setReservedQuantity(0);
+                    InventoryItem saved = inventoryItemRepository.save(item);
+                    publishStockChangedEvent(saved, "INVENTORY_STOCK_RELEASED", reason);
+                }
+                recordMovement(item.getProductId(), StockMovement.MovementType.RELEASED,
+                        itemRequest.getQuantity(), reference, reason, null);
+            }
         }
     }
 
@@ -255,23 +313,31 @@ public class InventoryService {
         validateItems(request);
 
         for (StockCheckRequest.Item itemRequest : request.getItems()) {
+            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.SALE, reference)) {
+                log.info("Skip duplicate sale finalization: productId={} reference={}", itemRequest.getProductId(), reference);
+                continue;
+            }
+
             InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Inventory item", "productId", itemRequest.getProductId()));
 
-            if (item.getReservedQuantity() < itemRequest.getQuantity()) {
-                throw new BadRequestException("Not enough reserved stock for product: " + itemRequest.getProductId());
+            if (item.getQuantity() < itemRequest.getQuantity()) {
+                throw new BadRequestException("Insufficient physical stock for product: " + itemRequest.getProductId());
             }
             if (item.getQuantity() < itemRequest.getQuantity()) {
-                throw new BadRequestException("Insufficient quantity for product: " + itemRequest.getProductId());
+                throw new BadRequestException("Insufficient physical stock for product: " + itemRequest.getProductId());
             }
 
-            item.setReservedQuantity(item.getReservedQuantity() - itemRequest.getQuantity());
+            // Use Math.min to guard against underflow if admin forced quantity below reserved
+            int reservedToRelease = Math.min(item.getReservedQuantity(), itemRequest.getQuantity());
+            item.setReservedQuantity(item.getReservedQuantity() - reservedToRelease);
             item.setQuantity(item.getQuantity() - itemRequest.getQuantity());
             InventoryItem saved = inventoryItemRepository.save(item);
 
             recordMovement(saved.getProductId(), StockMovement.MovementType.SALE,
                     itemRequest.getQuantity(), reference, "Finalized sale from order event", null);
+            publishStockChangedEvent(saved, "INVENTORY_STOCK_SOLD", "Finalized sale from order event");
             publishLowStockEventIfNeeded(saved);
         }
     }
@@ -285,6 +351,11 @@ public class InventoryService {
         validateItems(request);
 
         for (StockCheckRequest.Item itemRequest : request.getItems()) {
+            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RETURN, reference)) {
+                log.info("Skip duplicate return restock: productId={} reference={}", itemRequest.getProductId(), reference);
+                continue;
+            }
+
             InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Inventory item", "productId", itemRequest.getProductId()));
@@ -294,8 +365,47 @@ public class InventoryService {
 
             recordMovement(saved.getProductId(), StockMovement.MovementType.RETURN,
                     itemRequest.getQuantity(), reference, "Stock restocked from approved return", null);
+            publishStockChangedEvent(saved, "INVENTORY_STOCK_RESTOCKED", "Stock restocked from approved return");
             publishLowStockEventIfNeeded(saved);
         }
+    }
+
+    public void publishOrderOutOfStockEvent(OrderEventDto orderEvent, String reason) {
+        String productId = orderEvent.getItems() != null && !orderEvent.getItems().isEmpty()
+                ? orderEvent.getItems().get(0).getProductId()
+                : null;
+        InventoryEvent event = InventoryEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventType("INVENTORY_OUT_OF_STOCK")
+                .timestamp(Instant.now())
+                .orderId(orderEvent.getOrderId())
+                .orderNumber(orderEvent.getOrderNumber())
+                .productId(productId)
+                .reason(reason)
+                .message("Inventory could not finalize the order because stock is no longer available")
+                .build();
+        inventoryEventProducer.publishInventoryEvent(
+                orderEvent.getOrderId() != null ? orderEvent.getOrderId().toString() : productId,
+                event);
+    }
+
+    public void publishOrderStockFinalizedEvent(OrderEventDto orderEvent) {
+        String productId = orderEvent.getItems() != null && !orderEvent.getItems().isEmpty()
+                ? orderEvent.getItems().get(0).getProductId()
+                : null;
+        InventoryEvent event = InventoryEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventType("INVENTORY_SALE_FINALIZED")
+                .timestamp(Instant.now())
+                .orderId(orderEvent.getOrderId())
+                .orderNumber(orderEvent.getOrderNumber())
+                .productId(productId)
+                .reason("Inventory finalized for paid order")
+                .message("Inventory sale was finalized successfully")
+                .build();
+        inventoryEventProducer.publishInventoryEvent(
+                orderEvent.getOrderId() != null ? orderEvent.getOrderId().toString() : productId,
+                event);
     }
 
     private void validateItems(StockCheckRequest request) {
@@ -316,11 +426,6 @@ public class InventoryService {
                 .reorderLevel(item.getReorderLevel())
                 .warehouseLocation(item.getWarehouseLocation())
             .status(resolveStatus(availableQuantity, item.getReorderLevel()));
-
-        fetchProductSummary(item.getProductId()).ifPresent(product -> builder
-            .productName(product.getName())
-            .productSlug(product.getSlug())
-            .productThumbnail(product.getThumbnail()));
 
         return builder.build();
     }
@@ -346,6 +451,18 @@ public class InventoryService {
                 && stockMovementRepository.existsByProductIdAndTypeAndReference(productId, type, reference);
     }
 
+    private String resolveReference(StockCheckRequest request, String fallback) {
+        return request != null && StringUtils.hasText(request.getReference())
+                ? request.getReference().trim()
+                : fallback;
+    }
+
+    private String resolveReason(StockCheckRequest request, String fallback) {
+        return request != null && StringUtils.hasText(request.getReason())
+                ? request.getReason().trim()
+                : fallback;
+    }
+
     private StockMovementResponse toMovementResponse(StockMovement movement) {
         return StockMovementResponse.builder()
                 .id(movement.getId())
@@ -361,6 +478,22 @@ public class InventoryService {
 
     private boolean isLowStock(InventoryItem item) {
         return item.getQuantity() - item.getReservedQuantity() <= item.getReorderLevel();
+    }
+
+    private void publishStockChangedEvent(InventoryItem item, String eventType, String reason) {
+        InventoryEvent event = InventoryEvent.builder()
+                .eventId(UUID.randomUUID())
+                .eventType(eventType)
+                .timestamp(Instant.now())
+                .productId(item.getProductId())
+                .quantity(item.getQuantity())
+                .reorderLevel(item.getReorderLevel())
+                .warehouseLocation(item.getWarehouseLocation())
+                .reason(reason)
+                .message("Inventory stock changed")
+                .build();
+        inventoryEventProducer.publishInventoryEvent(item.getProductId(), event);
+        cacheInvalidationService.evictForProduct(item.getProductId(), eventType);
     }
 
     private Optional<ProductSummary> fetchProductSummary(String productId) {
@@ -594,6 +727,7 @@ public class InventoryService {
                                 "CSV_IMPORT", "Imported from CSV line " + lineNumber, null);
                     }
 
+                    publishStockChangedEvent(saved, "INVENTORY_STOCK_UPDATED", "Imported from CSV line " + lineNumber);
                     publishLowStockEventIfNeeded(saved);
                     successCount++;
 

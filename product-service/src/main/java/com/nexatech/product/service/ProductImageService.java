@@ -28,6 +28,7 @@ public class ProductImageService {
     private final ResilientDownstreamService resilientDownstreamService;
     private final ProductMapper productMapper;
     private final ProductResponseEnricher productResponseEnricher;
+    private final ProductCacheInvalidationService productCacheInvalidationService;
 
     /**
      * Uploads multiple images and appends their URLs to the product.
@@ -57,7 +58,9 @@ public class ProductImageService {
         if (!StringUtils.hasText(product.getThumbnail()) && !current.isEmpty()) {
             product.setThumbnail(current.getFirst());
         }
-        return productResponseEnricher.enrichImageResponse(productMapper.toResponse(productRepository.save(product)));
+        Product saved = productRepository.save(product);
+        productCacheInvalidationService.evictProductCaches(productId, "PRODUCT_IMAGES_UPDATED");
+        return productResponseEnricher.enrichImageResponse(productMapper.toResponse(saved));
     }
 
     /**
@@ -80,7 +83,9 @@ public class ProductImageService {
         if (!updated.contains(product.getThumbnail())) {
             product.setThumbnail(updated.isEmpty() ? null : updated.getFirst());
         }
-        return productResponseEnricher.enrichImageResponse(productMapper.toResponse(productRepository.save(product)));
+        Product saved = productRepository.save(product);
+        productCacheInvalidationService.evictProductCaches(productId, "PRODUCT_IMAGES_UPDATED");
+        return productResponseEnricher.enrichImageResponse(productMapper.toResponse(saved));
     }
 
     /**
@@ -100,7 +105,9 @@ public class ProductImageService {
 
         product.setImages(new ArrayList<>(orderedUrls));
         product.setThumbnail(orderedUrls.isEmpty() ? null : orderedUrls.getFirst());
-        return productResponseEnricher.enrichImageResponse(productMapper.toResponse(productRepository.save(product)));
+        Product saved = productRepository.save(product);
+        productCacheInvalidationService.evictProductCaches(productId, "PRODUCT_IMAGES_UPDATED");
+        return productResponseEnricher.enrichImageResponse(productMapper.toResponse(saved));
     }
 
     private Product getProduct(String id) {

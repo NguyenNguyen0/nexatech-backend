@@ -6,6 +6,7 @@ import com.nexatech.order.dto.response.PageResponse;
 import com.nexatech.order.dto.ContinuePaymentResponse;
 import com.nexatech.order.dto.CreateOrderRequest;
 import com.nexatech.order.dto.OrderResponse;
+import com.nexatech.order.dto.RefundBankInfoRequest;
 import com.nexatech.order.service.IdempotencyService;
 import com.nexatech.order.service.OrderService;
 import jakarta.validation.Valid;
@@ -78,6 +79,14 @@ public class OrderController {
             @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
             @PathVariable UUID id) {
         return ApiResponse.ok(orderService.continueVNPayPayment(customerId, id));
+    }
+
+    @PostMapping("/{id}/refund-info")
+    public ApiResponse<OrderResponse> submitRefundBankInfo(
+            @PathVariable UUID id,
+            @Valid @RequestBody RefundBankInfoRequest request) {
+        return ApiResponse.ok(orderService.submitRefundBankInfo(id, request),
+                "Refund bank information submitted");
     }
 
     private ApiResponse<OrderResponse> handleIdempotentCreateOrder(

@@ -36,6 +36,10 @@ public class OrderEvent extends BaseEvent {
     private String guestName;
     private String guestPhone;
     private String note;
+    private String compensationReason;
+    private String refundBankName;
+    private String refundAccountNumber;
+    private String refundAccountHolder;
     private List<OrderItemEvent> items;
 
     @Data

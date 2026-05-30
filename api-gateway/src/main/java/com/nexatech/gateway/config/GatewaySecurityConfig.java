@@ -53,7 +53,9 @@ public class GatewaySecurityConfig {
                 // VNPay callbacks — server-to-server IPN and browser return (no auth token)
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/payments/vnpay/ipn",
-                    "/api/v1/payments/vnpay/return")
+                    "/api/v1/payments/vnpay/return",
+                    "/payment/vnpay/ipn",
+                    "/payment/vnpay/return")
                 .permitAll()
                 // Guest order status polling after checkout
                 .requestMatchers(HttpMethod.GET, "/api/v1/orders/*").permitAll()
