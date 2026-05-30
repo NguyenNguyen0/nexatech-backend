@@ -139,7 +139,7 @@ Mỗi service có README riêng theo dạng graph dependency. Bảng dưới đ�
 | `news-service` | Spring Boot | 8092 | PostgreSQL + Redis + S3 | [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [news-service/README.md](news-service/README.md) |
 | `audit-service` | Spring Boot | 8096 | MongoDB | [api-gateway](api-gateway/README.md), [config-server](config-server/README.md), [discovery-server](discovery-server/README.md) | [audit-service/README.md](audit-service/README.md) |
 | `promotion-service` | NestJS | 8093 | PostgreSQL + Redis + Kafka | [api-gateway](api-gateway/README.md), [discovery-server](discovery-server/README.md) | [promotion-service/README.md](promotion-service/README.md) |
-| `agent-service` | FastAPI | 8093 | - | [api-gateway](api-gateway/README.md), [discovery-server](discovery-server/README.md) | [python-services/agent-service/README.md](python-services/agent-service/README.md) |
+| `agent-service` | FastAPI | 8097 | - | [api-gateway](api-gateway/README.md), [discovery-server](discovery-server/README.md) | [python-services/agent-service/README.md](python-services/agent-service/README.md) |
 | `mcp-server` | FastAPI | 8094 | - | [api-gateway](api-gateway/README.md), [discovery-server](discovery-server/README.md) | [python-services/mcp-server/README.md](python-services/mcp-server/README.md) |
 | `recommendation-service` | FastAPI | 8095 | MongoDB + Redis + Kafka | [product-service](product-service/README.md), [api-gateway](api-gateway/README.md), [discovery-server](discovery-server/README.md) | [python-services/recommendation-service/README.md](python-services/recommendation-service/README.md) |
 
@@ -261,7 +261,7 @@ KAFKA_GROUP_ID=promotion-service-group
 RESERVATION_TTL_SECONDS=300
 ```
 
-`promotion-service` defaults to port `8093` in the current code and Dockerfile. Use another `PORT` value, such as `8097`, when running it at the same time as `agent-service`, which also defaults to `8093`.
+`promotion-service` defaults to port `8093`. `agent-service` now defaults to `8097`, so the two can run together without overriding either port.
 
 Then:
 
@@ -324,7 +324,7 @@ EUREKA_INSTANCE_HOSTNAME=127.0.0.1
 | Shipping Service | `http://localhost:8091` | `GET /actuator/health` |
 | News Service | `http://localhost:8092` | `GET /actuator/health` |
 | Audit Service | `http://localhost:8096` | `GET /actuator/health` |
-| Agent Service | `http://localhost:8093` | `GET /health` |
+| Agent Service | `http://localhost:8097` | `GET /health` |
 | MCP Server | `http://localhost:8094` | `GET /health` |
 | Recommendation Service | `http://localhost:8095` | `GET /health`, `GET /ready` |
 | Promotion Service | `http://localhost:8093` by default, or custom `PORT` | `GET /health` |

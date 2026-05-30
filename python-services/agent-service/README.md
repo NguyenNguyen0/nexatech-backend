@@ -1,14 +1,16 @@
 # agent-service
 
-FastAPI service for agent-related APIs.
+FastAPI skeleton service for NexaTech agent orchestration. This setup introduces modular folders for LangGraph, HITL logic, MCP client access, and optional CopilotKit runtime objects.
 
-## Default port
+## Default Port
 
-- 8093
+- `8097`
 
-## Health endpoint
+## Runtime Endpoints
 
-- GET /health
+- `GET /health`
+- `GET /ready`
+- `GET /` (returns skeleton layout summary)
 
 ## Run
 
@@ -16,27 +18,64 @@ FastAPI service for agent-related APIs.
 uv run main.py
 ```
 
-## Environment variables
+From the repository root:
 
-- SERVICE_NAME=agent-service
-- PORT=8093
-- EUREKA_ENABLED=true
-- EUREKA_SERVER_URL=http://localhost:8761/eureka/
-- EUREKA_INSTANCE_HOSTNAME=127.0.0.1
-
-## Service Graph
-
-```mermaid
-flowchart LR
-	A[agent-service]
-	B[discovery-server]
-	C[api-gateway]
-
-	A --> B
-	C --> A
+```bash
+make run-agent
 ```
 
-## Dependencies
+## Folder Skeleton
 
-- Exposed through: [api-gateway](../../api-gateway/README.md)
-- Service discovery: [discovery-server](../../discovery-server/README.md)
+```text
+app/
+  core/
+  graph/
+  hitl/
+  runtime/
+  mcp_client.py
+  config.py
+tests/
+```
+
+## Installed Dependencies
+
+- `fastapi`
+- `uvicorn`
+- `py-eureka-client`
+- `httpx`
+- `pydantic-settings`
+- `langgraph`
+- `langgraph-checkpoint-postgres`
+- `langsmith`
+- `langchain-groq`
+- `copilotkit`
+- `pytest`
+- `pytest-asyncio`
+
+## Environment Variables
+
+See `.env.example` for a complete local template.
+
+Key variables:
+
+- `SERVICE_NAME`
+- `PORT`
+- `EUREKA_ENABLED`
+- `EUREKA_SERVER_URL`
+- `EUREKA_INSTANCE_HOSTNAME`
+- `MCP_SERVER_URL`
+- `REQUEST_TIMEOUT_SECONDS`
+- `LANGSMITH_TRACING`
+- `LANGSMITH_ENDPOINT`
+- `LANGSMITH_PROJECT`
+- `LANGSMITH_API_KEY`
+- `GROQ_API_KEY`
+- `GROQ_MODEL`
+- `AGUI_AGENT_NAME`
+- `AGUI_AGENT_DESCRIPTION`
+- `AGENT_DB_URL`
+
+## Notes
+
+- CopilotKit objects are initialized in runtime state (`app.state`) for compatibility with the current package API.
+- LangGraph checkpointer and full CopilotKit endpoint bridging are intentionally deferred to the next implementation phase.

@@ -7,11 +7,11 @@ RUN uv sync --frozen --no-dev
 COPY . .
 
 FROM python:3.12-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORT=8093
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORT=8097
 WORKDIR /app
 RUN groupadd --system app && useradd --system --gid app app
 COPY --from=build /app /app
 RUN chown -R app:app /app
 USER app
-EXPOSE 8093
+EXPOSE 8097
 CMD ["/app/.venv/bin/python", "main.py"]
