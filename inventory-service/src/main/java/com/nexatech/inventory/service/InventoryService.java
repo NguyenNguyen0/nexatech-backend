@@ -141,13 +141,13 @@ public class InventoryService {
     public boolean checkStock(StockCheckRequest request) {
         validateItems(request);
 
-        for (StockCheckRequest.Item itemRequest : request.getItems()) {
-            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
+        for (Map.Entry<String, Integer> itemRequest : aggregateItemQuantities(request).entrySet()) {
+            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getKey())
                     .orElseThrow(() -> new ResourceNotFoundException(
-                            "Inventory item", "productId", itemRequest.getProductId()));
+                            "Inventory item", "productId", itemRequest.getKey()));
 
             int available = item.getQuantity() - item.getReservedQuantity();
-            if (available < itemRequest.getQuantity()) {
+            if (available < itemRequest.getValue()) {
                 return false;
             }
         }
@@ -157,12 +157,12 @@ public class InventoryService {
     public boolean canFinalizeSale(StockCheckRequest request) {
         validateItems(request);
 
-        for (StockCheckRequest.Item itemRequest : request.getItems()) {
-            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
+        for (Map.Entry<String, Integer> itemRequest : aggregateItemQuantities(request).entrySet()) {
+            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getKey())
                     .orElseThrow(() -> new ResourceNotFoundException(
-                            "Inventory item", "productId", itemRequest.getProductId()));
+                            "Inventory item", "productId", itemRequest.getKey()));
 
-            if (item.getQuantity() < itemRequest.getQuantity()) {
+            if (item.getQuantity() < itemRequest.getValue()) {
                 return false;
             }
         }
@@ -271,25 +271,28 @@ public class InventoryService {
     @Transactional
     public void reserveStock(StockCheckRequest request, String reference, String reason) {
         validateItems(request);
-        if (!checkStock(request)) {
-            throw new BadRequestException("Insufficient stock for one or more products");
-        }
+        Map<String, Integer> itemQuantities = aggregateItemQuantities(request);
 
-        for (StockCheckRequest.Item itemRequest : request.getItems()) {
-            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RESERVED, reference)) {
-                log.info("Skip duplicate stock reservation: productId={} reference={}", itemRequest.getProductId(), reference);
+        for (Map.Entry<String, Integer> itemRequest : itemQuantities.entrySet()) {
+            String productId = itemRequest.getKey();
+            int quantity = itemRequest.getValue();
+            InventoryItem item = lockInventoryItem(productId);
+
+            if (hasMovement(productId, StockMovement.MovementType.RESERVED, reference)) {
+                log.info("Skip duplicate stock reservation: productId={} reference={}", productId, reference);
                 continue;
             }
 
-            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Inventory item", "productId", itemRequest.getProductId()));
+            int available = item.getQuantity() - item.getReservedQuantity();
+            if (available < quantity) {
+                throw new BadRequestException("Insufficient stock for product: " + productId);
+            }
 
-            item.setReservedQuantity(item.getReservedQuantity() + itemRequest.getQuantity());
+            item.setReservedQuantity(item.getReservedQuantity() + quantity);
             InventoryItem saved = inventoryItemRepository.save(item);
 
             recordMovement(saved.getProductId(), StockMovement.MovementType.RESERVED,
-                    itemRequest.getQuantity(), reference, reason, null);
+                    quantity, reference, reason, null);
             publishStockChangedEvent(saved, "INVENTORY_STOCK_RESERVED", reason);
             publishLowStockEventIfNeeded(saved);
         }
@@ -299,26 +302,25 @@ public class InventoryService {
     public void releaseStock(StockCheckRequest request, String reference, String reason) {
         validateItems(request);
 
-        for (StockCheckRequest.Item itemRequest : request.getItems()) {
-            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RELEASED, reference)) {
-                log.info("Skip duplicate stock release: productId={} reference={}", itemRequest.getProductId(), reference);
+        for (Map.Entry<String, Integer> itemRequest : aggregateItemQuantities(request).entrySet()) {
+            String productId = itemRequest.getKey();
+            int quantity = itemRequest.getValue();
+            InventoryItem item = lockInventoryItem(productId);
+
+            if (hasMovement(productId, StockMovement.MovementType.RELEASED, reference)) {
+                log.info("Skip duplicate stock release: productId={} reference={}", productId, reference);
                 continue;
             }
 
-            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Inventory item", "productId", itemRequest.getProductId()));
-
-            if (item.getReservedQuantity() < itemRequest.getQuantity()) {
-                throw new BadRequestException("Release quantity exceeds reserved quantity for product: "
-                        + itemRequest.getProductId());
+            if (item.getReservedQuantity() < quantity) {
+                throw new BadRequestException("Release quantity exceeds reserved quantity for product: " + productId);
             }
 
-            item.setReservedQuantity(item.getReservedQuantity() - itemRequest.getQuantity());
+            item.setReservedQuantity(item.getReservedQuantity() - quantity);
             inventoryItemRepository.save(item);
 
             recordMovement(item.getProductId(), StockMovement.MovementType.RELEASED,
-                    itemRequest.getQuantity(), reference, reason, null);
+                    quantity, reference, reason, null);
             publishStockChangedEvent(item, "INVENTORY_STOCK_RELEASED", reason);
         }
     }
@@ -327,41 +329,41 @@ public class InventoryService {
     public void releaseOrRestock(StockCheckRequest request, String reference, String reason) {
         validateItems(request);
 
-        for (StockCheckRequest.Item itemRequest : request.getItems()) {
-            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Inventory item", "productId", itemRequest.getProductId()));
+        for (Map.Entry<String, Integer> itemRequest : aggregateItemQuantities(request).entrySet()) {
+            String productId = itemRequest.getKey();
+            int quantity = itemRequest.getValue();
+            InventoryItem item = lockInventoryItem(productId);
 
-            boolean wasSold = hasMovement(itemRequest.getProductId(), StockMovement.MovementType.SALE, reference);
+            boolean wasSold = hasMovement(productId, StockMovement.MovementType.SALE, reference);
 
             if (wasSold) {
-                if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RETURN, reference)) {
-                    log.info("Skip duplicate restock for reference={}: productId={}", reference, itemRequest.getProductId());
+                if (hasMovement(productId, StockMovement.MovementType.RETURN, reference)) {
+                    log.info("Skip duplicate restock for reference={}: productId={}", reference, productId);
                     continue;
                 }
-                item.setQuantity(item.getQuantity() + itemRequest.getQuantity());
+                item.setQuantity(item.getQuantity() + quantity);
                 InventoryItem saved = inventoryItemRepository.save(item);
                 recordMovement(item.getProductId(), StockMovement.MovementType.RETURN,
-                        itemRequest.getQuantity(), reference, reason + " (Restocked from finalized sale)", null);
+                        quantity, reference, reason + " (Restocked from finalized sale)", null);
                 publishStockChangedEvent(saved, "INVENTORY_STOCK_RESTOCKED", reason);
             } else {
-                if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RELEASED, reference)) {
-                    log.info("Skip duplicate release for reference={}: productId={}", reference, itemRequest.getProductId());
+                if (hasMovement(productId, StockMovement.MovementType.RELEASED, reference)) {
+                    log.info("Skip duplicate release for reference={}: productId={}", reference, productId);
                     continue;
                 }
-                if (item.getReservedQuantity() >= itemRequest.getQuantity()) {
-                    item.setReservedQuantity(item.getReservedQuantity() - itemRequest.getQuantity());
+                if (item.getReservedQuantity() >= quantity) {
+                    item.setReservedQuantity(item.getReservedQuantity() - quantity);
                     InventoryItem saved = inventoryItemRepository.save(item);
                     publishStockChangedEvent(saved, "INVENTORY_STOCK_RELEASED", reason);
                 } else {
                     log.warn("Reserved quantity underflow for reference={}, productId={}, reserved={}, release={}",
-                            reference, itemRequest.getProductId(), item.getReservedQuantity(), itemRequest.getQuantity());
+                            reference, productId, item.getReservedQuantity(), quantity);
                     item.setReservedQuantity(0);
                     InventoryItem saved = inventoryItemRepository.save(item);
                     publishStockChangedEvent(saved, "INVENTORY_STOCK_RELEASED", reason);
                 }
                 recordMovement(item.getProductId(), StockMovement.MovementType.RELEASED,
-                        itemRequest.getQuantity(), reference, reason, null);
+                        quantity, reference, reason, null);
             }
         }
     }
@@ -370,31 +372,28 @@ public class InventoryService {
     public void finalizeSale(StockCheckRequest request, String reference) {
         validateItems(request);
 
-        for (StockCheckRequest.Item itemRequest : request.getItems()) {
-            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.SALE, reference)) {
-                log.info("Skip duplicate sale finalization: productId={} reference={}", itemRequest.getProductId(), reference);
+        for (Map.Entry<String, Integer> itemRequest : aggregateItemQuantities(request).entrySet()) {
+            String productId = itemRequest.getKey();
+            int quantity = itemRequest.getValue();
+            InventoryItem item = lockInventoryItem(productId);
+
+            if (hasMovement(productId, StockMovement.MovementType.SALE, reference)) {
+                log.info("Skip duplicate sale finalization: productId={} reference={}", productId, reference);
                 continue;
             }
 
-            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Inventory item", "productId", itemRequest.getProductId()));
-
-            if (item.getQuantity() < itemRequest.getQuantity()) {
-                throw new BadRequestException("Insufficient physical stock for product: " + itemRequest.getProductId());
-            }
-            if (item.getQuantity() < itemRequest.getQuantity()) {
-                throw new BadRequestException("Insufficient physical stock for product: " + itemRequest.getProductId());
+            if (item.getQuantity() < quantity) {
+                throw new BadRequestException("Insufficient physical stock for product: " + productId);
             }
 
             // Use Math.min to guard against underflow if admin forced quantity below reserved
-            int reservedToRelease = Math.min(item.getReservedQuantity(), itemRequest.getQuantity());
+            int reservedToRelease = Math.min(item.getReservedQuantity(), quantity);
             item.setReservedQuantity(item.getReservedQuantity() - reservedToRelease);
-            item.setQuantity(item.getQuantity() - itemRequest.getQuantity());
+            item.setQuantity(item.getQuantity() - quantity);
             InventoryItem saved = inventoryItemRepository.save(item);
 
             recordMovement(saved.getProductId(), StockMovement.MovementType.SALE,
-                    itemRequest.getQuantity(), reference, "Finalized sale from order event", null);
+                    quantity, reference, "Finalized sale from order event", null);
             publishStockChangedEvent(saved, "INVENTORY_STOCK_SOLD", "Finalized sale from order event");
             publishLowStockEventIfNeeded(saved);
         }
@@ -408,21 +407,21 @@ public class InventoryService {
     public void restockReturn(StockCheckRequest request, String reference) {
         validateItems(request);
 
-        for (StockCheckRequest.Item itemRequest : request.getItems()) {
-            if (hasMovement(itemRequest.getProductId(), StockMovement.MovementType.RETURN, reference)) {
-                log.info("Skip duplicate return restock: productId={} reference={}", itemRequest.getProductId(), reference);
+        for (Map.Entry<String, Integer> itemRequest : aggregateItemQuantities(request).entrySet()) {
+            String productId = itemRequest.getKey();
+            int quantity = itemRequest.getValue();
+            InventoryItem item = lockInventoryItem(productId);
+
+            if (hasMovement(productId, StockMovement.MovementType.RETURN, reference)) {
+                log.info("Skip duplicate return restock: productId={} reference={}", productId, reference);
                 continue;
             }
 
-            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Inventory item", "productId", itemRequest.getProductId()));
-
-            item.setQuantity(item.getQuantity() + itemRequest.getQuantity());
+            item.setQuantity(item.getQuantity() + quantity);
             InventoryItem saved = inventoryItemRepository.save(item);
 
             recordMovement(saved.getProductId(), StockMovement.MovementType.RETURN,
-                    itemRequest.getQuantity(), reference, "Stock restocked from approved return", null);
+                    quantity, reference, "Stock restocked from approved return", null);
             publishStockChangedEvent(saved, "INVENTORY_STOCK_RESTOCKED", "Stock restocked from approved return");
             publishLowStockEventIfNeeded(saved);
         }
@@ -478,6 +477,19 @@ public class InventoryService {
                 throw new BadRequestException("Quantity must be greater than zero for product: " + item.getProductId());
             }
         }
+    }
+
+    private Map<String, Integer> aggregateItemQuantities(StockCheckRequest request) {
+        return request.getItems().stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getProductId().trim(),
+                        java.util.TreeMap::new,
+                        Collectors.summingInt(StockCheckRequest.Item::getQuantity)));
+    }
+
+    private InventoryItem lockInventoryItem(String productId) {
+        return inventoryItemRepository.findLockedByProductId(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Inventory item", "productId", productId));
     }
 
     private InventoryResponse toResponse(InventoryItem item, ProductSummary productSummary) {
