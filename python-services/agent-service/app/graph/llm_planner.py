@@ -15,12 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 _AGENTIC_NO_VERBOSE_LEAK_RULES = """
-Quy tac bat buoc de tranh verbose thinking leak:
-- Khi user yeu cau tac vu cu the va co tool phu hop, chon tool ngay.
-- Khong giai thich truoc, khong viet ke hoach, khong liet ke available tools.
-- Khong noi "toi se thuc hien", "truoc tien toi can", "de lam viec nay".
-- Planner mode chi tra ve JSON hop le, khong markdown, khong prose, khong code fence.
-- Response mode chi tra loi sau khi co context/tool result; khong mo phong viec goi tool.
+STRICT ANTI-VERBOSE RULES (must follow without exception):
+- NEVER explain your reasoning before acting. NEVER list available tools.
+- NEVER say "tôi sẽ", "trước tiên", "để làm việc này", "tôi cần kiểm tra", "xin hãy xác nhận".
+- NEVER write prose, plans, or thinking steps visible to the user.
+- PLANNER MODE: output ONLY a single valid JSON object — no markdown, no code fences, no text outside JSON.
+- RESPONSE MODE: output ONLY the final answer based on tool_results — never simulate or narrate tool calls.
+- If unsure, pick the closest tool and return JSON immediately.
 """
 
 
@@ -101,36 +102,36 @@ def _extract_tool_call_from_verbose_text(
 
 
 async def _build_tool_catalog(available_tools: list[str]) -> str:
+    """Build a compact catalog string for the LLM planner.
+
+    Format: one line per tool — "tool_name: short description"
+    Only tools actually registered on the MCP server are included.
+    Keywords and default_args are intentionally omitted to keep token count low.
+    """
     lines: list[str] = []
     for descriptor in TOOL_DESCRIPTORS:
         if descriptor.tool_name in available_tools:
-            lines.append(
-                f"- {descriptor.tool_name}: keywords={', '.join(descriptor.keywords)}, "
-                f"required_role={descriptor.required_role}, default_args={descriptor.tool_args}"
-            )
+            lines.append(f"{descriptor.tool_name}: {descriptor.llm_hint()}")
     return "\n".join(lines)
 
 
 def _planner_system_prompt() -> str:
-    base_prompt = load_default_system_prompt()
     return (
-        f"{base_prompt}\n\n"
         f"{_AGENTIC_NO_VERBOSE_LEAK_RULES}\n\n"
-        "[Planner mode] Ban dang o che do tool planner. "
-        "Chi duoc phep chon dung 1 tool phu hop nhat tu danh sach duoc cung cap. "
-        "Neu user yeu cau hanh dong doc/tra cuu/liet ke/thong ke/co tool phu hop, "
-        "hay chon tool ngay thay vi tra loi bang loi.\n"
-        "Bat buoc tra ve DUY NHAT mot JSON object hop le.\n\n"
-        'Dinh dang bat buoc: {"tool_name": string|null, "tool_args": object, "required_role": string, "rationale": string}.\n'
-        'Neu khong co tool phu hop thi tra {"tool_name": null, "tool_args": {}, "required_role": "operator", "rationale": "no_matching_tool"}.\n\n'
-        "Vi du dung:\n"
-        'User: "liet ke san pham danh muc hera-pc"\n'
-        'Assistant: {"tool_name":"list_products_by_category_slug","tool_args":{"slug":"hera-pc"},"required_role":"operator","rationale":"category product listing"}\n'
-        'User: "xem review cua san pham abc"\n'
-        'Assistant: {"tool_name":"list_reviews_by_product","tool_args":{"product_id":"abc"},"required_role":"operator","rationale":"product reviews"}\n\n'
-        "Vi du sai, tuyet doi khong lam:\n"
-        'Assistant: "De liet ke san pham, truoc tien toi can kiem tra tool..."\n'
-        'Assistant: "Toi se goi tool list_products_by_category_slug..."\n'
+        "You are a JSON-only tool planner. Your sole output is one JSON object.\n"
+        "Required format: "
+        '{"tool_name": string|null, "tool_args": object, "required_role": string, "rationale": string}\n'
+        "If no tool fits: "
+        '{"tool_name": null, "tool_args": {}, "required_role": "operator", "rationale": "no_matching_tool"}\n\n'
+        "CORRECT examples:\n"
+        'User: "liệt kê sản phẩm danh mục hera-pc"\n'
+        'Output: {"tool_name":"list_products_by_category_slug","tool_args":{"slug":"hera-pc"},"required_role":"operator","rationale":"category product listing"}\n'
+        'User: "xem review sản phẩm abc-123"\n'
+        'Output: {"tool_name":"list_reviews_by_product","tool_args":{"product_id":"abc-123"},"required_role":"operator","rationale":"product reviews"}\n\n'
+        "WRONG — never do this:\n"
+        'Output: "Để liệt kê sản phẩm, trước tiên tôi cần kiểm tra tool..."\n'
+        'Output: "Tôi sẽ gọi tool list_products_by_category_slug để..."\n'
+        'Output: "Xin hãy xác nhận trước khi tôi tiếp tục."\n'
     )
 
 
@@ -153,10 +154,10 @@ async def plan_tool_call_with_llm(user_text: str) -> ToolPlan | None:
     llm = ChatGroq(
         model=SETTINGS.groq_model,
         api_key=SETTINGS.groq_api_key,
-        temperature=SETTINGS.groq_temperature,
+        temperature=0,  # deterministic output for planner — JSON only, no creative drift
     )
 
-    system_prompt = f"{_planner_system_prompt()}\n\nTool catalog:\n{await _build_tool_catalog(available_tools)}"
+    system_prompt = f"{_planner_system_prompt()}\n\nAvailable tools:\n{await _build_tool_catalog(available_tools)}"
 
     try:
         response = await llm.ainvoke(
@@ -216,6 +217,28 @@ async def synthesize_agent_response(state: dict[str, Any]) -> str:
         logger.error("LLM response synthesis is unavailable: GROQ_API_KEY is not configured.")
         raise RuntimeError("LLM response synthesis unavailable: GROQ_API_KEY is not configured")
 
+    # Hard guard: never invoke LLM synthesis when there are no tool results
+    # for a state that expected a tool execution — the LLM would hallucinate data.
+    final_status = state.get("final_status")
+    tool_results = state.get("tool_results") or []
+    tool_errors = state.get("tool_errors") or []
+    selected_tool = state.get("selected_tool")
+
+    DATA_NEEDED_STATUSES = {"executed", "tool_error"}
+    if final_status in DATA_NEEDED_STATUSES and not tool_results and not tool_errors:
+        logger.error(
+            "Synthesis guard: final_status=%s but tool_results and tool_errors are both empty — refusing to hallucinate. tool=%s",
+            final_status,
+            selected_tool,
+        )
+        return "Hệ thống đã chọn tool nhưng chưa nhận được kết quả từ MCP server. Vui lòng thử lại."
+
+    if final_status == "no_matching_tool":
+        available = state.get("available_tools") or []
+        if available:
+            return f"Không tìm thấy tool phù hợp cho yêu cầu này. Các tool hiện có: {', '.join(available)}."
+        return "Không tìm thấy tool phù hợp cho yêu cầu này."
+
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
         from langchain_groq import ChatGroq
@@ -247,11 +270,13 @@ async def synthesize_agent_response(state: dict[str, Any]) -> str:
     system_prompt = (
         f"{load_default_system_prompt()}\n\n"
         f"{_AGENTIC_NO_VERBOSE_LEAK_RULES}\n\n"
-        "[Response mode] Hãy tự tạo câu trả lời cuối cùng cho quản trị viên dựa trên context JSON. "
-        "Không dùng template cố định. Không bịa dữ liệu. Nếu context chứa lỗi hoặc thiếu tool, "
-        "nói rõ giới hạn dựa trên chính context đó. Nếu có tool_results, tóm tắt dữ liệu thật từ tool_results. "
-        "Nếu context không có tool_results và request là tác vụ cần dữ liệu, không được nói rằng đang/ sẽ gọi tool; "
-        "chỉ nêu rằng hệ thống chưa chọn hoặc chưa thực thi được tool phù hợp."
+        "[Response mode] Tạo câu trả lời cuối cùng cho quản trị viên từ context JSON dưới đây.\n"
+        "TUYỆT ĐỐI KHÔNG: viết 'tôi sẽ gọi tool', 'đang kiểm tra', 'trước tiên cần', "
+        "'xin xác nhận', hoặc bất kỳ mô tả nào về quá trình nội bộ.\n"
+        "Nếu tool_results có dữ liệu → tóm tắt dữ liệu thực từ tool_results.\n"
+        "Nếu final_status là 'no_matching_tool' → thông báo ngắn gọn rằng không tìm thấy tool phù hợp.\n"
+        "Nếu final_status là 'tool_error' → thông báo lỗi từ answer_context.\n"
+        "Không bịa dữ liệu. Không suy đoán. Không dùng template cố định."
     )
 
     try:

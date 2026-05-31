@@ -46,8 +46,21 @@ async def permission_gate(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def _is_tool_catalog_request(input_text: str) -> bool:
+    """Return True only when user is asking ABOUT the tool catalog itself.
+
+    Must NOT fire for requests like "dùng tool list_products_by_category_slug ..."
+    where "tool" appears but the intent is to invoke a specific tool.
+    """
     normalized = input_text.casefold()
-    tool_terms = ("tool", "tools", "công cụ", "cong cu", "khả năng", "kha nang")
+
+    # If a registered tool name appears in the text, the user is invoking a tool,
+    # not asking for a catalog listing — short-circuit immediately.
+    from app.graph.tool_registry import TOOL_DESCRIPTORS
+    if any(d.tool_name in normalized for d in TOOL_DESCRIPTORS):
+        return False
+
+    # "tool" alone is too broad; only treat plural / meta terms as catalog signals.
+    tool_terms = ("tools", "công cụ", "cong cu", "khả năng", "kha nang")
     list_terms = (
         "liệt kê",
         "liet ke",
