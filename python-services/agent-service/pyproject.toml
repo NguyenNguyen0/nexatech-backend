@@ -17,6 +17,7 @@ dependencies = [
     "motor>=3.7.1",
     "copilotkit>=0.1.93",
     "psycopg[binary]>=3.2.0",
+    "ag-ui-langgraph[fastapi]>=0.0.37",
 ]
 
 [dependency-groups]

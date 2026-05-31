@@ -31,7 +31,8 @@ from app.core.logging import (
 from app.core.settings import SETTINGS
 from app.graph.agent import compile_graph
 from app.mcp_client import MCP_CLIENT
-from app.runtime.copilotkit import attach_copilotkit_middleware
+from app.runtime.copilotkit import attach_copilotkit_endpoint
+from app.hitl.timeout_registry import cancel_timeout, schedule_timeout
 from app.runtime.checkpointer import (
     check_checkpointer_health,
     close_checkpointer,
@@ -411,7 +412,7 @@ async def _initialize_graph_runtime(app: FastAPI) -> None:
             exc.__class__.__name__,
         )
 
-    if attach_copilotkit_middleware(
+    if attach_copilotkit_endpoint(
         app,
         agent_name=SETTINGS.agui_agent_name,
         agent_description=SETTINGS.agui_agent_description,
@@ -861,13 +862,32 @@ async def run_agent_stream(
 
             interrupts = result.get("interrupts") or []
             for interrupt_item in interrupts:
+                interrupt_value = interrupt_item.get("value") or {}
+                # Schedule auto-timeout if checkpointer is enabled
+                if READINESS_CHECKS.get("checkpointer") == "ok":
+                    _timeout_sec = (
+                        interrupt_value.get("timeout_seconds")
+                        or SETTINGS.approval_timeout_seconds
+                    )
+                    graph = getattr(app.state, "compiled_graph", None)
+                    if graph is not None:
+                        schedule_timeout(
+                            thread_id,
+                            graph=graph,
+                            timeout_seconds=_timeout_sec,
+                        )
                 yield _sse_frame(
                     "hitl.interrupt",
                     _run_event(
                         "hitl.interrupt",
                         run_id=run_id,
                         thread_id=thread_id,
-                        data={"interrupt": interrupt_item},
+                        data={
+                            "interrupt": interrupt_item,
+                            "approval_request_id": interrupt_value.get("approval_request_id"),
+                            "timeout_seconds": interrupt_value.get("timeout_seconds"),
+                            "expires_at": interrupt_value.get("expires_at"),
+                        },
                     ),
                 )
 
@@ -930,10 +950,12 @@ async def resume_agent(
         raise HTTPException(
             status_code=503, detail="Resume requires the LangGraph checkpointer"
         )
+    # Cancel any pending auto-timeout before processing the decision
+    cancel_timeout(request.thread_id)
     await _persist_conversation_event(
         thread_id=request.thread_id,
         event_type="approval_decision",
-        payload={"decision": request.decision},
+        payload={"decision": request.decision, "thread_id": request.thread_id},
         request=raw_request,
     )
     result = await _invoke_graph(

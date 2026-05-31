@@ -78,7 +78,7 @@ async def test_graph_runtime_falls_back_to_stateless_when_checkpointer_fails(
 
     monkeypatch.setattr(server, "initialize_checkpointer", raise_checkpointer_error)
     monkeypatch.setattr(server, "compile_graph", lambda checkpointer=None: sentinel_graph)
-    monkeypatch.setattr(server, "attach_copilotkit_middleware", lambda *_, **__: False)
+    monkeypatch.setattr(server, "attach_copilotkit_endpoint", lambda *_, **__: False)
     monkeypatch.setattr(SETTINGS, "agent_db_url", "postgresql://invalid")
 
     await server._initialize_graph_runtime(app)

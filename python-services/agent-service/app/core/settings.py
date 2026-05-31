@@ -55,8 +55,8 @@ class Settings(BaseSettings):
     mongo_conversation_collection: str = "conversation_sessions"
     conversation_history_max_events: int = Field(default=500, ge=50, le=10000)
 
-    approval_timeout_seconds: int = Field(default=600, ge=60)
-    escalation_timeout_seconds: int = Field(default=900, ge=60)
+    approval_timeout_seconds: int = Field(default=30, ge=1)
+    escalation_timeout_seconds: int = Field(default=900, ge=1)
 
 
 SETTINGS = Settings()

@@ -39,7 +39,7 @@ def isolate_runtime_dependencies_for_tests(monkeypatch: pytest.MonkeyPatch):
         ]
 
     monkeypatch.setattr("app.server._log_connected_mcp_tools", fake_available_tools)
-    monkeypatch.setattr("app.server.attach_copilotkit_middleware", lambda *_, **__: False)
+    monkeypatch.setattr("app.server.attach_copilotkit_endpoint", lambda *_, **__: False)
 
     @asynccontextmanager
     async def noop_lifespan(_app):
