@@ -13,10 +13,12 @@ import com.nexatech.product.model.Product;
 import com.nexatech.product.model.Review;
 import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.repository.ReviewRepository;
+import com.nexatech.product.service.CatalogCacheVersionService;
 import com.nexatech.product.service.ResilientDownstreamService;
 import com.nexatech.product.service.ReviewEnrichmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -28,8 +30,13 @@ public class ReviewCommandHandler {
     private final ReviewMapper reviewMapper;
     private final ReviewEnrichmentService reviewEnrichmentService;
     private final ResilientDownstreamService resilientDownstreamService;
+    private final CatalogCacheVersionService catalogCacheVersionService;
 
-    @CacheEvict(value = "reviews", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "reviews", allEntries = true),
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public ReviewResponse handle(CreateReviewCommand command) {
         Product product = getActiveProductById(command.productId());
 
@@ -55,10 +62,16 @@ public class ReviewCommandHandler {
                 .helpfulCount(0L)
                 .build();
 
-        return reviewEnrichmentService.enrich(reviewMapper.toResponse(reviewRepository.save(review)));
+        ReviewResponse response = reviewEnrichmentService.enrich(reviewMapper.toResponse(reviewRepository.save(review)));
+        catalogCacheVersionService.bumpVersion("REVIEW_CREATED");
+        return response;
     }
 
-    @CacheEvict(value = "reviews", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "reviews", allEntries = true),
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public ReviewResponse handle(UpdateReviewCommand command) {
         Review review = findReview(command.id());
         assertOwnerOrAdmin(review, command.userId(), command.role());
@@ -69,21 +82,32 @@ public class ReviewCommandHandler {
         review.setImages(command.images());
         review.setVideos(command.videos());
 
-        return reviewEnrichmentService.enrich(reviewMapper.toResponse(reviewRepository.save(review)));
+        ReviewResponse response = reviewEnrichmentService.enrich(reviewMapper.toResponse(reviewRepository.save(review)));
+        catalogCacheVersionService.bumpVersion("REVIEW_UPDATED");
+        return response;
     }
 
-    @CacheEvict(value = "reviews", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "reviews", allEntries = true),
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public void handle(DeleteReviewCommand command) {
         Review review = findReview(command.id());
         assertOwnerOrAdmin(review, command.userId(), command.role());
         reviewRepository.delete(review);
+        catalogCacheVersionService.bumpVersion("REVIEW_DELETED");
     }
 
-    @CacheEvict(value = "reviews", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "reviews", allEntries = true)
+    })
     public ReviewResponse handle(MarkHelpfulCommand command) {
         Review review = findReview(command.id());
         review.setHelpfulCount(review.getHelpfulCount() + 1);
-        return reviewEnrichmentService.enrich(reviewMapper.toResponse(reviewRepository.save(review)));
+        ReviewResponse response = reviewEnrichmentService.enrich(reviewMapper.toResponse(reviewRepository.save(review)));
+        catalogCacheVersionService.bumpVersion("REVIEW_MARKED_HELPFUL");
+        return response;
     }
 
     private Product getActiveProductById(String productId) {

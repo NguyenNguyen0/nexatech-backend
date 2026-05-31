@@ -6,6 +6,7 @@ import com.nexatech.product.command.product.RestoreProductCommand;
 import com.nexatech.product.command.product.UpdateProductCommand;
 import com.nexatech.product.dto.request.ProductRequest;
 import com.nexatech.product.dto.response.ApiResponse;
+import com.nexatech.product.dto.response.CatalogCacheVersionResponse;
 import com.nexatech.product.dto.response.PageResponse;
 import com.nexatech.product.dto.response.ProductMinimalResponse;
 import com.nexatech.product.dto.response.ProductResponse;
@@ -15,12 +16,15 @@ import com.nexatech.product.handler.product.ProductQueryHandler;
 import com.nexatech.product.handler.review.ReviewQueryHandler;
 import com.nexatech.product.query.product.*;
 import com.nexatech.product.query.review.GetReviewsByProductSlugQuery;
+import com.nexatech.product.service.CatalogCacheVersionService;
 import com.nexatech.product.util.TextUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -38,6 +42,7 @@ public class ProductController {
     private final ProductCommandHandler productCommandHandler;
     private final ProductQueryHandler productQueryHandler;
     private final ReviewQueryHandler reviewQueryHandler;
+    private final CatalogCacheVersionService catalogCacheVersionService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -60,6 +65,13 @@ public class ProductController {
     @GetMapping("/slug/{slug}")
     public ApiResponse<ProductResponse> getProductBySlug(@PathVariable String slug) {
         return ApiResponse.ok(productQueryHandler.handle(new GetProductBySlugQuery(slug)));
+    }
+
+    @GetMapping("/catalog-version")
+    public ResponseEntity<ApiResponse<CatalogCacheVersionResponse>> getCatalogCacheVersion() {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(ApiResponse.ok(catalogCacheVersionService.currentVersion()));
     }
 
     @GetMapping
@@ -124,6 +136,10 @@ public class ProductController {
     }
 
     @GetMapping("/tags")
+    @Cacheable(
+            value = "productPages",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('tags', #tags, #pageable)",
+            unless = "#result == null || #result.data == null")
     public ApiResponse<PageResponse<ProductMinimalResponse>> getProductsByTags(
             @RequestParam List<String> tags,
             Pageable pageable) {
@@ -132,6 +148,10 @@ public class ProductController {
     }
 
     @GetMapping("/category/{categoryId}")
+    @Cacheable(
+            value = "productPages",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('categoryId', #categoryId, #pageable)",
+            unless = "#result == null || #result.data == null")
     public ApiResponse<PageResponse<ProductResponse>> getProductsByCategory(
             @PathVariable String categoryId,
             Pageable pageable) {
@@ -162,11 +182,19 @@ public class ProductController {
     }
 
     @GetMapping("/{id}/related")
+    @Cacheable(
+            value = "productPages",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('related:id', #id)",
+            unless = "#result == null || #result.data == null")
     public ApiResponse<List<ProductMinimalResponse>> getRelatedProducts(@PathVariable String id) {
         return ApiResponse.ok(productQueryHandler.handle(new GetRelatedProductsQuery(id)));
     }
 
     @GetMapping("/slug/{slug}/related")
+    @Cacheable(
+            value = "productPages",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('related:slug', #slug)",
+            unless = "#result == null || #result.data == null")
     public ApiResponse<List<ProductMinimalResponse>> getRelatedProductsBySlug(@PathVariable String slug) {
         return ApiResponse.ok(productQueryHandler.handle(new GetRelatedProductsBySlugQuery(slug)));
     }
