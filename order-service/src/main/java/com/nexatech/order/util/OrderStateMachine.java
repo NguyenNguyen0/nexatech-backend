@@ -14,9 +14,9 @@ public final class OrderStateMachine {
             new EnumMap<>(OrderStatus.class);
 
     static {
-        ALLOWED_TRANSITIONS.put(OrderStatus.PENDING,    EnumSet.of(OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.OUT_OF_STOCK, OrderStatus.SHIPPING_FAILED, OrderStatus.REFUND_PENDING));
-        ALLOWED_TRANSITIONS.put(OrderStatus.CONFIRMED,  EnumSet.of(OrderStatus.PROCESSING, OrderStatus.CANCELLED, OrderStatus.OUT_OF_STOCK, OrderStatus.SHIPPING_FAILED, OrderStatus.REFUND_PENDING));
-        ALLOWED_TRANSITIONS.put(OrderStatus.PROCESSING, EnumSet.of(OrderStatus.SHIPPED, OrderStatus.CANCELLED, OrderStatus.OUT_OF_STOCK, OrderStatus.SHIPPING_FAILED, OrderStatus.REFUND_PENDING));
+        ALLOWED_TRANSITIONS.put(OrderStatus.PENDING,    EnumSet.of(OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.OUT_OF_STOCK, OrderStatus.SHIPPING_FAILED, OrderStatus.REFUND_PENDING, OrderStatus.REFUNDED));
+        ALLOWED_TRANSITIONS.put(OrderStatus.CONFIRMED,  EnumSet.of(OrderStatus.PROCESSING, OrderStatus.CANCELLED, OrderStatus.OUT_OF_STOCK, OrderStatus.SHIPPING_FAILED, OrderStatus.REFUND_PENDING, OrderStatus.REFUNDED));
+        ALLOWED_TRANSITIONS.put(OrderStatus.PROCESSING, EnumSet.of(OrderStatus.SHIPPED, OrderStatus.CANCELLED, OrderStatus.OUT_OF_STOCK, OrderStatus.SHIPPING_FAILED, OrderStatus.REFUND_PENDING, OrderStatus.REFUNDED));
         ALLOWED_TRANSITIONS.put(OrderStatus.SHIPPED,    EnumSet.of(OrderStatus.DELIVERED, OrderStatus.SHIPPING_FAILED, OrderStatus.REFUND_PENDING));
         ALLOWED_TRANSITIONS.put(OrderStatus.DELIVERED,  EnumSet.of(OrderStatus.COMPLETED, OrderStatus.RETURNED, OrderStatus.OUT_OF_STOCK, OrderStatus.REFUND_PENDING));
         ALLOWED_TRANSITIONS.put(OrderStatus.COMPLETED,  EnumSet.noneOf(OrderStatus.class));

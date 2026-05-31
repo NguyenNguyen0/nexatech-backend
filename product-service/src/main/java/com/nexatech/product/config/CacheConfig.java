@@ -56,6 +56,7 @@ public class CacheConfig implements CachingConfigurer {
                 .withCacheConfiguration("products", defaults.entryTtl(Duration.ofMinutes(5)))
                 .withCacheConfiguration("productPages", defaults.entryTtl(Duration.ofMinutes(5)))
                 .withCacheConfiguration("productStock", defaults.entryTtl(Duration.ofMinutes(3)))
+                .withCacheConfiguration("productStockBatch", defaults.entryTtl(Duration.ofMinutes(3)))
                 .withCacheConfiguration("categories", defaults.entryTtl(Duration.ofMinutes(30)))
                 .withCacheConfiguration("reviews", defaults.entryTtl(Duration.ofMinutes(3)))
                 .build();

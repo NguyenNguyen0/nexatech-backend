@@ -14,6 +14,11 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
@@ -70,6 +75,35 @@ public class ResilientDownstreamService {
         return inventoryClient.getStock(productId);
     }
 
+    @CircuitBreaker(name = "inventoryService", fallbackMethod = "getStocksFallback")
+    @Retry(name = "inventoryService")
+    @Cacheable(
+            value = "productStockBatch",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('batch', #productIds)",
+            unless = "#result == null || #result.isEmpty()")
+    public Map<String, InventoryStockResponse.StockData> getStocks(Collection<String> productIds) {
+        List<String> normalizedIds = productIds == null ? List.of() : productIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (normalizedIds.isEmpty()) {
+            return Map.of();
+        }
+
+        var response = inventoryClient.getStocks(normalizedIds);
+        if (response == null || response.getData() == null) {
+            return Map.of();
+        }
+
+        return response.getData().stream()
+                .filter(stock -> stock.getProductId() != null && !stock.getProductId().isBlank())
+                .collect(Collectors.toMap(
+                        InventoryStockResponse.StockData::getProductId,
+                        Function.identity(),
+                        (left, right) -> left));
+    }
+
     @SuppressWarnings("unused")
     private StorageUploadResult uploadToStorageFallback(MultipartFile file, String bucket, Throwable throwable) {
         throw new ServiceUnavailableException(
@@ -101,5 +135,13 @@ public class ResilientDownstreamService {
     private InventoryStockResponse getStockFallback(String productId, Throwable throwable) {
         log.warn("Inventory service unavailable for product {}: {}", productId, throwable.getMessage());
         return null;
+    }
+
+    @SuppressWarnings("unused")
+    private Map<String, InventoryStockResponse.StockData> getStocksFallback(Collection<String> productIds, Throwable throwable) {
+        log.warn("Inventory service unavailable for {} products: {}",
+                productIds == null ? 0 : productIds.size(),
+                throwable.getMessage());
+        return Map.of();
     }
 }

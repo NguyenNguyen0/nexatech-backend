@@ -17,6 +17,9 @@ public interface InventoryClient {
     @PostMapping("/check")
     ApiResponse<Boolean> checkStock(@RequestBody StockOperationRequest request);
 
+    @PostMapping("/finalize/check")
+    ApiResponse<Boolean> checkFinalizableStock(@RequestBody StockOperationRequest request);
+
     // Giữ hàng (giảm availableQuantity) khi đơn hàng được tạo
     @PostMapping("/reserve")
     ApiResponse<Void> reserveStock(@RequestBody StockOperationRequest request);

@@ -6,6 +6,8 @@ import com.nexatech.order.client.dto.VNPayCreateDto;
 import com.nexatech.order.client.dto.VNPayInfo;
 import com.nexatech.order.dto.response.ApiResponse;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -26,4 +28,7 @@ public interface PaymentClient {
             @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody VNPayCreateDto request);
+
+    @GetMapping("/order/{orderId}")
+    ApiResponse<PaymentInfo> getPaymentByOrder(@PathVariable UUID orderId);
 }
