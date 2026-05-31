@@ -327,6 +327,20 @@ async def test_audit_search_is_read_only_and_does_not_require_hitl() -> None:
     assert result == {"request_sensitivity": "low"}
 
 
+@pytest.mark.asyncio
+async def test_medium_sensitivity_requires_checkpointer_for_hitl() -> None:
+    result = await needs_approval(
+        {
+            "selected_tool": "create_payment",
+            "checkpointer_enabled": False,
+        }
+    )
+
+    assert result["request_sensitivity"] == "medium"
+    assert result["final_status"] == "approval_unavailable"
+    assert result["answer_context"]["error"] == "approval_unavailable"
+
+
 def test_compile_graph_without_checkpointer() -> None:
     graph = compile_graph()
 

@@ -35,6 +35,45 @@ From the repository root:
 make run-agent
 ```
 
+## LangGraph Postgres Checkpointer
+
+Set `AGENT_DB_URL` to enable durable LangGraph state for interrupts, resume, and run-state lookup:
+
+```bash
+export AGENT_DB_URL=postgresql://nexatech:nexatech123@localhost:5432/nexatech_agent
+```
+
+The PostgreSQL database and user must already exist. On startup, `AsyncPostgresSaver.setup()` bootstraps the LangGraph checkpoint tables inside that database.
+
+> **Note:** The checkpointer uses `AsyncPostgresSaver` (from `langgraph.checkpoint.postgres.aio`)
+> instead of the sync `PostgresSaver`, because the FastAPI runtime calls `ainvoke` / `aget_tuple`.
+
+If `AGENT_DB_URL` is missing or Postgres is unavailable, the service still starts with a stateless graph. `/ready` reports the checkpointer as `disabled` or `error: ...`; low-sensitivity tools can still run, while HITL/resume routes require `checkpointer: ok`.
+
+### Database provisioning
+
+**Option A — Use the infra compose** (database already exists in `_postgres/init-databases.sql`):
+
+```bash
+# From repo root
+docker compose -f docker-compose.infra.yml up -d
+# nexatech_agent database is on port 5432
+```
+
+**Option B — Standalone Postgres for agent-service only** (port 5433):
+
+```bash
+cd python-services/agent-service
+docker compose -f docker-compose.postgres.yml up -d
+export AGENT_DB_URL=postgresql://nexatech:nexatech123@localhost:5433/nexatech_agent
+```
+
+### Running integration tests
+
+```bash
+AGENT_DB_URL=postgresql://nexatech:nexatech123@localhost:5432/nexatech_agent uv run pytest tests/test_graph_checkpoint_integration.py -v
+```
+
 ## Folder Skeleton
 
 ```text
