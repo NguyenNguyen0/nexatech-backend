@@ -17,6 +17,8 @@ import com.nexatech.product.util.TextUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.UncategorizedMongoDbException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -258,6 +260,23 @@ public class ProductQueryHandler {
                 query.minRating(), query.maxRating(),
                 query.featured(), null, false, query.specsFilters());
         return handle(delegate, pageable);
+    }
+
+    public List<ProductMinimalResponse> handle(GetRandomProductsByCategorySlugQuery query) {
+        Category category = categoryRepository.findBySlug(query.slug())
+                .filter(Category::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "slug", query.slug()));
+
+        int safeLimit = Math.max(1, Math.min(query.limit(), 12));
+        Criteria criteria = new Criteria().andOperator(
+                Criteria.where("active").is(true),
+                categoryArrayCriteria(category.getId()));
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(criteria),
+                Aggregation.sample(safeLimit));
+        AggregationResults<Product> results = mongoTemplate.aggregate(aggregation, "products", Product.class);
+
+        return toMinimalCatalogResponses(results.getMappedResults());
     }
 
     public Page<ProductMinimalResponse> handle(GetProductsByTagsQuery query, Pageable pageable) {

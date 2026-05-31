@@ -181,6 +181,17 @@ public class ProductController {
                 pageable)));
     }
 
+    @GetMapping("/category/slug/{slug}/random")
+    @Cacheable(
+            value = "productPages",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('randomCategorySlug', #slug, #limit)",
+            unless = "#result == null || #result.data == null")
+    public ApiResponse<List<ProductMinimalResponse>> getRandomProductsByCategorySlug(
+            @PathVariable String slug,
+            @RequestParam(required = false, defaultValue = "8") int limit) {
+        return ApiResponse.ok(productQueryHandler.handle(new GetRandomProductsByCategorySlugQuery(slug, limit)));
+    }
+
     @GetMapping("/{id}/related")
     @Cacheable(
             value = "productPages",
