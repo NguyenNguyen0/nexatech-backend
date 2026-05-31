@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 _AGENTIC_NO_VERBOSE_LEAK_RULES = """
 STRICT ANTI-VERBOSE RULES (must follow without exception):
+- Khong giai thich truoc.
+- DUY NHAT mot JSON object.
 - NEVER explain your reasoning before acting. NEVER list available tools.
 - NEVER say "tôi sẽ", "trước tiên", "để làm việc này", "tôi cần kiểm tra", "xin hãy xác nhận".
 - NEVER write prose, plans, or thinking steps visible to the user.

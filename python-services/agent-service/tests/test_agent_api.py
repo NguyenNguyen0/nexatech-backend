@@ -1,44 +1,94 @@
 from __future__ import annotations
 
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
+import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.settings import SETTINGS
+from app.graph.agent import compile_graph
 from app.server import READINESS_CHECKS, AgentRunRequest, app, get_conversation_thread, run_agent_stream
 
 
 @pytest.fixture(autouse=True)
-def disable_eureka_for_tests():
-    previous = SETTINGS.eureka_enabled
+def isolate_runtime_dependencies_for_tests(monkeypatch: pytest.MonkeyPatch):
+    previous_eureka_enabled = SETTINGS.eureka_enabled
+    previous_agent_db_url = SETTINGS.agent_db_url
+    previous_conversation_store_enabled = SETTINGS.conversation_store_enabled
+    previous_langsmith_tracing = SETTINGS.langsmith_tracing
     SETTINGS.eureka_enabled = False
+    SETTINGS.agent_db_url = None
+    SETTINGS.conversation_store_enabled = False
+    SETTINGS.langsmith_tracing = False
+    monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    monkeypatch.setenv("LANGCHAIN_TRACING_V2", "false")
     READINESS_CHECKS["eureka"] = "disabled"
+    READINESS_CHECKS["checkpointer"] = "disabled"
+    READINESS_CHECKS["conversation_store"] = "disabled"
+
+    async def fake_available_tools(_: str) -> list[str]:
+        return [
+            "list_promotions",
+            "list_products",
+            "get_audit_events",
+        ]
+
+    monkeypatch.setattr("app.server._log_connected_mcp_tools", fake_available_tools)
+    monkeypatch.setattr("app.server.attach_copilotkit_middleware", lambda *_, **__: False)
+
+    @asynccontextmanager
+    async def noop_lifespan(_app):
+        _app.state.compiled_graph = compile_graph()
+        _app.state.conversation_store = None
+        _app.state.active_stream_runs = {}
+        yield
+
+    previous_lifespan_context = app.router.lifespan_context
+    app.router.lifespan_context = noop_lifespan
+    app.state.compiled_graph = compile_graph()
+    app.state.conversation_store = None
+    app.state.active_stream_runs = {}
     yield
-    SETTINGS.eureka_enabled = previous
+    app.router.lifespan_context = previous_lifespan_context
+    SETTINGS.eureka_enabled = previous_eureka_enabled
+    SETTINGS.agent_db_url = previous_agent_db_url
+    SETTINGS.conversation_store_enabled = previous_conversation_store_enabled
+    SETTINGS.langsmith_tracing = previous_langsmith_tracing
 
 
-def test_run_agent_executes_low_sensitivity_flow(
+@pytest.mark.asyncio
+async def test_run_agent_executes_low_sensitivity_flow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_invoke_tool(
-        tool_name: str, tool_args: dict[str, object]
+    async def fake_invoke_graph(
+        graph_input: object, *, thread_id: str
     ) -> dict[str, object]:
+        assert isinstance(graph_input, dict)
+        assert graph_input["available_tools"] == [
+            "list_promotions",
+            "list_products",
+            "get_audit_events",
+        ]
         return {
-            "ok": True,
-            "tool": tool_name,
-            "data": {"items": []},
-            "raw": {"items": []},
+            "threadId": thread_id,
+            "status": "completed",
+            "output": {"selected_tool": "list_promotions"},
+            "interrupts": [],
+            "state": {"values": {}, "next": [], "interrupts": []},
         }
 
-    monkeypatch.setattr("app.graph.nodes.MCP_CLIENT.invoke_tool", fake_invoke_tool)
+    monkeypatch.setattr("app.server._invoke_graph", fake_invoke_graph)
 
-    with TestClient(app) as client:
-        response = client.post(
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.post(
             "/api/v1/agent/runs",
             json={"message": "Cho tôi xem các chương trình khuyến mãi hiện tại"},
         )
@@ -50,10 +100,14 @@ def test_run_agent_executes_low_sensitivity_flow(
     assert payload["interrupts"] == []
 
 
-def test_resume_agent_requires_checkpointer() -> None:
+@pytest.mark.asyncio
+async def test_resume_agent_requires_checkpointer() -> None:
     READINESS_CHECKS["checkpointer"] = "disabled"
-    with TestClient(app) as client:
-        response = client.post(
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.post(
             "/api/v1/agent/runs/resume",
             json={"threadId": "demo-thread", "decision": "approved"},
         )
@@ -62,7 +116,8 @@ def test_resume_agent_requires_checkpointer() -> None:
     assert response.json()["message"] == "Resume requires the LangGraph checkpointer"
 
 
-def test_run_agent_accepts_gateway_style_path_and_merges_header_roles(
+@pytest.mark.asyncio
+async def test_run_agent_accepts_gateway_style_path_and_merges_header_roles(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, object] = {}
@@ -82,8 +137,11 @@ def test_run_agent_accepts_gateway_style_path_and_merges_header_roles(
 
     monkeypatch.setattr("app.server._invoke_graph", fake_invoke_graph)
 
-    with TestClient(app) as client:
-        response = client.post(
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.post(
             "/runs",
             json={
                 "message": "liet ke khuyen mai",
@@ -104,7 +162,8 @@ def test_run_agent_accepts_gateway_style_path_and_merges_header_roles(
     }
 
 
-def test_stream_endpoint_emits_stable_events(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_stream_endpoint_emits_stable_events(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_invoke_graph(
         graph_input: object, *, thread_id: str
     ) -> dict[str, object]:
@@ -130,8 +189,11 @@ def test_stream_endpoint_emits_stable_events(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr("app.server._invoke_graph", fake_invoke_graph)
 
-    with TestClient(app) as client:
-        with client.stream(
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        async with client.stream(
             "POST",
             "/api/v1/agent/runs/stream",
             json={
@@ -141,7 +203,7 @@ def test_stream_endpoint_emits_stable_events(monkeypatch: pytest.MonkeyPatch) ->
             },
             headers={"X-User-Id": "user-123", "X-User-Role": "operator"},
         ) as response:
-            payload = response.read().decode("utf-8")
+            payload = (await response.aread()).decode("utf-8")
 
     assert response.status_code == 200
     assert "event: run.started" in payload
@@ -244,10 +306,14 @@ async def test_stream_endpoint_lets_graph_handle_empty_tool_catalog(
     assert [event["eventType"] for event in events] == ["user_message", "agent_result"]
 
 
-def test_interrupt_route_requires_checkpointer() -> None:
+@pytest.mark.asyncio
+async def test_interrupt_route_requires_checkpointer() -> None:
     READINESS_CHECKS["checkpointer"] = "disabled"
-    with TestClient(app) as client:
-        response = client.post(
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.post(
             "/api/v1/agent/runs/interrupts",
             json={"threadId": "demo-thread"},
         )
@@ -259,7 +325,8 @@ def test_interrupt_route_requires_checkpointer() -> None:
     )
 
 
-def test_list_conversations_requires_user_header_when_query_missing() -> None:
+@pytest.mark.asyncio
+async def test_list_conversations_requires_user_header_when_query_missing() -> None:
     class _FakeStore:
         async def list_threads_by_user(self, *, user_id: str, limit: int = 20):
             return []
@@ -267,9 +334,12 @@ def test_list_conversations_requires_user_header_when_query_missing() -> None:
         async def close(self):
             return None
 
-    with TestClient(app) as client:
-        client.app.state.conversation_store = _FakeStore()
-        response = client.get("/api/v1/agent/conversations")
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        app.state.conversation_store = _FakeStore()
+        response = await client.get("/api/v1/agent/conversations")
 
     assert response.status_code == 400
     assert response.json()["message"] == "X-User-Id header is required"

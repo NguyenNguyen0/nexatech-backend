@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -33,6 +32,44 @@ class ToolDescriptor:
 
 
 TOOL_DESCRIPTORS: tuple[ToolDescriptor, ...] = (
+    ToolDescriptor(
+        tool_name="list_mcp_domains",
+        description="List domain MCP endpoints",
+        keywords=("mcp domains", "mcp domain", "domain mcp", "mcp nào", "mcp nao"),
+        rationale="Use MCP domain listing when the request asks about available domain MCPs.",
+    ),
+    ToolDescriptor(
+        tool_name="get_mcp_domain",
+        description="Get one domain MCP endpoint",
+        keywords=("get mcp domain", "mcp domain detail", "chi tiết mcp", "chi tiet mcp"),
+        rationale="Use MCP domain lookup when the request names one MCP domain.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="route_to_mcp_domain",
+        description="Route intent to domain MCP",
+        keywords=("route", "routing", "định tuyến", "dinh tuyen"),
+        rationale="Use deterministic MCP domain routing for coarse domain selection.",
+    ),
+    ToolDescriptor(
+        tool_name="check_mcp_domain_health",
+        description="Check domain MCP health",
+        keywords=("mcp health", "domain health", "sức khỏe mcp", "suc khoe mcp"),
+        rationale="Use MCP health checks when the request asks whether domain MCPs are reachable.",
+    ),
+    ToolDescriptor(
+        tool_name="list_skills",
+        description="List available skill files",
+        keywords=("skills", "skill list", "kỹ năng", "ky nang"),
+        rationale="Use skill listing when the request asks what skills are available.",
+    ),
+    ToolDescriptor(
+        tool_name="get_skill",
+        description="Read a skill markdown file",
+        keywords=("get skill", "load skill", "đọc skill", "doc skill"),
+        rationale="Use skill lookup before complex workflows or when the request names a skill domain.",
+        heuristic_enabled=False,
+    ),
     ToolDescriptor(
         tool_name="list_promotions",
         description="List active promotion campaigns",
@@ -546,195 +583,13 @@ def extract_latest_user_text(state: dict[str, Any]) -> str:
     return str(content).strip()
 
 
-def _normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", text.casefold()).strip()
+def plan_tool_call(
+    user_text: str,
+    available_tools: list[str] | tuple[str, ...] | set[str] | None = None,
+) -> ToolPlan | None:
+    from app.graph.routing.keyword_matcher import KeywordToolMatcher
 
-
-def _extract_slug_after_any(text: str, markers: tuple[str, ...]) -> str | None:
-    for marker in markers:
-        pattern = rf"{re.escape(marker)}\s+([a-zA-Z0-9][a-zA-Z0-9_-]*)"
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            return match.group(1)
-    return None
-
-
-def _plan_product_request(normalized_text: str) -> ToolPlan | None:
-    has_product_intent = any(
-        term in normalized_text
-        for term in ("product", "products", "sản phẩm", "san pham")
+    return KeywordToolMatcher(TOOL_DESCRIPTORS).match(
+        user_text,
+        available_tools=available_tools,
     )
-    if not has_product_intent:
-        return None
-
-    category_slug = _extract_slug_after_any(
-        normalized_text,
-        (
-            "category slug",
-            "danh mục",
-            "danh muc",
-            "category",
-        ),
-    )
-    if category_slug:
-        return ToolPlan(
-            tool_name="list_products_by_category_slug",
-            tool_args={"slug": category_slug},
-            required_role="operator",
-            rationale="category product listing by slug",
-        )
-
-    product_slug = _extract_slug_after_any(
-        normalized_text,
-        (
-            "product slug",
-            "slug sản phẩm",
-            "slug san pham",
-        ),
-    )
-    if product_slug:
-        return ToolPlan(
-            tool_name="get_product_by_slug",
-            tool_args={"slug": product_slug},
-            required_role="operator",
-            rationale="product detail by slug",
-        )
-
-    search_keyword = _extract_slug_after_any(
-        normalized_text,
-        (
-            "tìm sản phẩm",
-            "tim san pham",
-            "search products",
-            "search product",
-        ),
-    )
-    if search_keyword:
-        return ToolPlan(
-            tool_name="search_products",
-            tool_args={"keyword": search_keyword, "params": {}},
-            required_role="operator",
-            rationale="product keyword search",
-        )
-
-    return None
-
-
-def _plan_review_request(normalized_text: str) -> ToolPlan | None:
-    has_review_intent = any(
-        term in normalized_text
-        for term in ("review", "reviews", "đánh giá", "danh gia")
-    )
-    if not has_review_intent:
-        return None
-
-    product_slug = _extract_slug_after_any(
-        normalized_text,
-        (
-            "product slug",
-            "slug sản phẩm",
-            "slug san pham",
-        ),
-    )
-    if product_slug:
-        return ToolPlan(
-            tool_name="list_reviews_by_product_slug",
-            tool_args={"slug": product_slug},
-            required_role="operator",
-            rationale="product reviews by slug",
-        )
-
-    product_id = _extract_slug_after_any(
-        normalized_text,
-        (
-            "product id",
-            "mã sản phẩm",
-            "ma san pham",
-            "sản phẩm",
-            "san pham",
-            "product",
-        ),
-    )
-    if product_id:
-        return ToolPlan(
-            tool_name="list_reviews_by_product",
-            tool_args={"product_id": product_id, "params": {}},
-            required_role="operator",
-            rationale="product reviews by product id",
-        )
-
-    return None
-
-
-def _plan_direct_tool_invocation(normalized_text: str) -> ToolPlan | None:
-    """Fast-path: user explicitly names a tool (e.g. 'dùng tool list_products_by_category_slug').
-
-    Matches any registered tool name appearing in the request and extracts the
-    most relevant argument from the surrounding text.
-    """
-    all_tool_names = {d.tool_name for d in TOOL_DESCRIPTORS}
-    matched_descriptor: ToolDescriptor | None = None
-    for descriptor in TOOL_DESCRIPTORS:
-        if descriptor.tool_name in normalized_text:
-            matched_descriptor = descriptor
-            break
-
-    if matched_descriptor is None:
-        return None
-
-    tool_name = matched_descriptor.tool_name
-    tool_args: dict[str, Any] = dict(matched_descriptor.tool_args)
-
-    # Extract slug/id argument from text when tool expects one.
-    # Pattern: any word that looks like a slug (letters, digits, hyphens) following
-    # common markers OR appearing directly adjacent to the tool name in the sentence.
-    slug_match = re.search(
-        r"(?:danh\s*mục|danh\s*muc|category|slug|mục|muc|cho|of|in)\s+"
-        r"([a-zA-Z0-9][a-zA-Z0-9_-]+)",
-        normalized_text,
-        flags=re.IGNORECASE,
-    )
-    if slug_match:
-        candidate = slug_match.group(1)
-        # Avoid capturing the tool name itself or common stop words
-        stop_words = all_tool_names | {"tool", "slug", "category", "danh", "muc", "mục"}
-        if candidate not in stop_words:
-            if "slug" in tool_name or "category" in tool_name:
-                tool_args["slug"] = candidate
-            elif "product_id" in tool_args or "id" in tool_name:
-                tool_args["product_id"] = candidate
-
-    return ToolPlan(
-        tool_name=tool_name,
-        tool_args=tool_args,
-        required_role=matched_descriptor.required_role,
-        rationale=f"direct tool invocation: {tool_name}",
-    )
-
-
-def plan_tool_call(user_text: str) -> ToolPlan | None:
-    normalized_text = _normalize(user_text)
-    if not normalized_text:
-        return None
-
-    # Highest priority: user explicitly names a tool.
-    direct_plan = _plan_direct_tool_invocation(normalized_text)
-    if direct_plan is not None:
-        return direct_plan
-
-    specific_plan = _plan_product_request(normalized_text) or _plan_review_request(normalized_text)
-    if specific_plan is not None:
-        return specific_plan
-
-    for descriptor in TOOL_DESCRIPTORS:
-        if not descriptor.heuristic_enabled:
-            continue
-        if any(keyword in normalized_text for keyword in descriptor.keywords):
-            return ToolPlan(
-                tool_name=descriptor.tool_name,
-                tool_args=dict(descriptor.tool_args),
-                required_role=descriptor.required_role,
-                rationale=descriptor.rationale,
-            )
-
-    return None

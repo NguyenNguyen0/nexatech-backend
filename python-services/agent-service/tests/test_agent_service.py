@@ -1,8 +1,8 @@
 import sys
 from pathlib import Path
 
+import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -19,18 +19,26 @@ def disable_eureka_for_tests():
     SETTINGS.eureka_enabled = previous
 
 
-def test_health_endpoint() -> None:
-    client = TestClient(app)
-    response = client.get("/health")
+@pytest.mark.asyncio
+async def test_health_endpoint() -> None:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get("/health")
 
     assert response.status_code == 200
     assert response.json()["status"] == "UP"
     assert response.headers["X-Correlation-Id"]
 
 
-def test_ready_endpoint() -> None:
-    client = TestClient(app)
-    response = client.get("/ready")
+@pytest.mark.asyncio
+async def test_ready_endpoint() -> None:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get("/ready")
 
     assert response.status_code == 200
     payload = response.json()
@@ -38,9 +46,13 @@ def test_ready_endpoint() -> None:
     assert payload["service"] == "agent-service"
 
 
-def test_root_endpoint_describes_skeleton_layout() -> None:
-    client = TestClient(app)
-    response = client.get("/")
+@pytest.mark.asyncio
+async def test_root_endpoint_describes_skeleton_layout() -> None:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get("/")
 
     assert response.status_code == 200
     payload = response.json()

@@ -59,8 +59,8 @@ def _is_tool_catalog_request(input_text: str) -> bool:
     if any(d.tool_name in normalized for d in TOOL_DESCRIPTORS):
         return False
 
-    # "tool" alone is too broad; only treat plural / meta terms as catalog signals.
-    tool_terms = ("tools", "công cụ", "cong cu", "khả năng", "kha nang")
+    # Treat "tool" as catalog intent only when paired with list/capability terms.
+    tool_terms = ("tool", "tools", "công cụ", "cong cu", "khả năng", "kha nang")
     list_terms = (
         "liệt kê",
         "liet ke",
@@ -93,7 +93,10 @@ async def agent_think(state: dict[str, Any]) -> dict[str, Any]:
                     "available_tools": available_tools,
                 },
             }
-        plan = plan_tool_call(input_text)
+        plan = plan_tool_call(
+            input_text,
+            available_tools=state.get("available_tools"),
+        )
         if plan is None:
             plan = await plan_tool_call_with_llm(input_text)
         if plan is None:

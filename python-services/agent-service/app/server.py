@@ -568,12 +568,12 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+async def health() -> dict[str, str]:
     return {"status": "UP", "service": SETTINGS.service_name}
 
 
 @app.get("/ready")
-def ready() -> dict[str, object]:
+async def ready() -> dict[str, object]:
     eureka_state = READINESS_CHECKS.get("eureka", "unknown")
     degraded = eureka_state.startswith("error") or eureka_state == "client_missing"
     return {
@@ -585,7 +585,7 @@ def ready() -> dict[str, object]:
 
 
 @app.get("/")
-def root() -> dict[str, object]:
+async def root() -> dict[str, object]:
     return {
         "message": "agent-service skeleton is running",
         "layout": [
