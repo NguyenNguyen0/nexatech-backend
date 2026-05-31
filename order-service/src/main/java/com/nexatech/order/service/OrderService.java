@@ -283,7 +283,7 @@ public class OrderService {
         }
 
         Order saved = orderRepository.save(order);
-        saveOrderEventToOutbox(saved, "ORDER_STATUS_UPDATED");
+        saveOrderEventToOutbox(saved, newStatus == OrderStatus.CANCELLED ? "ORDER_CANCELLED" : "ORDER_STATUS_UPDATED");
         auditLogService.logEvent("ORDER_STATUS_CHANGED", "Order", orderId.toString(),
                 Map.of("orderId", orderId.toString(),
                         "previousStatus", oldStatus.name(),
@@ -303,6 +303,10 @@ public class OrderService {
         }
 
         log.info("Cập nhật trạng thái đơn hàng {} : {} → {}", orderId, oldStatus, newStatus);
+
+        if (newStatus == OrderStatus.CANCELLED) {
+            releaseReservedStockBestEffort(saved, "admin_status_cancelled", "admin");
+        }
 
         return orderMapper.toResponse(saved);
     }
@@ -375,35 +379,34 @@ public class OrderService {
     public OrderResponse cancelOrder(UUID customerId, UUID orderId) {
         Order order = findById(orderId);
 
-        // Xác thực quyền sở hữu (dùng Objects.equals để tránh NPE với guest orders)
         if (!Objects.equals(order.getCustomerId(), customerId)) {
             throw new ForbiddenException("Bạn không có quyền huỷ đơn hàng này");
         }
 
-        // Cho phép huỷ khi đơn đang ở PENDING hoặc CONFIRMED
         if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
             throw new BadRequestException(
                     "Chỉ có thể huỷ đơn hàng ở trạng thái PENDING hoặc CONFIRMED, trạng thái hiện tại: " + order.getStatus()
             );
         }
 
-        // Giải phóng tồn kho ngoài transaction — nếu thất bại, đơn hàng vẫn giữ nguyên (không mất hàng)
-        try {
-            inventoryClient.releaseStock(buildStockRequestFromOrder(order));
-        } catch (Exception e) {
-            log.error("Không thể giải phóng tồn kho cho đơn hàng {}: {}", orderId, e.getMessage());
-            throw new BadRequestException("Không thể hoàn trả tồn kho, vui lòng thử lại sau");
-        }
-
-        // Cập nhật trạng thái trong transaction ngắn gọn (không có I/O mạng)
-        return new TransactionTemplate(transactionManager).execute(status -> {
+        OrderResponse response = new TransactionTemplate(transactionManager).execute(status -> {
             Order o = findById(orderId);
+            if (!Objects.equals(o.getCustomerId(), customerId)) {
+                throw new ForbiddenException("Bạn không có quyền huỷ đơn hàng này");
+            }
+            if (o.getStatus() != OrderStatus.PENDING && o.getStatus() != OrderStatus.CONFIRMED) {
+                throw new BadRequestException(
+                        "Chỉ có thể huỷ đơn hàng ở trạng thái PENDING hoặc CONFIRMED, trạng thái hiện tại: " + o.getStatus()
+                );
+            }
+
+            OrderStatus previousStatus = o.getStatus();
             o.setStatus(OrderStatus.CANCELLED);
             Order saved = orderRepository.save(o);
             saveOrderEventToOutbox(saved, "ORDER_CANCELLED");
             auditLogService.logEvent("ORDER_CANCELLED", "Order", orderId.toString(),
                     Map.of("orderId", orderId.toString(),
-                            "previousStatus", "PENDING_OR_CONFIRMED",
+                            "previousStatus", previousStatus.name(),
                             "newStatus", "CANCELLED",
                             "reason", "customer_request",
                             "customerId", customerId != null ? customerId.toString() : "guest"),
@@ -411,19 +414,22 @@ public class OrderService {
             log.info("Huỷ đơn hàng thành công: {} | customer: {}", orderId, customerId);
             return orderMapper.toResponse(saved);
         });
-    }
 
+        releaseReservedStockBestEffort(findById(orderId), "customer_request", customerId != null ? customerId.toString() : "guest");
+        return response;
+    }
     /**
      * Internal saga compensation path.
      *
-     * This method intentionally does not call inventory/payment/shipping synchronously.
-     * It changes the order state and writes ORDER_CANCELLED to the outbox; downstream
-     * services consume that event and perform their own compensating action.
+     * It changes the order state and writes ORDER_CANCELLED to the outbox. Inventory
+     * is also released immediately after commit as a best-effort fast path; the
+     * outbox event remains the retry path if inventory is temporarily unavailable.
      */
     public OrderResponse cancelOrderForSaga(UUID orderId, String reason, String actor) {
         Order current = findById(orderId);
         if (current.getStatus() == OrderStatus.CANCELLED) {
             log.info("Order already cancelled, skip duplicate compensation: orderId={} reason={}", orderId, reason);
+            releaseReservedStockBestEffort(current, reason, actor);
             return orderMapper.toResponse(current);
         }
         if (current.getStatus() != OrderStatus.PENDING && current.getStatus() != OrderStatus.CONFIRMED) {
@@ -431,7 +437,7 @@ public class OrderService {
             return orderMapper.toResponse(current);
         }
 
-        return new TransactionTemplate(transactionManager).execute(status -> {
+        OrderResponse response = new TransactionTemplate(transactionManager).execute(status -> {
             Order order = findById(orderId);
             if (order.getStatus() == OrderStatus.CANCELLED) {
                 return orderMapper.toResponse(order);
@@ -461,6 +467,11 @@ public class OrderService {
                     orderId, oldStatus, reason, actor);
             return orderMapper.toResponse(saved);
         });
+        Order afterCancel = findById(orderId);
+        if (afterCancel.getStatus() == OrderStatus.CANCELLED) {
+            releaseReservedStockBestEffort(afterCancel, reason, actor);
+        }
+        return response;
     }
 
     public OrderResponse markOutOfStockForCompensation(UUID orderId, String reason, String actor) {
@@ -770,6 +781,23 @@ public class OrderService {
      * Xây dựng OrderEvent và lưu vào outbox trong cùng transaction nghiệp vụ.
      * Scheduler sẽ đọc và publish lên Kafka sau — đảm bảo at-least-once delivery.
      */
+    private void releaseReservedStockBestEffort(Order order, String reason, String actor) {
+        if (order == null || order.getItems() == null || order.getItems().isEmpty()) {
+            return;
+        }
+        try {
+            StockOperationRequest request = buildStockRequestFromOrder(order);
+            request.setReason("Release stock for cancelled order " + order.getOrderNumber() + ": " + reason);
+            inventoryClient.releaseStock(request);
+            log.info("Released reserved stock for cancelled order: orderId={} reason={} actor={}",
+                    order.getId(), reason, actor);
+        } catch (Exception e) {
+            log.warn("Unable to release reserved stock immediately for cancelled order {}. "
+                            + "ORDER_CANCELLED outbox event will retry asynchronously: {}",
+                    order.getId(), e.getMessage());
+        }
+    }
+
     private void saveOrderEventToOutbox(Order order, String eventType) {
         OrderEvent event = OrderEvent.builder()
                 .eventId(UUID.randomUUID())

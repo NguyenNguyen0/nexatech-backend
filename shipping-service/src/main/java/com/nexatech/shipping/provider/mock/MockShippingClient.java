@@ -77,7 +77,7 @@ public class MockShippingClient implements ShippingProviderClient {
                 .build();
 
         Shipment saved = shipmentRepository.save(shipment);
-        addHistory(saved, ShipmentStatus.PENDING_PICKUP, WAREHOUSE_ADDRESS, null, null, "Shipment created in mock provider");
+        addHistory(saved, ShipmentStatus.PENDING_PICKUP, WAREHOUSE_ADDRESS, null, null, "Đơn vận chuyển đã được tạo");
         saveShippingEventToOutbox(saved, "SHIPMENT_CREATED");
         auditLogService.log("SHIPMENT_CREATED", "Shipment", saved.getId().toString(),
                 "status=PENDING_PICKUP", "mock-provider");
