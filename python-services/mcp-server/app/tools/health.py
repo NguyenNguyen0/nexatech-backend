@@ -4,6 +4,7 @@ from typing import Annotated, Any
 
 from app.mcp.server import mcp
 from app.mcp.domains import DOMAIN_APIS
+from app.schemas.tool_contract import tool_result, validation_error
 from pydantic import Field
 
 
@@ -32,14 +33,10 @@ async def check_dependency_health(
     if service_name:
         api = SERVICE_APIS.get(service_name)
         if api is None:
-            return {
-                "ok": False,
-                "service": service_name,
-                "message": f"Unknown dependency '{service_name}'",
-            }
-        return {"service": service_name, "health": await api.health()}
+            return validation_error(f"Unknown dependency '{service_name}'")
+        return tool_result({"service": service_name, "health": await api.health()})
 
-    return await check_all_dependency_health()
+    return tool_result((await check_all_dependency_health())["data"])
 
 
 @mcp.tool()
@@ -53,46 +50,46 @@ async def check_all_dependency_health() -> dict[str, Any]:
     result: dict[str, Any] = {"ok": True, "dependencies": {}}
     for service_name, api in SERVICE_APIS.items():
         result["dependencies"][service_name] = await api.health()
-    return result
+    return tool_result(result)
 
 
 @mcp.tool()
 async def check_news_service_health() -> dict[str, Any]:
     """Check whether news-service is reachable from the MCP server."""
-    return await SERVICE_APIS["news-service"].health()
+    return tool_result(await SERVICE_APIS["news-service"].health())
 
 
 @mcp.tool()
 async def check_inventory_service_health() -> dict[str, Any]:
     """Check whether inventory-service is reachable from the MCP server."""
-    return await SERVICE_APIS["inventory-service"].health()
+    return tool_result(await SERVICE_APIS["inventory-service"].health())
 
 
 @mcp.tool()
 async def check_product_service_health() -> dict[str, Any]:
     """Check whether product-service is reachable from the MCP server."""
-    return await SERVICE_APIS["product-service"].health()
+    return tool_result(await SERVICE_APIS["product-service"].health())
 
 
 @mcp.tool()
 async def check_order_service_health() -> dict[str, Any]:
     """Check whether order-service is reachable from the MCP server."""
-    return await SERVICE_APIS["order-service"].health()
+    return tool_result(await SERVICE_APIS["order-service"].health())
 
 
 @mcp.tool()
 async def check_payment_service_health() -> dict[str, Any]:
     """Check whether payment-service is reachable from the MCP server."""
-    return await SERVICE_APIS["payment-service"].health()
+    return tool_result(await SERVICE_APIS["payment-service"].health())
 
 
 @mcp.tool()
 async def check_audit_service_health() -> dict[str, Any]:
     """Check whether audit-service is reachable from the MCP server."""
-    return await SERVICE_APIS["audit-service"].health()
+    return tool_result(await SERVICE_APIS["audit-service"].health())
 
 
 @mcp.tool()
 async def check_promotion_service_health() -> dict[str, Any]:
     """Check whether promotion-service is reachable from the MCP server."""
-    return await SERVICE_APIS["promotion-service"].health()
+    return tool_result(await SERVICE_APIS["promotion-service"].health())

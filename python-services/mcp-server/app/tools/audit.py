@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from app.mcp.server import mcp
+from app.schemas.tool_contract import tool_result
+from app.schemas.tool_inputs import AuditSearchParams, dump_input
 from app.services.audit import AUDIT_API
 from pydantic import Field
 
@@ -10,7 +12,7 @@ from pydantic import Field
 @mcp.tool()
 async def search_audit_logs(
     params: Annotated[
-        dict[str, Any] | None,
+        AuditSearchParams | None,
         Field(
             description=(
                 "Optional audit search filters. Supported keys: action, entityType, "
@@ -26,7 +28,7 @@ async def search_audit_logs(
     entity changes, source-service events, or a time window. Dates should be passed
     in the format expected by audit-service, typically ISO-8601 strings.
     """
-    return await AUDIT_API.search_audit_logs(params=params)
+    return tool_result(await AUDIT_API.search_audit_logs(params=dump_input(params)))
 
 
 @mcp.tool()
@@ -42,7 +44,7 @@ async def get_audit_entry(
     specific audit record, including actor, action, entity, source service, payload,
     timestamps, and trace metadata if present.
     """
-    return await AUDIT_API.get_audit_entry(entry_id)
+    return tool_result(await AUDIT_API.get_audit_entry(entry_id))
 
 
 @mcp.tool()
@@ -63,7 +65,7 @@ async def get_audit_trace(
     especially useful with X-Correlation-Id from error responses, order IDs, entity
     IDs, or trace IDs captured in logs.
     """
-    return await AUDIT_API.trace_by_lookup_id(lookup_id)
+    return tool_result(await AUDIT_API.trace_by_lookup_id(lookup_id))
 
 
 @mcp.tool()
@@ -74,4 +76,4 @@ async def get_audit_facets() -> dict[str, Any]:
     actions, entity types, actors, source services, or other selectable filter
     values exposed by audit-service.
     """
-    return await AUDIT_API.get_audit_facets()
+    return tool_result(await AUDIT_API.get_audit_facets())

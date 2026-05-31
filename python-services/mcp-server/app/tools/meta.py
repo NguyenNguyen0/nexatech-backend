@@ -8,6 +8,7 @@ from pydantic import Field
 from app.core.settings import SETTINGS
 from app.mcp.domains import DOMAIN_PROFILES, domain_url, list_domain_metadata
 from app.mcp.server import mcp
+from app.schemas.tool_contract import tool_result, validation_error
 
 
 @mcp.tool()
@@ -18,11 +19,12 @@ async def list_mcp_domains() -> dict[str, Any]:
     the domain name, service name, base URL, MCP endpoint, dependencies, and a
     short description of the business boundary.
     """
-    return {
-        "ok": True,
-        "profile": SETTINGS.mcp_server_profile,
-        "domains": list_domain_metadata(),
-    }
+    return tool_result(
+        {
+            "profile": SETTINGS.mcp_server_profile,
+            "domains": list_domain_metadata(),
+        }
+    )
 
 
 @mcp.tool()
@@ -45,16 +47,12 @@ async def get_mcp_domain(
     normalized = domain.strip().lower()
     domain_config = DOMAIN_PROFILES.get(normalized)
     if domain_config is None:
-        return {
-            "ok": False,
-            "message": f"Unknown MCP domain '{domain}'",
-            "supportedDomains": list(DOMAIN_PROFILES),
-        }
+        return validation_error(
+            f"Unknown MCP domain '{domain}'",
+            code="MCP-UNKNOWN-DOMAIN",
+        )
 
-    return {
-        "ok": True,
-        "domain": _domain_payload(normalized),
-    }
+    return tool_result({"domain": _domain_payload(normalized)})
 
 
 @mcp.tool()
@@ -150,18 +148,17 @@ async def route_to_mcp_domain(
     ]
 
     if not matches:
-        return {
-            "ok": False,
-            "routeType": "unknown",
-            "message": "No MCP domain matched the intent.",
-            "supportedDomains": list(DOMAIN_PROFILES),
-        }
+        return validation_error(
+            "No MCP domain matched the intent.",
+            code="MCP-NO-DOMAIN-MATCH",
+        )
 
-    return {
-        "ok": True,
-        "routeType": "single_domain" if len(matches) == 1 else "multi_domain",
-        "domains": [_domain_payload(domain_name) for domain_name in matches],
-    }
+    return tool_result(
+        {
+            "routeType": "single_domain" if len(matches) == 1 else "multi_domain",
+            "domains": [_domain_payload(domain_name) for domain_name in matches],
+        }
+    )
 
 
 @mcp.tool()
@@ -185,16 +182,16 @@ async def check_mcp_domain_health(
         normalized = domain.strip().lower()
         domain_config = DOMAIN_PROFILES.get(normalized)
         if domain_config is None:
-            return {
-                "ok": False,
-                "message": f"Unknown MCP domain '{domain}'",
-                "supportedDomains": list(DOMAIN_PROFILES),
+            return validation_error(
+                f"Unknown MCP domain '{domain}'",
+                code="MCP-UNKNOWN-DOMAIN",
+            )
+        return tool_result(
+            {
+                "domain": normalized,
+                "health": await _check_domain_health(domain_config),
             }
-        return {
-            "ok": True,
-            "domain": normalized,
-            "health": await _check_domain_health(domain_config),
-        }
+        )
 
     dependencies: dict[str, Any] = {}
     ok = True
@@ -203,7 +200,7 @@ async def check_mcp_domain_health(
         dependencies[domain_name] = health
         ok = ok and bool(health.get("ok"))
 
-    return {"ok": ok, "domains": dependencies}
+    return tool_result({"ok": ok, "domains": dependencies})
 
 
 def _domain_payload(domain_name: str) -> dict[str, Any]:

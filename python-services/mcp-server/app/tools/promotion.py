@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from app.mcp.server import mcp
+from app.schemas.tool_contract import tool_result
 from app.services.promotion import PROMOTION_API
 from pydantic import Field
 
@@ -26,7 +27,7 @@ async def list_promotions(
     usually a list or paged object containing promotion IDs, codes, discount values,
     status, start/end dates, and included products.
     """
-    return await PROMOTION_API.list_promotions(status=status)
+    return tool_result(await PROMOTION_API.list_promotions(status=status))
 
 
 @mcp.tool()
@@ -47,7 +48,7 @@ async def get_promotion(
     details. If no matching item is found, the tool returns a structured PRO-4040
     not-found response instead of raising.
     """
-    return await PROMOTION_API.get_promotion(promotion_id)
+    return tool_result(await PROMOTION_API.get_promotion(promotion_id))
 
 
 @mcp.tool()
@@ -58,7 +59,7 @@ async def list_flash_sales() -> dict[str, Any]:
     checking which campaigns are visible publicly. It calls the public flash-sales
     endpoint and returns the raw promotion-service payload.
     """
-    return await PROMOTION_API.list_flash_sales()
+    return tool_result(await PROMOTION_API.list_flash_sales())
 
 
 @mcp.tool()
@@ -79,4 +80,4 @@ async def get_flash_sale(
     discount window, or included sale products. If not found, the tool returns a
     structured PRO-4041 response.
     """
-    return await PROMOTION_API.get_flash_sale(flash_sale_id)
+    return tool_result(await PROMOTION_API.get_flash_sale(flash_sale_id))

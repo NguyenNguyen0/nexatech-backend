@@ -17,6 +17,7 @@ from app.core.logging import (
     user_role_ctx,
 )
 from app.mcp.domains import get_profile_tool_modules, list_domain_metadata
+from app.schemas.tool_contract import tool_result, validation_error
 from app.services.audit import AuditServiceApi
 from app.services.inventory import InventoryServiceApi
 from app.services.news import NewsServiceApi
@@ -75,6 +76,46 @@ def test_meta_domain_metadata_lists_independent_mcp_endpoints() -> None:
     assert domains["inventory"]["mcpEndpoint"].endswith(":8101/mcp")
     assert domains["product"]["toolModules"] == ["product"]
     assert domains["audit"]["dependencies"] == ["audit-service"]
+
+
+def test_tool_result_wraps_success_payload_with_backward_compatible_ok() -> None:
+    result = tool_result({"id": "product-1"}, requires_approval=True, idempotency_key="idem-1")
+
+    assert result["success"] is True
+    assert result["ok"] is True
+    assert result["data"] == {"id": "product-1"}
+    assert result["requiresApproval"] is True
+    assert result["idempotencyKey"] == "idem-1"
+
+
+def test_tool_result_preserves_structured_downstream_error() -> None:
+    result = tool_result(
+        {
+            "ok": False,
+            "service": "inventory-service",
+            "statusCode": 404,
+            "tag": "INV-5001",
+            "message": "Inventory item not found",
+            "correlationId": "corr-1",
+        },
+        rollback_needed=True,
+    )
+
+    assert result["success"] is False
+    assert result["ok"] is False
+    assert result["tag"] == "INV-5001"
+    assert result["error"]["code"] == "INV-5001"
+    assert result["error"]["rollbackNeeded"] is True
+    assert result["correlationId"] == "corr-1"
+
+
+def test_validation_error_uses_tool_contract_error_shape() -> None:
+    result = validation_error("Bad request", code="MCP-BAD")
+
+    assert result["success"] is False
+    assert result["ok"] is False
+    assert result["tag"] == "MCP-BAD"
+    assert result["error"]["retryAllowed"] is False
 
 
 @pytest.mark.asyncio

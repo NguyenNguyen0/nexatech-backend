@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from app.mcp.server import mcp
+from app.schemas.tool_contract import tool_result
 from app.services.payment import PAYMENT_API
 from pydantic import Field
 
@@ -39,7 +40,11 @@ async def create_payment(
     start a payment flow or create a payment record for an order. Include
     idempotency_key for retries, timeouts, or client re-submissions.
     """
-    return await PAYMENT_API.create_payment(order_id, method, idempotency_key)
+    return tool_result(
+        await PAYMENT_API.create_payment(order_id, method, idempotency_key),
+        requires_approval=True,
+        idempotency_key=idempotency_key,
+    )
 
 
 @mcp.tool()
@@ -54,7 +59,7 @@ async def get_payment(
     Use this when the caller needs payment status, amount, method, external
     gateway reference, timestamps, refund state, or order linkage for one payment.
     """
-    return await PAYMENT_API.get_payment(payment_id)
+    return tool_result(await PAYMENT_API.get_payment(payment_id))
 
 
 @mcp.tool()
@@ -69,7 +74,7 @@ async def get_payment_by_order(
     Use this when the caller has an order ID but not a payment ID, such as order
     detail pages, checkout recovery, support lookups, or reconciliation flows.
     """
-    return await PAYMENT_API.get_payment_by_order(order_id)
+    return tool_result(await PAYMENT_API.get_payment_by_order(order_id))
 
 
 @mcp.tool()
@@ -80,7 +85,7 @@ async def get_my_payments() -> dict[str, Any]:
     support flows where the current request identity determines which payments are
     visible.
     """
-    return await PAYMENT_API.my_payments()
+    return tool_result(await PAYMENT_API.my_payments())
 
 
 @mcp.tool()
@@ -89,6 +94,10 @@ async def refund_payment(
         str,
         Field(description="Payment ID to refund."),
     ],
+    idempotency_key: Annotated[
+        str | None,
+        Field(description="Optional idempotency key for caller-side retry tracking."),
+    ] = None,
 ) -> dict[str, Any]:
     """Request a refund for a payment.
 
@@ -96,7 +105,11 @@ async def refund_payment(
     initiate a refund. The payment-service decides whether the payment is eligible
     based on status, method, timing, and gateway rules.
     """
-    return await PAYMENT_API.refund(payment_id)
+    return tool_result(
+        await PAYMENT_API.refund(payment_id),
+        requires_approval=True,
+        idempotency_key=idempotency_key,
+    )
 
 
 @mcp.tool()
@@ -107,4 +120,4 @@ async def get_payment_stats() -> dict[str, Any]:
     totals, revenue, success/failure rates, refund metrics, gateway distribution,
     or payment-method breakdowns returned by payment-service.
     """
-    return await PAYMENT_API.stats()
+    return tool_result(await PAYMENT_API.stats())
