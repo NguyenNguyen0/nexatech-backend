@@ -59,12 +59,9 @@ mcp_app = mcp.http_app(
 )
 
 
-@asynccontextmanager
-async def _mounted_mcp_lifespan(_: FastAPI):
-    yield
+# The original FastMCP lifespan context manager is kept on mcp_app.
+# We will manually enter it in the parent app's lifespan below.
 
-
-mcp_app.router.lifespan_context = _mounted_mcp_lifespan
 
 READINESS_CHECKS: dict[str, str] = {
     "service": "ok",
@@ -167,7 +164,8 @@ async def lifespan(app: FastAPI):
     await _log_dependency_connectivity()
     await _register_eureka()
     try:
-        yield
+        async with mcp_app.router.lifespan_context(mcp_app):
+            yield
     finally:
         await _deregister_eureka()
 

@@ -214,6 +214,24 @@ async def plan_tool_call_with_llm(user_text: str) -> ToolPlan | None:
     )
 
 
+
+
+def _truncate_data(data: Any, max_list_size: int = 5, max_string_len: int = 200) -> Any:
+    """Recursively truncate large lists and strings to keep context size small and avoid LLM rate limits."""
+    if isinstance(data, dict):
+        return {k: _truncate_data(v, max_list_size, max_string_len) for k, v in data.items()}
+    if isinstance(data, list):
+        if len(data) > max_list_size:
+            truncated = [_truncate_data(item, max_list_size, max_string_len) for item in data[:max_list_size]]
+            truncated.append(f"... (truncated {len(data) - max_list_size} items)")
+            return truncated
+        return [_truncate_data(item, max_list_size, max_string_len) for item in data]
+    if isinstance(data, str):
+        if len(data) > max_string_len:
+            return data[:max_string_len] + "..."
+    return data
+
+
 async def synthesize_agent_response(state: dict[str, Any]) -> str:
     if not SETTINGS.groq_api_key:
         logger.error("LLM response synthesis is unavailable: GROQ_API_KEY is not configured.")
@@ -254,14 +272,18 @@ async def synthesize_agent_response(state: dict[str, Any]) -> str:
     response_context = {
         "user_text": user_text,
         "final_status": state.get("final_status"),
-        "available_tools": state.get("available_tools") or [],
+        "available_tools": (
+            state.get("available_tools") or []
+            if state.get("final_status") == "no_matching_tool"
+            else []
+        ),
         "selected_tool": state.get("selected_tool"),
         "selected_tool_args": state.get("selected_tool_args") or {},
-        "tool_results": state.get("tool_results") or [],
+        "tool_results": _truncate_data(state.get("tool_results") or []),
         "tool_errors": state.get("tool_errors") or [],
         "approval_result": state.get("approval_result"),
         "request_sensitivity": state.get("request_sensitivity"),
-        "answer_context": state.get("answer_context") or {},
+        "answer_context": _truncate_data(state.get("answer_context") or {}),
     }
 
     llm = ChatGroq(
