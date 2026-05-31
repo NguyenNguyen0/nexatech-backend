@@ -98,16 +98,13 @@ public class ProductQueryHandler {
         boolean hasRatingFilter = query.minRating() != null || query.maxRating() != null;
         if (!hasRatingFilter) {
             Query q = Query.query(finalCriteria).with(safePageable);
-            List<ProductMinimalResponse> content = mongoTemplate.find(q, Product.class).stream()
-                    .map(this::toMinimalCatalogResponse)
-                    .toList();
+            List<ProductMinimalResponse> content = toMinimalCatalogResponses(mongoTemplate.find(q, Product.class));
             long total = mongoTemplate.count(Query.query(finalCriteria), Product.class);
             return new PageImpl<>(content, safePageable, total);
         }
 
         Query q = Query.query(finalCriteria).with(safePageable.getSort());
-        List<ProductMinimalResponse> filtered = mongoTemplate.find(q, Product.class).stream()
-                .map(this::toMinimalCatalogResponse)
+        List<ProductMinimalResponse> filtered = toMinimalCatalogResponses(mongoTemplate.find(q, Product.class)).stream()
                 .filter(r -> ProductQueryUtils.matchesRatingRange(r.getAverageRating(), query.minRating(), query.maxRating()))
                 .toList();
 
@@ -159,9 +156,7 @@ public class ProductQueryHandler {
                     .with(hasRatingFilter ? Pageable.unpaged() : pageable)
                     .addCriteria(combinedCriteria);
 
-            List<ProductMinimalResponse> hits = mongoTemplate.find(q, Product.class).stream()
-                    .map(this::toMinimalCatalogResponse)
-                    .toList();
+            List<ProductMinimalResponse> hits = toMinimalCatalogResponses(mongoTemplate.find(q, Product.class));
 
             if (!hits.isEmpty()) {
                 if (hasRatingFilter) {
@@ -184,16 +179,13 @@ public class ProductQueryHandler {
         Query regexQuery = Query.query(regexCriteria).with(hasRatingFilter ? Pageable.unpaged() : pageable);
 
         if (hasRatingFilter) {
-            List<ProductMinimalResponse> all = mongoTemplate.find(regexQuery, Product.class).stream()
-                    .map(this::toMinimalCatalogResponse)
+            List<ProductMinimalResponse> all = toMinimalCatalogResponses(mongoTemplate.find(regexQuery, Product.class)).stream()
                     .filter(r -> ProductQueryUtils.matchesRatingRange(r.getAverageRating(), query.minRating(), query.maxRating()))
                     .toList();
             return ProductQueryUtils.pageSlice(all, pageable);
         }
 
-        List<ProductMinimalResponse> content = mongoTemplate.find(regexQuery, Product.class).stream()
-                .map(this::toMinimalCatalogResponse)
-                .toList();
+        List<ProductMinimalResponse> content = toMinimalCatalogResponses(mongoTemplate.find(regexQuery, Product.class));
         long total = mongoTemplate.count(Query.query(regexCriteria), Product.class);
         return new PageImpl<>(content, pageable, total);
     }
@@ -280,9 +272,7 @@ public class ProductQueryHandler {
                 ProductQueryUtils.anyTagCriteria(normalizedTags));
 
         Query q = Query.query(finalCriteria).with(safePageable);
-        List<ProductMinimalResponse> content = mongoTemplate.find(q, Product.class).stream()
-                .map(this::toMinimalCatalogResponse)
-                .toList();
+        List<ProductMinimalResponse> content = toMinimalCatalogResponses(mongoTemplate.find(q, Product.class));
         long total = mongoTemplate.count(Query.query(finalCriteria), Product.class);
         return new PageImpl<>(content, safePageable, total);
     }
@@ -343,19 +333,29 @@ public class ProductQueryHandler {
         Query query = Query.query(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
         query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        return mongoTemplate.find(query, Product.class).stream()
-                .map(this::toMinimalCatalogResponse)
+        return toMinimalCatalogResponses(mongoTemplate.find(query, Product.class)).stream()
                 .sorted(featuredComparatorForMinimal())
                 .limit(RELATED_PRODUCT_LIMIT)
                 .toList();
     }
 
     private ProductMinimalResponse toMinimalCatalogResponse(Product product) {
+        return productResponseEnricher.enrichMinimalCatalogResponse(toMinimalBaseResponse(product));
+    }
+
+    private List<ProductMinimalResponse> toMinimalCatalogResponses(List<Product> products) {
+        List<ProductMinimalResponse> responses = products.stream()
+                .map(this::toMinimalBaseResponse)
+                .toList();
+        return productResponseEnricher.enrichMinimalCatalogResponses(responses);
+    }
+
+    private ProductMinimalResponse toMinimalBaseResponse(Product product) {
         ProductMinimalResponse response = productMapper.toMinimalResponse(product);
         if (response.getOriginalPrice() == null) {
             response.setOriginalPrice(response.getCompareAtPrice());
         }
-        return productResponseEnricher.enrichMinimalCatalogResponse(response);
+        return response;
     }
 
     private ProductMinimalResponse toMinimalSyncResponse(Product product) {
@@ -371,8 +371,7 @@ public class ProductQueryHandler {
         Query query = Query.query(Criteria.where("active").is(true));
         query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        List<ProductMinimalResponse> all = mongoTemplate.find(query, Product.class).stream()
-                .map(this::toMinimalCatalogResponse)
+        List<ProductMinimalResponse> all = toMinimalCatalogResponses(mongoTemplate.find(query, Product.class)).stream()
                 .sorted(featuredComparatorForMinimal())
                 .toList();
 

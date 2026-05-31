@@ -34,4 +34,5 @@ public class ShippingEventDto {
 
     private BigDecimal shippingFee;
     private String currency;
+    private String failureReason;
 }

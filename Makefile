@@ -7,6 +7,7 @@ DOCKER_INFRA = docker-compose.infra.yml
 DOCKER_FULL = docker-compose.yml
 DOCKER_CORE = _realms/docker-compose-order-payment.yml
 MVN = mvn
+SHELL := /bin/bash
 
 # Load .env.ec2 và set env vars trong cùng một PowerShell process
 # Load .env (service credentials: GHN, VNPay, MinIO, v.v.)
@@ -14,7 +15,7 @@ MVN = mvn
 .PHONY: help build clean compile dev-up dev-down full-up full-down infra-reset logs-infra logs-full prune \
 	core-up core-down core-build core-logs \
 	run-discovery run-config run-gateway \
-	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-audit run-storage run-promotion run-recommendation \
+	run-identity run-user run-product run-inventory run-order run-payment run-notification run-chat run-audit run-storage run-promotion run-mcp run-mcp-meta run-mcp-inventory run-mcp-product run-mcp-order run-mcp-payment run-mcp-promotion run-mcp-news run-mcp-audit run-recommendation \
 	run-gateway-test run-chat-test \
 	run-gateway-ec2 run-identity-ec2 run-user-ec2 run-product-ec2 run-inventory-ec2 \
 	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-audit-ec2 run-storage-ec2 run-news-ec2 run-promotion-ec2 run-recommendation-ec2 \
@@ -51,6 +52,7 @@ help:
 	@echo "  make run-audit          - Run audit-service"
 	@echo "  make run-storage        - Run storage-service"
 	@echo "  make run-promotion      - Run promotion-service (Node.js, requires .env in promotion-service/)"
+	@echo "  make run-mcp            - Run mcp-server (Python/FastAPI + FastMCP)"
 	@echo "  make run-recommendation - Run recommendation-service (Python/FastAPI)"
 	@echo ""
 	@echo "Run with EC2 infra (loads .env.ec2):"
@@ -129,6 +131,14 @@ logs-full:
 	docker compose -f $(DOCKER_FULL) logs -f
 
 # --- Run Individual Services (from root, PowerShell compatible) ---
+spring-service:
+	@test -f "$(ENV_FILE)" || (echo "ENV_FILE not found: $(ENV_FILE)" && exit 1)
+	@echo "Starting $(SERVICE) with $(ENV_FILE)"
+	@set -a && \
+	. ./$(ENV_FILE) && \
+	set +a && \
+	$(MVN) -pl $(SERVICE) spring-boot:run
+
 run-discovery:
 	$(MVN) -pl discovery-server spring-boot:run
 
@@ -165,11 +175,41 @@ run-chat:
 run-audit:
 	$(MVN) -pl audit-service spring-boot:run
 
+run-news:
+	$(MVN) -pl news-service spring-boot:run
+
 run-storage:
 	$(MVN) -pl storage-service spring-boot:run
 
 run-promotion:
 	powershell -NoProfile -Command "Set-Location promotion-service; npm run start:dev"
+
+run-mcp:
+	cd python-services/mcp-server && uv run main.py
+
+run-mcp-meta:
+	cd python-services/mcp-server && SERVICE_NAME=meta-mcp MCP_SERVER_PROFILE=meta PORT=8094 uv run main.py
+
+run-mcp-inventory:
+	cd python-services/mcp-server && SERVICE_NAME=inventory-mcp MCP_SERVER_PROFILE=inventory PORT=8101 uv run main.py
+
+run-mcp-product:
+	cd python-services/mcp-server && SERVICE_NAME=product-mcp MCP_SERVER_PROFILE=product PORT=8102 uv run main.py
+
+run-mcp-order:
+	cd python-services/mcp-server && SERVICE_NAME=order-mcp MCP_SERVER_PROFILE=order PORT=8103 uv run main.py
+
+run-mcp-payment:
+	cd python-services/mcp-server && SERVICE_NAME=payment-mcp MCP_SERVER_PROFILE=payment PORT=8104 uv run main.py
+
+run-mcp-promotion:
+	cd python-services/mcp-server && SERVICE_NAME=promotion-mcp MCP_SERVER_PROFILE=promotion PORT=8105 uv run main.py
+
+run-mcp-news:
+	cd python-services/mcp-server && SERVICE_NAME=news-mcp MCP_SERVER_PROFILE=news PORT=8106 uv run main.py
+
+run-mcp-audit:
+	cd python-services/mcp-server && SERVICE_NAME=audit-mcp MCP_SERVER_PROFILE=audit PORT=8107 uv run main.py
 
 run-recommendation:
 	powershell -NoProfile -Command "Set-Location python-services/recommendation-service; uv run main.py"

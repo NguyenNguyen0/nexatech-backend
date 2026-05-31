@@ -60,6 +60,12 @@ public class Order extends BaseEntity {
     private Instant shippedAt;      // Tự động gán khi status → SHIPPED
     private Instant deliveredAt;    // Tự động gán khi status → DELIVERED
 
+    private String compensationReason;
+    private String refundBankName;
+    private String refundAccountNumber;
+    private String refundAccountHolder;
+    private Instant refundInfoSubmittedAt;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();

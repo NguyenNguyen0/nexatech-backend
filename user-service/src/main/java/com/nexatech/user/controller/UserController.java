@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.base.PageResponse;
@@ -20,11 +22,13 @@ import com.nexatech.user.dto.request.AdminUserCreateRequest;
 import com.nexatech.user.dto.request.UserRoleUpdateRequest;
 import com.nexatech.user.dto.request.UserUpdatenRequest;
 import com.nexatech.user.dto.request.VerifyOtpRequest;
+import com.nexatech.user.dto.response.AvatarUploadResponse;
 import com.nexatech.user.dto.response.OnboardingStatusResponse;
 import com.nexatech.user.dto.response.UserResponse;
 import com.nexatech.user.exception.AppException;
 import com.nexatech.user.exception.ErrorCode;
 import com.nexatech.user.service.AdminUserService;
+import com.nexatech.user.service.AvatarStorageService;
 import com.nexatech.user.service.UserService;
 
 import lombok.AccessLevel;
@@ -41,6 +45,7 @@ public class UserController {
 
     UserService userService;
     AdminUserService adminUserService;
+    AvatarStorageService avatarStorageService;
 
     @PostMapping
     // @RequiresPermission(PermissionsAccept.User.CREATE)
@@ -90,6 +95,17 @@ public class UserController {
     public ApiResponse<UserResponse> getUserById(@PathVariable String userId) {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.getUserById(userId))
+                .build();
+    }
+
+    @PostMapping(value = "/{userId}/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<AvatarUploadResponse> uploadAvatar(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String userId,
+            @RequestPart("file") MultipartFile file) {
+        assertSelfOrAdmin(jwt, userId);
+        return ApiResponse.<AvatarUploadResponse>builder()
+                .result(avatarStorageService.upload(file))
                 .build();
     }
 
@@ -146,5 +162,12 @@ public class UserController {
             throw new AppException(ErrorCode.UNAUTHENTICATED);
         }
         return jwt.getSubject();
+    }
+
+    private void assertSelfOrAdmin(Jwt jwt, String userId) {
+        String currentUserId = currentUserId(jwt);
+        if (!currentUserId.equalsIgnoreCase(userId)) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
     }
 }

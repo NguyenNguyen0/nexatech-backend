@@ -2,6 +2,9 @@ package com.nexatech.inventory.event;
 
 import com.nexatech.inventory.dto.StockCheckRequest;
 import com.nexatech.inventory.exception.BadRequestException;
+import com.nexatech.inventory.exception.ResourceNotFoundException;
+import com.nexatech.inventory.model.ProcessedEvent;
+import com.nexatech.inventory.repository.ProcessedEventRepository;
 import com.nexatech.inventory.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,16 +12,23 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class InventoryEventConsumer {
 
-    private final InventoryService inventoryService;
+    private static final String CONSUMER_NAME = "inventory-service:InventoryEventConsumer";
+    private static final String OUT_OF_STOCK_MARKER_EVENT = "ORDER_PAYMENT_COMPLETED_OUT_OF_STOCK";
 
+    private final InventoryService inventoryService;
+    private final ProcessedEventRepository processedEventRepository;
+
+    @Transactional
     @KafkaListener(
             topics = "order.events",
             groupId = "inventory-service-group",
@@ -33,20 +43,51 @@ public class InventoryEventConsumer {
             return;
         }
 
+        UUID eventId = event.getEventId();
+        if (eventId == null) {
+            log.warn("OrderEvent is missing eventId, inventory deduplication skipped: type={}", event.getEventType());
+        } else if (processedEventRepository.existsByEventIdAndConsumerName(eventId, CONSUMER_NAME)) {
+            log.info("Duplicate OrderEvent skipped by inventory-service: eventId={} type={}",
+                    eventId, event.getEventType());
+            return;
+        }
+
         try {
             String eventType = event.getEventType();
             log.info("Received order event type={} orderId={}", eventType, event.getOrderId());
 
+            boolean acted = true;
             switch (eventType) {
                 case "ORDER_CANCELLED" -> handleOrderCancelled(event);
+                case "ORDER_OUT_OF_STOCK", "ORDER_SHIPPING_FAILED", "ORDER_REFUND_PENDING" -> handleOrderCompensation(event);
                 case "ORDER_DELIVERED" -> handleOrderDelivered(event);
+                case "ORDER_PAYMENT_COMPLETED" -> handleOrderPaymentCompleted(event);
                 case "ORDER_STATUS_UPDATED" -> {
-                    if ("DELIVERED".equals(event.getStatus())) {
+                    if ("CONFIRMED".equals(event.getStatus())) {
+                        handleOrderConfirmed(event);
+                    } else if ("DELIVERED".equals(event.getStatus())) {
                         handleOrderDelivered(event);
+                    } else {
+                        acted = false; // other statuses (PROCESSING, SHIPPED, etc.) are intentionally ignored
                     }
                 }
                 case "ORDER_RETURN_APPROVED" -> handleOrderReturnApproved(event);
-                default -> log.debug("Ignoring unsupported order event type={}", eventType);
+                default -> {
+                    acted = false;
+                    log.debug("Ignoring unsupported order event type={}", eventType);
+                }
+            }
+
+            // Only persist dedup record if we actually did something.
+            // Skipping on ignored events prevents stale records from blocking future
+            // code paths after a service restart with new logic.
+            if (acted && eventId != null) {
+                processedEventRepository.save(ProcessedEvent.builder()
+                        .eventId(eventId)
+                        .eventType(eventType != null ? eventType : "UNKNOWN")
+                        .consumerName(CONSUMER_NAME)
+                        .aggregateId(event.getOrderId() != null ? event.getOrderId().toString() : null)
+                        .build());
             }
         } catch (Exception e) {
             log.error("[KAFKA][{}] partition={} offset={} key={} processError type={} orderId={} error={}",
@@ -64,16 +105,72 @@ public class InventoryEventConsumer {
 
     private void handleOrderCancelled(OrderEventDto event) {
         StockCheckRequest request = buildStockCheckRequest(event);
-        inventoryService.releaseStock(
-                request,
-                "ORDER:" + event.getOrderId(),
-                "Release reserved stock for cancelled order"
-        );
+        try {
+            inventoryService.releaseOrRestock(
+                    request,
+                    "ORDER:" + event.getOrderId(),
+                    "Release reserved stock for cancelled order"
+            );
+        } catch (BadRequestException | ResourceNotFoundException e) {
+            log.warn("Skip cancelled-order stock release/restock for orderId={} because stock is already unavailable or released: {}",
+                    event.getOrderId(), e.getMessage());
+        }
+    }
+
+    private void handleOrderCompensation(OrderEventDto event) {
+        StockCheckRequest request = buildStockCheckRequest(event);
+        try {
+            inventoryService.releaseOrRestock(
+                    request,
+                    "ORDER:" + event.getOrderId(),
+                    "Release reserved stock for compensated order"
+            );
+        } catch (BadRequestException | ResourceNotFoundException e) {
+            log.warn("Skip compensation stock release/restock for orderId={} because stock is already unavailable or released: {}",
+                    event.getOrderId(), e.getMessage());
+        }
+    }
+
+    private void handleOrderConfirmed(OrderEventDto event) {
+        handleOrderPaymentCompleted(event);
+    }
+
+    private void handleOrderPaymentCompleted(OrderEventDto event) {
+        StockCheckRequest request = buildStockCheckRequest(event);
+        String orderAggregateId = event.getOrderId() != null ? event.getOrderId().toString() : null;
+        try {
+            inventoryService.finalizeSale(request, "ORDER:" + event.getOrderId());
+            inventoryService.publishOrderStockFinalizedEvent(event);
+        } catch (BadRequestException | ResourceNotFoundException e) {
+            log.warn("Inventory finalization failed for paid orderId={}: {}",
+                    event.getOrderId(), e.getMessage());
+            if (orderAggregateId != null
+                    && processedEventRepository.existsByEventTypeAndConsumerNameAndAggregateId(
+                    OUT_OF_STOCK_MARKER_EVENT, CONSUMER_NAME, orderAggregateId)) {
+                log.info("Skip duplicate out-of-stock event for already failed paid orderId={}", event.getOrderId());
+                return;
+            }
+            if (orderAggregateId != null) {
+                processedEventRepository.save(ProcessedEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .eventType(OUT_OF_STOCK_MARKER_EVENT)
+                        .consumerName(CONSUMER_NAME)
+                        .aggregateId(orderAggregateId)
+                        .build());
+            }
+            inventoryService.publishOrderOutOfStockEvent(event, e.getMessage());
+        }
     }
 
     private void handleOrderDelivered(OrderEventDto event) {
         StockCheckRequest request = buildStockCheckRequest(event);
-        inventoryService.finalizeSale(request, "ORDER:" + event.getOrderId());
+        try {
+            inventoryService.finalizeSale(request, "ORDER:" + event.getOrderId());
+        } catch (BadRequestException | ResourceNotFoundException e) {
+            log.warn("Inventory finalization failed for delivered orderId={}: {}",
+                    event.getOrderId(), e.getMessage());
+            inventoryService.publishOrderOutOfStockEvent(event, e.getMessage());
+        }
     }
 
     private void handleOrderReturnApproved(OrderEventDto event) {

@@ -8,4 +8,21 @@ dependencies = [
     "fastapi>=0.116.0",
     "uvicorn>=0.35.0",
     "py-eureka-client>=0.13.2",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.14.1",
+    "langgraph>=1.2.2",
+    "langsmith>=0.8.7",
+    "langchain-groq>=1.1.2",
+    "langgraph-checkpoint-postgres>=3.1.0",
+    "motor>=3.7.1",
+    "copilotkit>=0.1.93",
+    "psycopg[binary]>=3.2.0",
+    "ag-ui-langgraph[fastapi]>=0.0.37",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.11.0",
 ]

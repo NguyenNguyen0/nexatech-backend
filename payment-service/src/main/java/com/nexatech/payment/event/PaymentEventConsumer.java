@@ -109,6 +109,17 @@ public class PaymentEventConsumer {
                                 "triggeredBy", "kafka:order.events",
                                 "action", "refundOnOrderCancellation"),
                         CONSUMER_NAME);
+            } else if ("ORDER_OUT_OF_STOCK".equals(event.getEventType())
+                    || "ORDER_SHIPPING_FAILED".equals(event.getEventType())
+                    || "ORDER_REFUND_PENDING".equals(event.getEventType())) {
+                paymentService.refundOnOrderCancellation(event.getOrderId());
+                auditLogService.logEvent("ORDER_COMPENSATION_RECEIVED", "Payment",
+                        event.getOrderId().toString(),
+                        Map.of("orderId", event.getOrderId().toString(),
+                                "eventType", event.getEventType(),
+                                "triggeredBy", "kafka:order.events",
+                                "action", "refundOnOrderCancellation"),
+                        CONSUMER_NAME);
             }
         } catch (Exception e) {
             log.error("Lỗi xử lý OrderEvent type={} orderId={}: {}", event.getEventType(), event.getOrderId(), e.getMessage());

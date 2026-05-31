@@ -10,9 +10,15 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
@@ -42,10 +48,60 @@ public class ResilientDownstreamService {
         return orderClient.checkPurchased(userId, productId).getData();
     }
 
+    @CircuitBreaker(name = "orderService", fallbackMethod = "getPurchaseCountFallback")
+    @Retry(name = "orderService")
+    public int getPurchaseCount(UUID userId, String productId) {
+        try {
+            Integer count = orderClient.getProductPurchaseCount(userId, productId).getData();
+            return count != null ? count : 0;
+        } catch (Exception ex) {
+            return resolvePurchaseCountFallback(userId, productId, ex);
+        }
+    }
+
+    private int resolvePurchaseCountFallback(UUID userId, String productId, Exception cause) {
+        log.warn(
+                "Order purchase-count unavailable for product {}, falling back to check-purchased: {}",
+                productId,
+                cause.getMessage());
+        Boolean purchased = orderClient.checkPurchased(userId, productId).getData();
+        return Boolean.TRUE.equals(purchased) ? 1 : 0;
+    }
+
     @CircuitBreaker(name = "inventoryService", fallbackMethod = "getStockFallback")
     @Retry(name = "inventoryService")
+    @Cacheable(value = "productStock", key = "#productId", unless = "#result == null || #result.data == null")
     public InventoryStockResponse getStock(String productId) {
         return inventoryClient.getStock(productId);
+    }
+
+    @CircuitBreaker(name = "inventoryService", fallbackMethod = "getStocksFallback")
+    @Retry(name = "inventoryService")
+    @Cacheable(
+            value = "productStockBatch",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('batch', #productIds)",
+            unless = "#result == null || #result.isEmpty()")
+    public Map<String, InventoryStockResponse.StockData> getStocks(Collection<String> productIds) {
+        List<String> normalizedIds = productIds == null ? List.of() : productIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (normalizedIds.isEmpty()) {
+            return Map.of();
+        }
+
+        var response = inventoryClient.getStocks(normalizedIds);
+        if (response == null || response.getData() == null) {
+            return Map.of();
+        }
+
+        return response.getData().stream()
+                .filter(stock -> stock.getProductId() != null && !stock.getProductId().isBlank())
+                .collect(Collectors.toMap(
+                        InventoryStockResponse.StockData::getProductId,
+                        Function.identity(),
+                        (left, right) -> left));
     }
 
     @SuppressWarnings("unused")
@@ -70,8 +126,22 @@ public class ResilientDownstreamService {
     }
 
     @SuppressWarnings("unused")
+    private int getPurchaseCountFallback(UUID userId, String productId, Throwable throwable) {
+        return resolvePurchaseCountFallback(userId, productId,
+                throwable instanceof Exception exception ? exception : new RuntimeException(throwable));
+    }
+
+    @SuppressWarnings("unused")
     private InventoryStockResponse getStockFallback(String productId, Throwable throwable) {
         log.warn("Inventory service unavailable for product {}: {}", productId, throwable.getMessage());
         return null;
+    }
+
+    @SuppressWarnings("unused")
+    private Map<String, InventoryStockResponse.StockData> getStocksFallback(Collection<String> productIds, Throwable throwable) {
+        log.warn("Inventory service unavailable for {} products: {}",
+                productIds == null ? 0 : productIds.size(),
+                throwable.getMessage());
+        return Map.of();
     }
 }

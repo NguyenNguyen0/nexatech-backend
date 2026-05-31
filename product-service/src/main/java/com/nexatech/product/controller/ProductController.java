@@ -18,6 +18,7 @@ import com.nexatech.product.query.review.GetReviewsByProductSlugQuery;
 import com.nexatech.product.util.TextUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.util.MultiValueMap;
@@ -62,6 +63,10 @@ public class ProductController {
     }
 
     @GetMapping
+    @Cacheable(
+            value = "productPages",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('list', #keyword, #categoryId, #categorySlug, #brandId, #sku, #minPrice, #maxPrice, #minRating, #maxRating, #featured, #active, #includeDeleted, #queryParams, #pageable)",
+            unless = "#result == null || #result.data == null")
     public ApiResponse<PageResponse<ProductMinimalResponse>> getProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String categoryId,
@@ -86,12 +91,20 @@ public class ProductController {
     }
 
     @GetMapping("/featured")
+    @Cacheable(
+            value = "productPages",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('featured', #pageable)",
+            unless = "#result == null || #result.data == null")
     public ApiResponse<PageResponse<ProductResponse>> getFeaturedProducts(Pageable pageable) {
         return ApiResponse.ok(PageResponse.of(
                 productQueryHandler.handle(new GetFeaturedProductsQuery(), pageable)));
     }
 
     @GetMapping("/search")
+    @Cacheable(
+            value = "productPages",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('search', #keyword, #categoryId, #categorySlug, #brandId, #minPrice, #maxPrice, #minRating, #maxRating, #queryParams, #pageable)",
+            unless = "#result == null || #result.data == null")
     public ApiResponse<PageResponse<ProductMinimalResponse>> searchProducts(
             @RequestParam String keyword,
             @RequestParam(required = false) String categoryId,
@@ -127,6 +140,10 @@ public class ProductController {
     }
 
     @GetMapping("/category/slug/{slug}")
+    @Cacheable(
+            value = "productPages",
+            key = "T(com.nexatech.product.util.ProductCacheKey).list('categorySlug', #slug, #brandId, #minPrice, #maxPrice, #minRating, #maxRating, #featured, #queryParams, #pageable)",
+            unless = "#result == null || #result.data == null")
     public ApiResponse<PageResponse<ProductMinimalResponse>> getProductsByCategorySlug(
             @PathVariable String slug,
             @RequestParam(required = false) String brandId,

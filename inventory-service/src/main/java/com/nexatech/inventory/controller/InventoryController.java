@@ -4,6 +4,7 @@ import com.nexatech.inventory.dto.response.ApiResponse;
 import com.nexatech.inventory.dto.BulkImportResult;
 import com.nexatech.inventory.dto.CSVImportResult;
 import com.nexatech.inventory.dto.InventoryResponse;
+import com.nexatech.inventory.dto.PageResponse;
 import com.nexatech.inventory.dto.StockMovementResponse;
 import com.nexatech.inventory.dto.StockCheckRequest;
 import com.nexatech.inventory.dto.StockUpdateRequest;
@@ -11,7 +12,8 @@ import com.nexatech.inventory.dto.WarehouseUpdateRequest;
 import com.nexatech.inventory.service.InventoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,28 +28,48 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @GetMapping("/list")
-    public ApiResponse<Page<InventoryResponse>> getAllInventory(
+    @Cacheable(
+            value = "inventoryLists",
+            key = "T(com.nexatech.inventory.util.InventoryCacheKey).of('list', #sku, #status, #keyword, #warehouseLocation, #pageable)",
+            unless = "#result == null || #result.data == null")
+    public ApiResponse<PageResponse<InventoryResponse>> getAllInventory(
             @RequestParam(required = false) String sku,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String warehouseLocation,
             Pageable pageable) {
-        return ApiResponse.ok(inventoryService.getAllInventory(sku, status, keyword, warehouseLocation, pageable));
+        return ApiResponse.ok(PageResponse.of(
+                inventoryService.getAllInventory(sku, status, keyword, warehouseLocation, pageable)));
+    }
+
+    @GetMapping("/batch")
+    @Cacheable(
+            value = "inventoryStockBatch",
+            key = "T(com.nexatech.inventory.util.InventoryCacheKey).of('batch', #productIds)",
+            unless = "#result == null || #result.data == null")
+    public ApiResponse<List<InventoryResponse>> getStocks(@RequestParam List<String> productIds) {
+        return ApiResponse.ok(inventoryService.getStocks(productIds));
     }
 
     @GetMapping("/{productId}")
+    @Cacheable(value = "inventoryStock", key = "#productId", unless = "#result == null || #result.data == null")
     public ApiResponse<InventoryResponse> getStock(@PathVariable String productId) {
         return ApiResponse.ok(inventoryService.getStock(productId));
     }
 
     @GetMapping("/{productId}/movements")
-    public ApiResponse<Page<StockMovementResponse>> getStockMovements(
+    @Cacheable(
+            value = "inventoryMovements",
+            key = "T(com.nexatech.inventory.util.InventoryCacheKey).of(#productId, #pageable)",
+            unless = "#result == null || #result.data == null")
+    public ApiResponse<PageResponse<StockMovementResponse>> getStockMovements(
             @PathVariable String productId,
             Pageable pageable) {
-        return ApiResponse.ok(inventoryService.getStockMovements(productId, pageable));
+        return ApiResponse.ok(PageResponse.of(inventoryService.getStockMovements(productId, pageable)));
     }
 
     @PutMapping
+    @CachePut(value = "inventoryStock", key = "#request.productId", unless = "#result == null || #result.data == null")
     public ApiResponse<InventoryResponse> updateStock(@Valid @RequestBody StockUpdateRequest request) {
         return ApiResponse.ok(inventoryService.updateStock(request));
     }
@@ -55,6 +77,11 @@ public class InventoryController {
     @PostMapping("/check")
     public ApiResponse<Boolean> checkStock(@Valid @RequestBody StockCheckRequest request) {
         return ApiResponse.ok(inventoryService.checkStock(request));
+    }
+
+    @PostMapping("/finalize/check")
+    public ApiResponse<Boolean> checkFinalizableStock(@Valid @RequestBody StockCheckRequest request) {
+        return ApiResponse.ok(inventoryService.canFinalizeSale(request));
     }
 
     @PostMapping("/reserve")
@@ -70,6 +97,7 @@ public class InventoryController {
     }
 
     @GetMapping("/low-stock")
+    @Cacheable(value = "lowStockInventory", key = "'all'", unless = "#result == null || #result.data == null")
     public ApiResponse<List<InventoryResponse>> getLowStockItems() {
         return ApiResponse.ok(inventoryService.getLowStockItems());
     }
@@ -85,6 +113,7 @@ public class InventoryController {
     }
 
     @PatchMapping("/{productId}/warehouse")
+    @CachePut(value = "inventoryStock", key = "#productId", unless = "#result == null || #result.data == null")
     public ApiResponse<InventoryResponse> updateWarehouseInfo(
             @PathVariable String productId,
             @Valid @RequestBody WarehouseUpdateRequest request) {

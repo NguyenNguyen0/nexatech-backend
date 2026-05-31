@@ -1,0 +1,326 @@
+from __future__ import annotations
+
+import importlib
+import logging
+import uuid
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+
+try:
+    import py_eureka_client.eureka_client as eureka_client
+except ImportError:  # pragma: no cover
+    eureka_client = None
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+from app.core.logging import (
+    authorization_ctx,
+    configure_logging,
+    correlation_id_ctx,
+    user_email_ctx,
+    user_id_ctx,
+    user_role_ctx,
+)
+from app.core.settings import SETTINGS
+from app.mcp.domains import (
+    get_profile_service_apis,
+    get_profile_tool_modules,
+    list_domain_metadata,
+    normalize_profile,
+)
+from app.mcp.server import mcp
+
+
+configure_logging(SETTINGS.service_name, SETTINGS.log_level)
+logger = logging.getLogger(SETTINGS.service_name)
+MCP_PROFILE = normalize_profile(SETTINGS.mcp_server_profile)
+
+
+def _register_profile_tools() -> tuple[str, ...]:
+    modules = get_profile_tool_modules(MCP_PROFILE)
+    for module_name in modules:
+        importlib.import_module(f"app.tools.{module_name}")
+    logger.info(
+        "[STARTUP] MCP profile=%s registered tool modules=%s",
+        MCP_PROFILE,
+        modules,
+    )
+    return modules
+
+
+REGISTERED_TOOL_MODULES = _register_profile_tools()
+mcp_app = mcp.http_app(
+    path="/",
+    transport="streamable-http",
+    json_response=True,
+    stateless_http=True,
+)
+
+
+# The original FastMCP lifespan context manager is kept on mcp_app.
+# We will manually enter it in the parent app's lifespan below.
+
+
+READINESS_CHECKS: dict[str, str] = {
+    "service": "ok",
+    "profile": MCP_PROFILE,
+    "eureka": "pending",
+    "dependencies": "pending",
+}
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+async def _register_eureka() -> None:
+    logger.info("[STARTUP] Checking dependencies...")
+    if not SETTINGS.eureka_enabled:
+        READINESS_CHECKS["eureka"] = "disabled"
+        logger.info("[STARTUP] - Eureka: disabled")
+        return
+
+    if eureka_client is None:
+        READINESS_CHECKS["eureka"] = "client_missing"
+        logger.warning("[STARTUP] - Eureka: client missing, running without registration")
+        return
+
+    try:
+        await eureka_client.init_async(
+            eureka_server=SETTINGS.eureka_server_url,
+            app_name=SETTINGS.service_name,
+            instance_port=SETTINGS.port,
+            instance_host=SETTINGS.eureka_instance_hostname,
+            health_check_url=f"http://{SETTINGS.eureka_instance_hostname}:{SETTINGS.port}/health",
+            home_page_url=f"http://{SETTINGS.eureka_instance_hostname}:{SETTINGS.port}",
+        )
+        READINESS_CHECKS["eureka"] = "ok"
+        logger.info("[STARTUP] + Eureka: registered")
+    except Exception as exc:  # pragma: no cover
+        READINESS_CHECKS["eureka"] = f"error: {exc.__class__.__name__}"
+        logger.warning("[STARTUP] - Eureka: registration failed (%s)", exc.__class__.__name__)
+
+
+async def _deregister_eureka() -> None:
+    if not SETTINGS.eureka_enabled or eureka_client is None:
+        return
+
+    try:
+        await eureka_client.stop_async()
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Failed to deregister from Eureka: %s", exc)
+
+
+async def _log_dependency_connectivity() -> None:
+    connected_services: list[str] = []
+    degraded_services: list[str] = []
+
+    if not SETTINGS.startup_dependency_checks_enabled:
+        READINESS_CHECKS["dependencies"] = "disabled"
+        logger.info("[STARTUP] - Dependency checks: disabled")
+        return
+
+    service_apis = get_profile_service_apis(MCP_PROFILE)
+    if MCP_PROFILE == "meta":
+        READINESS_CHECKS["dependencies"] = "managed_by_meta"
+        logger.info("[STARTUP] meta profile: dependency checks delegated to meta tools")
+        return
+
+    for service_name, api in service_apis.items():
+        try:
+            health_result = await api.health()
+            if isinstance(health_result, dict) and health_result.get("ok") is True:
+                connected_services.append(service_name)
+                logger.info("[STARTUP] + %s: reachable", service_name)
+            else:
+                degraded_services.append(service_name)
+                status_code = health_result.get("statusCode") if isinstance(health_result, dict) else None
+                message = health_result.get("message") if isinstance(health_result, dict) else None
+                logger.warning(
+                    "[STARTUP] - %s: unreachable status=%s message=%s",
+                    service_name,
+                    status_code or "unknown",
+                    message or "health check returned non-ok",
+                )
+        except Exception as exc:  # pragma: no cover
+            degraded_services.append(service_name)
+            logger.warning("[STARTUP] - %s: health check failed (%s)", service_name, exc.__class__.__name__)
+
+    READINESS_CHECKS["dependencies"] = "ok" if not degraded_services else "degraded"
+    logger.info(
+        "[STARTUP] dependency summary: connected=%s degraded=%s",
+        connected_services,
+        degraded_services,
+    )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.settings = SETTINGS
+    app.state.readiness_checks = READINESS_CHECKS
+
+    await _log_dependency_connectivity()
+    await _register_eureka()
+    try:
+        async with mcp_app.router.lifespan_context(mcp_app):
+            yield
+    finally:
+        await _deregister_eureka()
+
+
+app = FastAPI(
+    title=f"NexaTech {MCP_PROFILE} MCP Server",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    correlation_id = request.headers.get("X-Correlation-Id") or str(uuid.uuid4())
+    user_id = request.headers.get("X-User-Id") or "-"
+    user_role = request.headers.get("X-User-Role") or "-"
+    user_email = request.headers.get("X-User-Email") or "-"
+    authorization = request.headers.get("Authorization") or "-"
+
+    correlation_token = correlation_id_ctx.set(correlation_id)
+    user_id_token = user_id_ctx.set(user_id)
+    user_role_token = user_role_ctx.set(user_role)
+    user_email_token = user_email_ctx.set(user_email)
+    authorization_token = authorization_ctx.set(authorization)
+    request.state.correlation_id = correlation_id
+
+    try:
+        response = await call_next(request)
+    finally:
+        correlation_id_ctx.reset(correlation_token)
+        user_id_ctx.reset(user_id_token)
+        user_role_ctx.reset(user_role_token)
+        user_email_ctx.reset(user_email_token)
+        authorization_ctx.reset(authorization_token)
+
+    response.headers["X-Correlation-Id"] = correlation_id
+    return response
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    correlation_id = getattr(request.state, "correlation_id", "unknown")
+    tag = f"MCP-{exc.status_code}"
+
+    logger.warning(
+        "[%s] %s %s correlationId=%s userId=%s - %s",
+        tag,
+        request.method,
+        request.url.path,
+        correlation_id,
+        request.headers.get("X-User-Id", "anonymous"),
+        exc.detail,
+    )
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": exc.status_code,
+            "tag": tag,
+            "message": str(exc.detail),
+            "correlationId": correlation_id,
+            "timestamp": _utc_timestamp(),
+        },
+        headers={"X-Correlation-Id": correlation_id},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    correlation_id = getattr(request.state, "correlation_id", "unknown")
+    logger.warning(
+        "[MCP-400] %s %s correlationId=%s userId=%s - Validation failed",
+        request.method,
+        request.url.path,
+        correlation_id,
+        request.headers.get("X-User-Id", "anonymous"),
+    )
+
+    return JSONResponse(
+        status_code=400,
+        content={
+            "code": 400,
+            "tag": "MCP-400",
+            "message": "Validation failed",
+            "correlationId": correlation_id,
+            "errors": exc.errors(),
+            "timestamp": _utc_timestamp(),
+        },
+        headers={"X-Correlation-Id": correlation_id},
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    correlation_id = getattr(request.state, "correlation_id", "unknown")
+    logger.exception(
+        "[MCP-500] %s %s correlationId=%s userId=%s - %s",
+        request.method,
+        request.url.path,
+        correlation_id,
+        request.headers.get("X-User-Id", "anonymous"),
+        str(exc),
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "code": 500,
+            "tag": "MCP-500",
+            "message": "Internal server error",
+            "correlationId": correlation_id,
+            "timestamp": _utc_timestamp(),
+        },
+        headers={"X-Correlation-Id": correlation_id},
+    )
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {
+        "status": "UP",
+        "service": SETTINGS.service_name,
+        "profile": MCP_PROFILE,
+    }
+
+
+@app.get("/ready")
+def ready() -> dict[str, object]:
+    eureka_state = READINESS_CHECKS.get("eureka", "unknown")
+    degraded = eureka_state.startswith("error") or eureka_state == "client_missing"
+    return {
+        "ready": True,
+        "service": SETTINGS.service_name,
+        "degraded": degraded,
+        "checks": READINESS_CHECKS,
+    }
+
+
+@app.get("/")
+def root() -> dict[str, object]:
+    return {
+        "message": "mcp-server skeleton is running",
+        "profile": MCP_PROFILE,
+        "mcpEndpoint": f"http://localhost:{SETTINGS.port}/mcp",
+        "registeredToolModules": list(REGISTERED_TOOL_MODULES),
+        "managedDomains": list_domain_metadata() if MCP_PROFILE == "meta" else [],
+        "layout": [
+            "app/core",
+            "app/mcp",
+            "app/clients",
+            "app/tools",
+            "app/services",
+            "app/schemas",
+            "app/utils",
+        ],
+    }
+
+
+app.mount("/mcp", mcp_app)

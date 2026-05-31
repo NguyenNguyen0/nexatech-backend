@@ -4,6 +4,7 @@ import com.nexatech.shipping.dto.*;
 import com.nexatech.shipping.entity.Shipment;
 import com.nexatech.shipping.enums.ShipmentStatus;
 import com.nexatech.shipping.enums.ShippingProvider;
+import com.nexatech.shipping.event.ShippingEvent;
 import com.nexatech.shipping.exception.ResourceNotFoundException;
 import com.nexatech.shipping.mapper.ShipmentMapper;
 import com.nexatech.shipping.provider.ghn.GhnShippingClient;
@@ -26,6 +27,7 @@ public class ShippingService {
     private final ShipmentRepository shipmentRepository;
     private final ShipmentMapper shipmentMapper;
     private final AuditLogService auditLogService;
+    private final OutboxEventService outboxEventService;
 
     public ShippingFeeResponse calculateFee(ShippingFeeRequest request) {
         return providerFactory.getCurrentProviderClient().calculateFee(request);
@@ -86,6 +88,20 @@ public class ShippingService {
             }
         }, () -> auditLogService.log("ORDER_CANCELLED_NO_SHIPMENT", "Shipment", orderId,
                 "No shipment found for cancelled order", actor));
+    }
+
+    public void publishShipmentCreationFailed(String orderId, String reason, String actor) {
+        ShippingEvent event = ShippingEvent.builder()
+                .eventId(java.util.UUID.randomUUID())
+                .eventType("SHIPMENT_CREATION_FAILED")
+                .timestamp(java.time.Instant.now())
+                .orderId(orderId)
+                .status(ShipmentStatus.FAILED)
+                .failureReason(reason)
+                .build();
+        outboxEventService.saveEvent("Shipment", orderId, "SHIPMENT_CREATION_FAILED", event);
+        auditLogService.log("SHIPMENT_CREATION_FAILED", "Shipment", orderId,
+                reason, actor);
     }
 
     private boolean isTerminal(ShipmentStatus status) {

@@ -35,3 +35,6 @@ CREATE DATABASE nexatech_news WITH OWNER nexatech;
 
 -- Promotion Service
 CREATE DATABASE nexatech_promotions WITH OWNER nexatech;
+
+-- Agent Service (LangGraph checkpointer)
+CREATE DATABASE nexatech_agent WITH OWNER nexatech;

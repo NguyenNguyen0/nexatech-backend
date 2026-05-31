@@ -35,6 +35,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
        @EntityGraph(attributePaths = "items")
        List<Order> findTop50ByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(OrderStatus status, Instant createdAt);
 
+       @EntityGraph(attributePaths = "items")
+       List<Order> findTop50ByStatusOrderByCreatedAtAsc(OrderStatus status);
+
        @Override
        @EntityGraph(attributePaths = "items")
        Page<Order> findAll(Pageable pageable);
@@ -87,6 +90,18 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
                      AND o.status IN :statuses
        """)
        boolean existsPurchasedProduct(@Param("customerId") UUID customerId,
+                     @Param("productId") String productId,
+                     @Param("statuses") Set<OrderStatus> statuses);
+
+       @Query("""
+              SELECT COALESCE(SUM(i.quantity), 0)
+              FROM Order o
+              JOIN o.items i
+              WHERE o.customerId = :customerId
+                     AND i.productId = :productId
+                     AND o.status IN :statuses
+       """)
+       Long sumPurchasedProductQuantity(@Param("customerId") UUID customerId,
                      @Param("productId") String productId,
                      @Param("statuses") Set<OrderStatus> statuses);
 }

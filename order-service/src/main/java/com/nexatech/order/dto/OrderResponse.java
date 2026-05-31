@@ -33,6 +33,8 @@ public class OrderResponse {
     private String shippingAddress;
     private String shippingMethod;
     private PaymentMethod paymentMethod;
+    private UUID paymentId;
+    private String paymentStatus;
     private String note;
     private List<OrderItemResponse> items;
     private Instant createdAt;
@@ -43,6 +45,11 @@ public class OrderResponse {
     private Instant estimatedDelivery;
     private Instant shippedAt;
     private Instant deliveredAt;
+    private String compensationReason;
+    private String refundBankName;
+    private String refundAccountNumber;
+    private String refundAccountHolder;
+    private Instant refundInfoSubmittedAt;
 
     @Data
     @Builder

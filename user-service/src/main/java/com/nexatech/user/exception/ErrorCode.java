@@ -50,6 +50,10 @@ public enum ErrorCode {
     OTP_INVALID(2034, "OTP is invalid", HttpStatus.BAD_REQUEST),
     OTP_EXPIRED(2035, "OTP is expired", HttpStatus.BAD_REQUEST),
     USER_ACCOUNT_DISABLED(2036, "This account has been disabled", HttpStatus.FORBIDDEN),
+    AVATAR_FILE_INVALID(2037, "File ảnh không hợp lệ. Chỉ hỗ trợ JPEG, PNG, WebP, GIF", HttpStatus.BAD_REQUEST),
+    AVATAR_FILE_TOO_LARGE(2038, "Ảnh tối đa 1MB", HttpStatus.BAD_REQUEST),
+    AVATAR_UPLOAD_FAILED(2039, "Không thể tải ảnh đại diện lên", HttpStatus.BAD_REQUEST),
+    AVATAR_S3_NOT_CONFIGURED(2040, "Chưa cấu hình AWS S3 cho upload avatar", HttpStatus.BAD_REQUEST),
     ;
 
     ErrorCode(int code, String message, HttpStatusCode statusCode) {

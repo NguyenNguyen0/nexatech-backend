@@ -7,6 +7,15 @@
 
 ---
 
+## Nested Service Instructions
+- Before editing any service, check whether that service directory contains its own `AGENTS.md`.
+- The nearest `AGENTS.md` to the files being edited is the most specific rule set and must be followed together with this root file.
+- If a service-level `AGENTS.md` gives more detailed guidance for its language, framework, naming, testing, or operational behavior, treat it as authoritative for that service.
+- If root and service instructions appear to conflict, prefer the service-level instruction for files inside that service unless it would violate repo-wide safety, security, tracing, or deployment requirements from this root file.
+- When a change crosses multiple services, read and apply each affected service's `AGENTS.md`; do not assume a Spring, NestJS, or Python service follows the same local conventions.
+
+---
+
 ## Build & Run Workflow
 - Containers: `make infra-up` → `make build` (skips tests by default) → `make up`; `make reset` nukes volumes before a clean redeploy (see `Makefile`).
 - Local dev: run infra via Docker, then start `discovery-server`, `config-server`, then your target service with `mvn spring-boot:run` in that order (`README.md#local-development`).

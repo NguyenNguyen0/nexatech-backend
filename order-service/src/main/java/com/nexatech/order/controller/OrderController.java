@@ -6,6 +6,7 @@ import com.nexatech.order.dto.response.PageResponse;
 import com.nexatech.order.dto.ContinuePaymentResponse;
 import com.nexatech.order.dto.CreateOrderRequest;
 import com.nexatech.order.dto.OrderResponse;
+import com.nexatech.order.dto.RefundBankInfoRequest;
 import com.nexatech.order.service.IdempotencyService;
 import com.nexatech.order.service.OrderService;
 import jakarta.validation.Valid;
@@ -40,11 +41,6 @@ public class OrderController {
         return ApiResponse.ok(orderService.createOrder(customerId, request));
     }
 
-    @GetMapping("/{id}")
-    public ApiResponse<OrderResponse> getOrder(@PathVariable UUID id) {
-        return ApiResponse.ok(orderService.getOrder(id));
-    }
-
     @GetMapping("/my")
     public ApiResponse<PageResponse<OrderResponse>> getMyOrders(
             @RequestHeader("X-User-Id") UUID customerId,
@@ -59,6 +55,18 @@ public class OrderController {
         return ApiResponse.ok(orderService.hasPurchasedProduct(userId, productId));
     }
 
+    @GetMapping("/product-purchase-count")
+    public ApiResponse<Integer> getProductPurchaseCount(
+            @RequestParam UUID userId,
+            @RequestParam String productId) {
+        return ApiResponse.ok(orderService.countPurchasedProductQuantity(userId, productId));
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<OrderResponse> getOrder(@PathVariable UUID id) {
+        return ApiResponse.ok(orderService.getOrder(id));
+    }
+
     @PostMapping("/{id}/cancel")
     public ApiResponse<OrderResponse> cancelOrder(
             @RequestHeader("X-User-Id") UUID customerId,
@@ -71,6 +79,14 @@ public class OrderController {
             @RequestHeader(value = "X-User-Id", required = false) UUID customerId,
             @PathVariable UUID id) {
         return ApiResponse.ok(orderService.continueVNPayPayment(customerId, id));
+    }
+
+    @PostMapping("/{id}/refund-info")
+    public ApiResponse<OrderResponse> submitRefundBankInfo(
+            @PathVariable UUID id,
+            @Valid @RequestBody RefundBankInfoRequest request) {
+        return ApiResponse.ok(orderService.submitRefundBankInfo(id, request),
+                "Refund bank information submitted");
     }
 
     private ApiResponse<OrderResponse> handleIdempotentCreateOrder(

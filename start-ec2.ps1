@@ -30,6 +30,38 @@ function Import-DotEnvFile {
     }
 }
 
+function Import-DotEnvKeys {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Keys
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    $allowed = [System.Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    foreach ($key in $Keys) {
+        [void]$allowed.Add($key)
+    }
+
+    Get-Content -LiteralPath $Path | ForEach-Object {
+        $line = $_.Trim()
+        if (-not $line -or $line.StartsWith("#") -or -not $line.Contains("=")) {
+            return
+        }
+
+        $parts = $line -split "=", 2
+        $name = $parts[0].Trim()
+        if ($allowed.Contains($name)) {
+            [Environment]::SetEnvironmentVariable($name, $parts[1].Trim(), "Process")
+        }
+    }
+}
+
 Import-DotEnvFile -Path (Join-Path $PSScriptRoot ".env")
 Import-DotEnvFile -Path (Join-Path $PSScriptRoot ".env.ec2") -Required
 
@@ -51,7 +83,16 @@ if (-not $env:SPRING_JPA_OPEN_IN_VIEW) {
 
 switch ($ServiceName) {
     "api-gateway" {}
-    "product-service" {}
+    "product-service" {
+        # Only merge service secrets; keep EC2 infra from .env.ec2
+        Import-DotEnvKeys -Path (Join-Path $PSScriptRoot "product-service/.env") -Keys @(
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_REGION",
+            "AWS_S3_BUCKET",
+            "PRODUCT_INTERNAL_API_KEY"
+        )
+    }
     "inventory-service" {}
     "identity-service" {}
     "storage-service" {}
@@ -88,11 +129,31 @@ switch ($ServiceName) {
         $env:DATASOURCE_USERNAME = $env:DB_USERNAME
         $env:DATASOURCE_PASSWORD = $env:DB_PASSWORD
         $env:KAFKA_GROUP_ID = "user-service-group"
+        Import-DotEnvKeys -Path (Join-Path $PSScriptRoot "user-service/.env") -Keys @(
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_REGION",
+            "AWS_S3_BUCKET"
+        )
     }
     "news-service" {
         $env:SPRING_DATASOURCE_URL = "jdbc:postgresql://$($env:EC2_HOST):5432/nexatech_news"
         $env:SPRING_DATASOURCE_USERNAME = $env:DB_USERNAME
         $env:SPRING_DATASOURCE_PASSWORD = $env:DB_PASSWORD
+        if (-not $env:SERVER_PORT) {
+            $env:SERVER_PORT = "8092"
+        }
+        if (-not $env:SPRING_CLOUD_CONFIG_URI -and $env:CONFIG_SERVER_URI) {
+            $env:SPRING_CLOUD_CONFIG_URI = $env:CONFIG_SERVER_URI
+        }
+        Import-DotEnvKeys -Path (Join-Path $PSScriptRoot "news-service/.env") -Keys @(
+            "SPRING_CLOUD_CONFIG_URI",
+            "SERVER_PORT",
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_REGION",
+            "AWS_S3_BUCKET"
+        )
     }
     "promotion-service" {
         $env:DATABASE_URL = "postgresql://$($env:DB_USERNAME):$($env:DB_PASSWORD)@$($env:EC2_HOST):5432/nexatech_promotions"
