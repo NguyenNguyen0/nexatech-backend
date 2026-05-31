@@ -13,6 +13,11 @@ services:
           - /api/v1/auth
         strip_path: false
 
+      - name: api-gateway-health-route
+        paths:
+          - /actuator/health
+        strip_path: false
+
       - name: user-route
         paths:
           - /api/v1/users
