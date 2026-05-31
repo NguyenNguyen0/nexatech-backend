@@ -14,6 +14,7 @@ public class InventoryStockResponse {
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class StockData {
+        private String productId;
         private int quantity;
         private int reservedQuantity;
         private int availableQuantity;

@@ -59,6 +59,11 @@ public class GatewaySecurityConfig {
                 .permitAll()
                 // Guest order status polling after checkout
                 .requestMatchers(HttpMethod.GET, "/api/v1/orders/*").permitAll()
+                // Guest order detail can display read-only shipment tracking.
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/shipping/orders/*",
+                    "/api/v1/shipping/shipments/*/tracking")
+                .permitAll()
                 .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
         return http.build();

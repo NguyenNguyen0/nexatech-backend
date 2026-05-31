@@ -3,6 +3,7 @@ package com.nexatech.order.service;
 import com.nexatech.order.client.InventoryClient;
 import com.nexatech.order.client.PaymentClient;
 import com.nexatech.order.client.ProductClient;
+import com.nexatech.order.client.dto.PaymentInfo;
 import com.nexatech.order.client.dto.ProductInfo;
 import com.nexatech.order.client.dto.StockOperationRequest;
 import com.nexatech.order.client.dto.VNPayCreateDto;
@@ -12,6 +13,7 @@ import com.nexatech.order.dto.CreateOrderRequest;
 import com.nexatech.order.dto.OrderResponse;
 import com.nexatech.order.dto.RefundBankInfoRequest;
 import com.nexatech.order.dto.UpdateShippingRequest;
+import com.nexatech.order.dto.response.ApiResponse;
 import com.nexatech.order.enums.OrderStatus;
 import com.nexatech.order.enums.PaymentMethod;
 import com.nexatech.order.event.OrderEvent;
@@ -30,6 +32,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -166,7 +169,7 @@ public class OrderService {
      * Lấy chi tiết một đơn hàng theo ID.
      */
     public OrderResponse getOrder(UUID orderId) {
-        return orderMapper.toResponse(findById(orderId));
+        return enrichPaymentStatus(orderMapper.toResponse(findById(orderId)));
     }
 
     /**
@@ -175,7 +178,8 @@ public class OrderService {
     @Transactional(readOnly = true)
     public Page<OrderResponse> getMyOrders(UUID customerId, Pageable pageable) {
         return orderRepository.findByCustomerId(customerId, pageable)
-                .map(orderMapper::toResponse);
+                .map(orderMapper::toResponse)
+                .map(this::enrichPaymentStatus);
     }
 
     public boolean hasPurchasedProduct(UUID customerId, String productId) {
@@ -202,6 +206,13 @@ public class OrderService {
         }
         if (order.getPaymentMethod() != PaymentMethod.VNPAY) {
             throw new BadRequestException("Đơn hàng này không sử dụng phương thức thanh toán VNPay");
+        }
+
+        PaymentInfo currentPayment = fetchPaymentInfo(orderId);
+        if (currentPayment != null
+                && ("COMPLETED".equalsIgnoreCase(currentPayment.getStatus())
+                || "REFUNDED".equalsIgnoreCase(currentPayment.getStatus()))) {
+            throw new BadRequestException("Don hang da thanh toan, khong the mo lai cong VNPay");
         }
 
         Instant expiresAt = order.getCreatedAt().plusSeconds(pendingPaymentTimeoutMinutes * 60);
@@ -246,9 +257,9 @@ public class OrderService {
     @Transactional(readOnly = true)
     public Page<OrderResponse> getAllOrders(OrderStatus status, Pageable pageable) {
         if (status != null) {
-            return orderRepository.findByStatus(status, pageable).map(orderMapper::toResponse);
+            return orderRepository.findByStatus(status, pageable).map(orderMapper::toResponse).map(this::enrichPaymentStatus);
         }
-        return orderRepository.findAll(pageable).map(orderMapper::toResponse);
+        return orderRepository.findAll(pageable).map(orderMapper::toResponse).map(this::enrichPaymentStatus);
     }
 
     /**
@@ -272,7 +283,7 @@ public class OrderService {
         }
 
         Order saved = orderRepository.save(order);
-        saveOrderEventToOutbox(saved, "ORDER_STATUS_UPDATED");
+        saveOrderEventToOutbox(saved, newStatus == OrderStatus.CANCELLED ? "ORDER_CANCELLED" : "ORDER_STATUS_UPDATED");
         auditLogService.logEvent("ORDER_STATUS_CHANGED", "Order", orderId.toString(),
                 Map.of("orderId", orderId.toString(),
                         "previousStatus", oldStatus.name(),
@@ -292,6 +303,10 @@ public class OrderService {
         }
 
         log.info("Cập nhật trạng thái đơn hàng {} : {} → {}", orderId, oldStatus, newStatus);
+
+        if (newStatus == OrderStatus.CANCELLED) {
+            releaseReservedStockBestEffort(saved, "admin_status_cancelled", "admin");
+        }
 
         return orderMapper.toResponse(saved);
     }
@@ -327,6 +342,13 @@ public class OrderService {
             return orderMapper.toResponse(current);
         }
 
+        if (!canInventoryFinalizeSale(current)) {
+            return markOutOfStockForCompensation(
+                    orderId,
+                    "Inventory cannot finalize sale because physical stock is no longer available",
+                    actor);
+        }
+
         return new TransactionTemplate(transactionManager).execute(status -> {
             Order order = findById(orderId);
             if (order.getStatus() != OrderStatus.PENDING) {
@@ -357,35 +379,34 @@ public class OrderService {
     public OrderResponse cancelOrder(UUID customerId, UUID orderId) {
         Order order = findById(orderId);
 
-        // Xác thực quyền sở hữu (dùng Objects.equals để tránh NPE với guest orders)
         if (!Objects.equals(order.getCustomerId(), customerId)) {
             throw new ForbiddenException("Bạn không có quyền huỷ đơn hàng này");
         }
 
-        // Cho phép huỷ khi đơn đang ở PENDING hoặc CONFIRMED
         if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.CONFIRMED) {
             throw new BadRequestException(
                     "Chỉ có thể huỷ đơn hàng ở trạng thái PENDING hoặc CONFIRMED, trạng thái hiện tại: " + order.getStatus()
             );
         }
 
-        // Giải phóng tồn kho ngoài transaction — nếu thất bại, đơn hàng vẫn giữ nguyên (không mất hàng)
-        try {
-            inventoryClient.releaseStock(buildStockRequestFromOrder(order));
-        } catch (Exception e) {
-            log.error("Không thể giải phóng tồn kho cho đơn hàng {}: {}", orderId, e.getMessage());
-            throw new BadRequestException("Không thể hoàn trả tồn kho, vui lòng thử lại sau");
-        }
-
-        // Cập nhật trạng thái trong transaction ngắn gọn (không có I/O mạng)
-        return new TransactionTemplate(transactionManager).execute(status -> {
+        OrderResponse response = new TransactionTemplate(transactionManager).execute(status -> {
             Order o = findById(orderId);
+            if (!Objects.equals(o.getCustomerId(), customerId)) {
+                throw new ForbiddenException("Bạn không có quyền huỷ đơn hàng này");
+            }
+            if (o.getStatus() != OrderStatus.PENDING && o.getStatus() != OrderStatus.CONFIRMED) {
+                throw new BadRequestException(
+                        "Chỉ có thể huỷ đơn hàng ở trạng thái PENDING hoặc CONFIRMED, trạng thái hiện tại: " + o.getStatus()
+                );
+            }
+
+            OrderStatus previousStatus = o.getStatus();
             o.setStatus(OrderStatus.CANCELLED);
             Order saved = orderRepository.save(o);
             saveOrderEventToOutbox(saved, "ORDER_CANCELLED");
             auditLogService.logEvent("ORDER_CANCELLED", "Order", orderId.toString(),
                     Map.of("orderId", orderId.toString(),
-                            "previousStatus", "PENDING_OR_CONFIRMED",
+                            "previousStatus", previousStatus.name(),
                             "newStatus", "CANCELLED",
                             "reason", "customer_request",
                             "customerId", customerId != null ? customerId.toString() : "guest"),
@@ -393,19 +414,22 @@ public class OrderService {
             log.info("Huỷ đơn hàng thành công: {} | customer: {}", orderId, customerId);
             return orderMapper.toResponse(saved);
         });
-    }
 
+        releaseReservedStockBestEffort(findById(orderId), "customer_request", customerId != null ? customerId.toString() : "guest");
+        return response;
+    }
     /**
      * Internal saga compensation path.
      *
-     * This method intentionally does not call inventory/payment/shipping synchronously.
-     * It changes the order state and writes ORDER_CANCELLED to the outbox; downstream
-     * services consume that event and perform their own compensating action.
+     * It changes the order state and writes ORDER_CANCELLED to the outbox. Inventory
+     * is also released immediately after commit as a best-effort fast path; the
+     * outbox event remains the retry path if inventory is temporarily unavailable.
      */
     public OrderResponse cancelOrderForSaga(UUID orderId, String reason, String actor) {
         Order current = findById(orderId);
         if (current.getStatus() == OrderStatus.CANCELLED) {
             log.info("Order already cancelled, skip duplicate compensation: orderId={} reason={}", orderId, reason);
+            releaseReservedStockBestEffort(current, reason, actor);
             return orderMapper.toResponse(current);
         }
         if (current.getStatus() != OrderStatus.PENDING && current.getStatus() != OrderStatus.CONFIRMED) {
@@ -413,7 +437,7 @@ public class OrderService {
             return orderMapper.toResponse(current);
         }
 
-        return new TransactionTemplate(transactionManager).execute(status -> {
+        OrderResponse response = new TransactionTemplate(transactionManager).execute(status -> {
             Order order = findById(orderId);
             if (order.getStatus() == OrderStatus.CANCELLED) {
                 return orderMapper.toResponse(order);
@@ -443,6 +467,11 @@ public class OrderService {
                     orderId, oldStatus, reason, actor);
             return orderMapper.toResponse(saved);
         });
+        Order afterCancel = findById(orderId);
+        if (afterCancel.getStatus() == OrderStatus.CANCELLED) {
+            releaseReservedStockBestEffort(afterCancel, reason, actor);
+        }
+        return response;
     }
 
     public OrderResponse markOutOfStockForCompensation(UUID orderId, String reason, String actor) {
@@ -535,6 +564,28 @@ public class OrderService {
         }
     }
 
+    public void reconcilePendingPaidOrders(String actor) {
+        List<Order> pendingOrders = orderRepository.findTop50ByStatusOrderByCreatedAtAsc(OrderStatus.PENDING);
+        for (Order order : pendingOrders) {
+            PaymentInfo payment = fetchPaymentInfo(order.getId());
+            if (payment == null || !StringUtils.hasText(payment.getStatus())) {
+                continue;
+            }
+
+            if ("COMPLETED".equalsIgnoreCase(payment.getStatus())) {
+                log.warn("Reconciling pending order with completed payment: orderId={} orderNumber={}",
+                        order.getId(), order.getOrderNumber());
+                requestInventoryFinalizationAfterPayment(order.getId(), actor);
+            } else if ("REFUNDED".equalsIgnoreCase(payment.getStatus())) {
+                log.warn("Reconciling pending order with refunded payment: orderId={} orderNumber={}",
+                        order.getId(), order.getOrderNumber());
+                updateOrderStatus(order.getId(), OrderStatus.REFUNDED);
+            } else if ("FAILED".equalsIgnoreCase(payment.getStatus())) {
+                cancelOrderForSaga(order.getId(), "payment_failed_reconciliation", actor);
+            }
+        }
+    }
+
     // ==================== Private helpers ====================
 
     private OrderResponse markCompensationStatus(UUID orderId,
@@ -556,7 +607,7 @@ public class OrderService {
             return orderMapper.toResponse(current);
         }
 
-        return new TransactionTemplate(transactionManager).execute(status -> {
+        return requiresNewTransaction().execute(status -> {
             Order order = findById(orderId);
             if (order.getStatus() == OrderStatus.REFUNDED
                     || order.getStatus() == compensationStatus
@@ -571,6 +622,7 @@ public class OrderService {
             order.setStatus(compensationStatus);
             order.setCompensationReason(reason);
             Order saved = orderRepository.save(order);
+            orderRepository.flush();
             saveOrderEventToOutbox(saved, eventType);
             auditLogService.logEvent(eventType, "Order", orderId.toString(),
                     Map.of("orderId", orderId.toString(),
@@ -590,6 +642,28 @@ public class OrderService {
         });
     }
 
+    private TransactionTemplate requiresNewTransaction() {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template;
+    }
+
+    private boolean canInventoryFinalizeSale(Order order) {
+        try {
+            ApiResponse<Boolean> response = inventoryClient.checkFinalizableStock(buildStockRequestFromOrder(order));
+            boolean canFinalize = response != null && Boolean.TRUE.equals(response.getData());
+            if (!canFinalize) {
+                log.warn("Inventory finalization pre-check failed: orderId={} orderNumber={}",
+                        order.getId(), order.getOrderNumber());
+            }
+            return canFinalize;
+        } catch (Exception e) {
+            log.error("Inventory finalization pre-check failed closed: orderId={} error={}",
+                    order.getId(), e.getMessage());
+            return false;
+        }
+    }
+
     private Order findById(UUID orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng: " + orderId));
@@ -599,6 +673,30 @@ public class OrderService {
      * Gọi product-service lấy thông tin và tính giá cho một dòng sản phẩm.
      * Nếu product-service không khả dụng, dùng unitPrice từ frontend (localStorage cart) làm fallback.
      */
+    private OrderResponse enrichPaymentStatus(OrderResponse response) {
+        if (response == null || response.getId() == null) {
+            return response;
+        }
+        PaymentInfo payment = fetchPaymentInfo(response.getId());
+        if (payment != null) {
+            response.setPaymentId(payment.getId());
+            response.setPaymentStatus(payment.getStatus());
+        }
+        return response;
+    }
+
+    private PaymentInfo fetchPaymentInfo(UUID orderId) {
+        try {
+            var paymentResponse = paymentClient.getPaymentByOrder(orderId);
+            if (paymentResponse != null && paymentResponse.isSuccess()) {
+                return paymentResponse.getData();
+            }
+        } catch (Exception e) {
+            log.debug("Could not fetch payment for order {}: {}", orderId, e.getMessage());
+        }
+        return null;
+    }
+
     private OrderItem buildOrderItem(CreateOrderRequest.OrderItemRequest itemReq) {
         BigDecimal price = null;
         String productName = null;
@@ -683,6 +781,23 @@ public class OrderService {
      * Xây dựng OrderEvent và lưu vào outbox trong cùng transaction nghiệp vụ.
      * Scheduler sẽ đọc và publish lên Kafka sau — đảm bảo at-least-once delivery.
      */
+    private void releaseReservedStockBestEffort(Order order, String reason, String actor) {
+        if (order == null || order.getItems() == null || order.getItems().isEmpty()) {
+            return;
+        }
+        try {
+            StockOperationRequest request = buildStockRequestFromOrder(order);
+            request.setReason("Release stock for cancelled order " + order.getOrderNumber() + ": " + reason);
+            inventoryClient.releaseStock(request);
+            log.info("Released reserved stock for cancelled order: orderId={} reason={} actor={}",
+                    order.getId(), reason, actor);
+        } catch (Exception e) {
+            log.warn("Unable to release reserved stock immediately for cancelled order {}. "
+                            + "ORDER_CANCELLED outbox event will retry asynchronously: {}",
+                    order.getId(), e.getMessage());
+        }
+    }
+
     private void saveOrderEventToOutbox(Order order, String eventType) {
         OrderEvent event = OrderEvent.builder()
                 .eventId(UUID.randomUUID())

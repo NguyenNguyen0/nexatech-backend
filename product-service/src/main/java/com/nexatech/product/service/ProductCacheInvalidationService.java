@@ -15,10 +15,20 @@ public class ProductCacheInvalidationService {
     private final CacheManager cacheManager;
 
     public void evictProductCaches(String productId, String reason) {
+        boolean inventoryDriven = reason != null
+                && (reason.startsWith("INVENTORY_") || "LOW_STOCK".equals(reason));
+
         evictAll("productPages");
+        evictAll("productStockBatch");
 
         if (StringUtils.hasText(productId)) {
-            evict("products", productId);
+            if (inventoryDriven) {
+                // Product detail can be cached by both id and slug. Inventory events only
+                // carry productId, so clear detail cache to avoid stale stock on PDP.
+                evictAll("products");
+            } else {
+                evict("products", productId);
+            }
             evict("productStock", productId);
         } else {
             evictAll("products");

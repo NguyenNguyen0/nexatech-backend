@@ -2,6 +2,8 @@ package com.nexatech.inventory.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 
 import java.util.List;
@@ -9,6 +11,8 @@ import java.util.List;
 @Data
 public class StockCheckRequest {
 
+    @NotEmpty
+    @Valid
     private List<Item> items;
     private String reference;
     private String reason;

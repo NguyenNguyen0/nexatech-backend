@@ -12,6 +12,7 @@ import com.nexatech.inventory.dto.WarehouseUpdateRequest;
 import com.nexatech.inventory.service.InventoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
@@ -41,6 +42,15 @@ public class InventoryController {
                 inventoryService.getAllInventory(sku, status, keyword, warehouseLocation, pageable)));
     }
 
+    @GetMapping("/batch")
+    @Cacheable(
+            value = "inventoryStockBatch",
+            key = "T(com.nexatech.inventory.util.InventoryCacheKey).of('batch', #productIds)",
+            unless = "#result == null || #result.data == null")
+    public ApiResponse<List<InventoryResponse>> getStocks(@RequestParam List<String> productIds) {
+        return ApiResponse.ok(inventoryService.getStocks(productIds));
+    }
+
     @GetMapping("/{productId}")
     @Cacheable(value = "inventoryStock", key = "#productId", unless = "#result == null || #result.data == null")
     public ApiResponse<InventoryResponse> getStock(@PathVariable String productId) {
@@ -59,6 +69,7 @@ public class InventoryController {
     }
 
     @PutMapping
+    @CachePut(value = "inventoryStock", key = "#request.productId", unless = "#result == null || #result.data == null")
     public ApiResponse<InventoryResponse> updateStock(@Valid @RequestBody StockUpdateRequest request) {
         return ApiResponse.ok(inventoryService.updateStock(request));
     }
@@ -66,6 +77,11 @@ public class InventoryController {
     @PostMapping("/check")
     public ApiResponse<Boolean> checkStock(@Valid @RequestBody StockCheckRequest request) {
         return ApiResponse.ok(inventoryService.checkStock(request));
+    }
+
+    @PostMapping("/finalize/check")
+    public ApiResponse<Boolean> checkFinalizableStock(@Valid @RequestBody StockCheckRequest request) {
+        return ApiResponse.ok(inventoryService.canFinalizeSale(request));
     }
 
     @PostMapping("/reserve")
@@ -97,6 +113,7 @@ public class InventoryController {
     }
 
     @PatchMapping("/{productId}/warehouse")
+    @CachePut(value = "inventoryStock", key = "#productId", unless = "#result == null || #result.data == null")
     public ApiResponse<InventoryResponse> updateWarehouseInfo(
             @PathVariable String productId,
             @Valid @RequestBody WarehouseUpdateRequest request) {

@@ -18,6 +18,7 @@ public class InventoryCacheInvalidationService {
         evictAll("inventoryLists");
         evictAll("lowStockInventory");
         evictAll("inventoryMovements");
+        evictAll("inventoryStockBatch");
 
         if (StringUtils.hasText(productId)) {
             evict("inventoryStock", productId);

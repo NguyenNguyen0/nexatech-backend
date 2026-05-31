@@ -140,6 +140,20 @@ switch ($ServiceName) {
         $env:SPRING_DATASOURCE_URL = "jdbc:postgresql://$($env:EC2_HOST):5432/nexatech_news"
         $env:SPRING_DATASOURCE_USERNAME = $env:DB_USERNAME
         $env:SPRING_DATASOURCE_PASSWORD = $env:DB_PASSWORD
+        if (-not $env:SERVER_PORT) {
+            $env:SERVER_PORT = "8092"
+        }
+        if (-not $env:SPRING_CLOUD_CONFIG_URI -and $env:CONFIG_SERVER_URI) {
+            $env:SPRING_CLOUD_CONFIG_URI = $env:CONFIG_SERVER_URI
+        }
+        Import-DotEnvKeys -Path (Join-Path $PSScriptRoot "news-service/.env") -Keys @(
+            "SPRING_CLOUD_CONFIG_URI",
+            "SERVER_PORT",
+            "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY",
+            "AWS_REGION",
+            "AWS_S3_BUCKET"
+        )
     }
     "promotion-service" {
         $env:DATABASE_URL = "postgresql://$($env:DB_USERNAME):$($env:DB_PASSWORD)@$($env:EC2_HOST):5432/nexatech_promotions"

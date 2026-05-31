@@ -23,6 +23,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
@@ -36,7 +37,7 @@ public class CategoryCommandHandler {
     @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse handle(CreateCategoryCommand command) {
         String normalizedName = TextUtils.normalizeName(command.name());
-        if (categoryRepository.existsByNameIgnoreCase(normalizedName)) {
+        if (existsByNameInParent(normalizedName, command.parentId(), null)) {
             throw new BadRequestException("Category name already exists: " + normalizedName);
         }
 
@@ -46,7 +47,7 @@ public class CategoryCommandHandler {
 
         Category category = Category.builder()
                 .name(normalizedName)
-                .slug(generateUniqueSlug(normalizedName, null))
+                .slug(generateUniqueSlug(preferredSlug(command.metadata(), normalizedName), null))
                 .description(command.description())
                 .parentId(command.parentId())
                 .sortOrder(command.sortOrder())
@@ -63,7 +64,7 @@ public class CategoryCommandHandler {
         Category category = getActiveCategory(command.id());
         String normalizedName = TextUtils.normalizeName(command.name());
 
-        if (categoryRepository.existsByNameIgnoreCaseAndIdNot(normalizedName, command.id())) {
+        if (existsByNameInParent(normalizedName, command.parentId(), command.id())) {
             throw new BadRequestException("Category name already exists: " + normalizedName);
         }
 
@@ -75,14 +76,16 @@ public class CategoryCommandHandler {
         }
 
         String oldName = category.getName();
+        String oldSlug = category.getSlug();
         category.setName(normalizedName);
         category.setDescription(command.description());
         category.setParentId(command.parentId());
         category.setSortOrder(command.sortOrder());
         category.setFilter(command.filter());
         category.setMetadata(sanitizeMetadata(command.metadata()));
-        if (!normalizedName.equalsIgnoreCase(oldName)) {
-            category.setSlug(generateUniqueSlug(normalizedName, command.id()));
+        String preferredSlug = preferredSlug(command.metadata(), normalizedName);
+        if (!normalizedName.equalsIgnoreCase(oldName) || !preferredSlug.equals(oldSlug)) {
+            category.setSlug(generateUniqueSlug(preferredSlug, command.id()));
         }
 
         return categoryMapper.toResponse(categoryRepository.save(category));
@@ -143,8 +146,19 @@ public class CategoryCommandHandler {
         return new LinkedHashMap<>(metadata);
     }
 
-    private String generateUniqueSlug(String name, String currentCategoryId) {
-        String base = toSlug(name);
+    private boolean existsByNameInParent(String name, String parentId, String excludedId) {
+        Criteria criteria = Criteria.where("name").regex("^" + Pattern.quote(name) + "$", "i");
+        criteria = StringUtils.hasText(parentId)
+                ? criteria.and("parentId").is(parentId)
+                : criteria.and("parentId").in(null, "");
+        if (StringUtils.hasText(excludedId)) {
+            criteria = criteria.and("_id").ne(excludedId);
+        }
+        return mongoTemplate.exists(Query.query(criteria), Category.class);
+    }
+
+    private String generateUniqueSlug(String value, String currentCategoryId) {
+        String base = toSlug(value);
         String candidate = base;
         int suffix = 1;
 
@@ -159,5 +173,13 @@ public class CategoryCommandHandler {
 
     private String toSlug(String value) {
         return TextUtils.toSlug(value, "category");
+    }
+
+    private String preferredSlug(Map<String, Object> metadata, String fallback) {
+        if (metadata == null) {
+            return fallback;
+        }
+        Object expectedSlug = metadata.get("expectedSlug");
+        return expectedSlug instanceof String slug && StringUtils.hasText(slug) ? slug : fallback;
     }
 }
