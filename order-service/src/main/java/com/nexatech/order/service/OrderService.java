@@ -3,6 +3,7 @@ package com.nexatech.order.service;
 import com.nexatech.order.client.InventoryClient;
 import com.nexatech.order.client.PaymentClient;
 import com.nexatech.order.client.ProductClient;
+import com.nexatech.order.client.dto.PaymentInfo;
 import com.nexatech.order.client.dto.ProductInfo;
 import com.nexatech.order.client.dto.StockOperationRequest;
 import com.nexatech.order.client.dto.VNPayCreateDto;
@@ -12,6 +13,7 @@ import com.nexatech.order.dto.CreateOrderRequest;
 import com.nexatech.order.dto.OrderResponse;
 import com.nexatech.order.dto.RefundBankInfoRequest;
 import com.nexatech.order.dto.UpdateShippingRequest;
+import com.nexatech.order.dto.response.ApiResponse;
 import com.nexatech.order.enums.OrderStatus;
 import com.nexatech.order.enums.PaymentMethod;
 import com.nexatech.order.event.OrderEvent;
@@ -30,6 +32,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -166,7 +169,7 @@ public class OrderService {
      * Lấy chi tiết một đơn hàng theo ID.
      */
     public OrderResponse getOrder(UUID orderId) {
-        return orderMapper.toResponse(findById(orderId));
+        return enrichPaymentStatus(orderMapper.toResponse(findById(orderId)));
     }
 
     /**
@@ -175,7 +178,8 @@ public class OrderService {
     @Transactional(readOnly = true)
     public Page<OrderResponse> getMyOrders(UUID customerId, Pageable pageable) {
         return orderRepository.findByCustomerId(customerId, pageable)
-                .map(orderMapper::toResponse);
+                .map(orderMapper::toResponse)
+                .map(this::enrichPaymentStatus);
     }
 
     public boolean hasPurchasedProduct(UUID customerId, String productId) {
@@ -202,6 +206,13 @@ public class OrderService {
         }
         if (order.getPaymentMethod() != PaymentMethod.VNPAY) {
             throw new BadRequestException("Đơn hàng này không sử dụng phương thức thanh toán VNPay");
+        }
+
+        PaymentInfo currentPayment = fetchPaymentInfo(orderId);
+        if (currentPayment != null
+                && ("COMPLETED".equalsIgnoreCase(currentPayment.getStatus())
+                || "REFUNDED".equalsIgnoreCase(currentPayment.getStatus()))) {
+            throw new BadRequestException("Don hang da thanh toan, khong the mo lai cong VNPay");
         }
 
         Instant expiresAt = order.getCreatedAt().plusSeconds(pendingPaymentTimeoutMinutes * 60);
@@ -246,9 +257,9 @@ public class OrderService {
     @Transactional(readOnly = true)
     public Page<OrderResponse> getAllOrders(OrderStatus status, Pageable pageable) {
         if (status != null) {
-            return orderRepository.findByStatus(status, pageable).map(orderMapper::toResponse);
+            return orderRepository.findByStatus(status, pageable).map(orderMapper::toResponse).map(this::enrichPaymentStatus);
         }
-        return orderRepository.findAll(pageable).map(orderMapper::toResponse);
+        return orderRepository.findAll(pageable).map(orderMapper::toResponse).map(this::enrichPaymentStatus);
     }
 
     /**
@@ -325,6 +336,13 @@ public class OrderService {
             log.info("Skip inventory finalization request because order is no longer PENDING: orderId={} status={}",
                     orderId, current.getStatus());
             return orderMapper.toResponse(current);
+        }
+
+        if (!canInventoryFinalizeSale(current)) {
+            return markOutOfStockForCompensation(
+                    orderId,
+                    "Inventory cannot finalize sale because physical stock is no longer available",
+                    actor);
         }
 
         return new TransactionTemplate(transactionManager).execute(status -> {
@@ -535,6 +553,28 @@ public class OrderService {
         }
     }
 
+    public void reconcilePendingPaidOrders(String actor) {
+        List<Order> pendingOrders = orderRepository.findTop50ByStatusOrderByCreatedAtAsc(OrderStatus.PENDING);
+        for (Order order : pendingOrders) {
+            PaymentInfo payment = fetchPaymentInfo(order.getId());
+            if (payment == null || !StringUtils.hasText(payment.getStatus())) {
+                continue;
+            }
+
+            if ("COMPLETED".equalsIgnoreCase(payment.getStatus())) {
+                log.warn("Reconciling pending order with completed payment: orderId={} orderNumber={}",
+                        order.getId(), order.getOrderNumber());
+                requestInventoryFinalizationAfterPayment(order.getId(), actor);
+            } else if ("REFUNDED".equalsIgnoreCase(payment.getStatus())) {
+                log.warn("Reconciling pending order with refunded payment: orderId={} orderNumber={}",
+                        order.getId(), order.getOrderNumber());
+                updateOrderStatus(order.getId(), OrderStatus.REFUNDED);
+            } else if ("FAILED".equalsIgnoreCase(payment.getStatus())) {
+                cancelOrderForSaga(order.getId(), "payment_failed_reconciliation", actor);
+            }
+        }
+    }
+
     // ==================== Private helpers ====================
 
     private OrderResponse markCompensationStatus(UUID orderId,
@@ -556,7 +596,7 @@ public class OrderService {
             return orderMapper.toResponse(current);
         }
 
-        return new TransactionTemplate(transactionManager).execute(status -> {
+        return requiresNewTransaction().execute(status -> {
             Order order = findById(orderId);
             if (order.getStatus() == OrderStatus.REFUNDED
                     || order.getStatus() == compensationStatus
@@ -571,6 +611,7 @@ public class OrderService {
             order.setStatus(compensationStatus);
             order.setCompensationReason(reason);
             Order saved = orderRepository.save(order);
+            orderRepository.flush();
             saveOrderEventToOutbox(saved, eventType);
             auditLogService.logEvent(eventType, "Order", orderId.toString(),
                     Map.of("orderId", orderId.toString(),
@@ -590,6 +631,28 @@ public class OrderService {
         });
     }
 
+    private TransactionTemplate requiresNewTransaction() {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template;
+    }
+
+    private boolean canInventoryFinalizeSale(Order order) {
+        try {
+            ApiResponse<Boolean> response = inventoryClient.checkFinalizableStock(buildStockRequestFromOrder(order));
+            boolean canFinalize = response != null && Boolean.TRUE.equals(response.getData());
+            if (!canFinalize) {
+                log.warn("Inventory finalization pre-check failed: orderId={} orderNumber={}",
+                        order.getId(), order.getOrderNumber());
+            }
+            return canFinalize;
+        } catch (Exception e) {
+            log.error("Inventory finalization pre-check failed closed: orderId={} error={}",
+                    order.getId(), e.getMessage());
+            return false;
+        }
+    }
+
     private Order findById(UUID orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng: " + orderId));
@@ -599,6 +662,30 @@ public class OrderService {
      * Gọi product-service lấy thông tin và tính giá cho một dòng sản phẩm.
      * Nếu product-service không khả dụng, dùng unitPrice từ frontend (localStorage cart) làm fallback.
      */
+    private OrderResponse enrichPaymentStatus(OrderResponse response) {
+        if (response == null || response.getId() == null) {
+            return response;
+        }
+        PaymentInfo payment = fetchPaymentInfo(response.getId());
+        if (payment != null) {
+            response.setPaymentId(payment.getId());
+            response.setPaymentStatus(payment.getStatus());
+        }
+        return response;
+    }
+
+    private PaymentInfo fetchPaymentInfo(UUID orderId) {
+        try {
+            var paymentResponse = paymentClient.getPaymentByOrder(orderId);
+            if (paymentResponse != null && paymentResponse.isSuccess()) {
+                return paymentResponse.getData();
+            }
+        } catch (Exception e) {
+            log.debug("Could not fetch payment for order {}: {}", orderId, e.getMessage());
+        }
+        return null;
+    }
+
     private OrderItem buildOrderItem(CreateOrderRequest.OrderItemRequest itemReq) {
         BigDecimal price = null;
         String productName = null;

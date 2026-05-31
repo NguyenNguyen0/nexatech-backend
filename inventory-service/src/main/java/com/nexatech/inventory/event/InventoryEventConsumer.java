@@ -23,6 +23,7 @@ import java.util.UUID;
 public class InventoryEventConsumer {
 
     private static final String CONSUMER_NAME = "inventory-service:InventoryEventConsumer";
+    private static final String OUT_OF_STOCK_MARKER_EVENT = "ORDER_PAYMENT_COMPLETED_OUT_OF_STOCK";
 
     private final InventoryService inventoryService;
     private final ProcessedEventRepository processedEventRepository;
@@ -136,12 +137,27 @@ public class InventoryEventConsumer {
 
     private void handleOrderPaymentCompleted(OrderEventDto event) {
         StockCheckRequest request = buildStockCheckRequest(event);
+        String orderAggregateId = event.getOrderId() != null ? event.getOrderId().toString() : null;
         try {
             inventoryService.finalizeSale(request, "ORDER:" + event.getOrderId());
             inventoryService.publishOrderStockFinalizedEvent(event);
         } catch (BadRequestException | ResourceNotFoundException e) {
             log.warn("Inventory finalization failed for paid orderId={}: {}",
                     event.getOrderId(), e.getMessage());
+            if (orderAggregateId != null
+                    && processedEventRepository.existsByEventTypeAndConsumerNameAndAggregateId(
+                    OUT_OF_STOCK_MARKER_EVENT, CONSUMER_NAME, orderAggregateId)) {
+                log.info("Skip duplicate out-of-stock event for already failed paid orderId={}", event.getOrderId());
+                return;
+            }
+            if (orderAggregateId != null) {
+                processedEventRepository.save(ProcessedEvent.builder()
+                        .eventId(UUID.randomUUID())
+                        .eventType(OUT_OF_STOCK_MARKER_EVENT)
+                        .consumerName(CONSUMER_NAME)
+                        .aggregateId(orderAggregateId)
+                        .build());
+            }
             inventoryService.publishOrderOutOfStockEvent(event, e.getMessage());
         }
     }
