@@ -25,6 +25,7 @@ public class PendingPaymentTimeoutScheduler {
     public void cancelExpiredPendingPayments() {
         Instant cutoff = Instant.now().minus(Duration.ofMinutes(pendingTimeoutMinutes));
         try {
+            orderService.reconcilePendingPaidOrders(ACTOR);
             orderService.cancelExpiredPendingOrders(cutoff, ACTOR);
         } catch (Exception e) {
             log.error("Unable to cancel expired pending payment orders: {}", e.getMessage(), e);

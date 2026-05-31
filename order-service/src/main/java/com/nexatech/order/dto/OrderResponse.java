@@ -33,6 +33,8 @@ public class OrderResponse {
     private String shippingAddress;
     private String shippingMethod;
     private PaymentMethod paymentMethod;
+    private UUID paymentId;
+    private String paymentStatus;
     private String note;
     private List<OrderItemResponse> items;
     private Instant createdAt;

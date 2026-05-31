@@ -54,6 +54,7 @@ public class CacheConfig implements CachingConfigurer {
                 .cacheDefaults(defaults)
                 .withCacheConfiguration("inventoryLists", defaults.entryTtl(Duration.ofMinutes(3)))
                 .withCacheConfiguration("inventoryStock", defaults.entryTtl(Duration.ofMinutes(3)))
+                .withCacheConfiguration("inventoryStockBatch", defaults.entryTtl(Duration.ofMinutes(3)))
                 .withCacheConfiguration("inventoryMovements", defaults.entryTtl(Duration.ofMinutes(2)))
                 .withCacheConfiguration("lowStockInventory", defaults.entryTtl(Duration.ofMinutes(3)))
                 .build();

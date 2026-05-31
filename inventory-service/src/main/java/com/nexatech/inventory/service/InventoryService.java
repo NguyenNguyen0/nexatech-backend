@@ -21,6 +21,7 @@ import com.nexatech.inventory.repository.InventoryItemRepository;
 import com.nexatech.inventory.repository.StockMovementRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -35,10 +36,17 @@ import java.io.InputStreamReader;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -46,6 +54,7 @@ import java.util.UUID;
 public class InventoryService {
 
     private static final int DEFAULT_REORDER_LEVEL = 10;
+    private static final int PRODUCT_LOOKUP_BATCH_SIZE = 50;
     private static final java.util.Set<String> ALLOWED_SORT_FIELDS = java.util.Set.of(
             "productId", "productName", "sku", "quantity", "reservedQuantity", "availableQuantity",
             "reorderLevel", "status", "warehouseLocation");
@@ -56,10 +65,29 @@ public class InventoryService {
     private final ProductClient productClient;
     private final InventoryCacheInvalidationService cacheInvalidationService;
 
+    @Value("${product.internal.api-key:change-me}")
+    private String productInternalApiKey;
+
     public InventoryResponse getStock(String productId) {
         InventoryItem item = inventoryItemRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inventory item", "productId", productId));
-        return toResponse(item);
+        return toResponse(item, fetchProductSummary(item.getProductId()).orElse(null));
+    }
+
+    public List<InventoryResponse> getStocks(List<String> productIds) {
+        List<String> normalizedIds = normalizeProductIds(productIds);
+        if (normalizedIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, InventoryItem> itemsByProductId = inventoryItemRepository.findByProductIdIn(normalizedIds).stream()
+                .collect(Collectors.toMap(InventoryItem::getProductId, Function.identity(), (left, right) -> left));
+
+        return normalizedIds.stream()
+                .map(itemsByProductId::get)
+                .filter(Objects::nonNull)
+                .map(item -> toResponse(item, null))
+                .toList();
     }
 
         public Page<StockMovementResponse> getStockMovements(String productId, Pageable pageable) {
@@ -91,6 +119,11 @@ public class InventoryService {
 
         int oldQuantity = item.getQuantity();
         item.setQuantity(request.getQuantity());
+        if (item.getReservedQuantity() > request.getQuantity()) {
+            log.warn("Clamping reserved quantity because physical stock was lowered below reservations: productId={}, reserved={}, quantity={}",
+                    item.getProductId(), item.getReservedQuantity(), request.getQuantity());
+            item.setReservedQuantity(request.getQuantity());
+        }
         InventoryItem saved = inventoryItemRepository.save(item);
 
         int delta = request.getQuantity() - oldQuantity;
@@ -102,7 +135,7 @@ public class InventoryService {
         publishStockChangedEvent(saved, "INVENTORY_STOCK_UPDATED",
                 StringUtils.hasText(request.getReason()) ? request.getReason() : "Manual stock update");
         publishLowStockEventIfNeeded(saved);
-        return toResponse(saved);
+        return toResponse(saved, productSummary);
     }
 
     public boolean checkStock(StockCheckRequest request) {
@@ -115,6 +148,21 @@ public class InventoryService {
 
             int available = item.getQuantity() - item.getReservedQuantity();
             if (available < itemRequest.getQuantity()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean canFinalizeSale(StockCheckRequest request) {
+        validateItems(request);
+
+        for (StockCheckRequest.Item itemRequest : request.getItems()) {
+            InventoryItem item = inventoryItemRepository.findByProductId(itemRequest.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Inventory item", "productId", itemRequest.getProductId()));
+
+            if (item.getQuantity() < itemRequest.getQuantity()) {
                 return false;
             }
         }
@@ -140,9 +188,14 @@ public class InventoryService {
     }
 
     public List<InventoryResponse> getLowStockItems() {
-        return inventoryItemRepository.findAll().stream()
+        List<InventoryItem> lowStockItems = inventoryItemRepository.findAll().stream()
                 .filter(this::isLowStock)
-                .map(this::toResponse)
+                .toList();
+        Map<String, ProductSummary> productSummaries = fetchProductSummaries(
+                lowStockItems.stream().map(InventoryItem::getProductId).toList());
+
+        return lowStockItems.stream()
+                .map(item -> toResponse(item, productSummaries.get(item.getProductId())))
                 .toList();
     }
 
@@ -179,10 +232,15 @@ public class InventoryService {
                                                    String warehouseLocation,
                                                    Pageable pageable) {
         Pageable safePageable = sanitizePageable(pageable);
-        List<InventoryResponse> filtered = inventoryItemRepository.findAll().stream()
+        List<InventoryItem> candidates = inventoryItemRepository.findAll().stream()
                 .filter(item -> matchesWarehouse(item, warehouseLocation))
                 .filter(item -> matchesSku(item, sku))
-                .map(this::toResponse)
+                .toList();
+        Map<String, ProductSummary> productSummaries = fetchProductSummaries(
+                candidates.stream().map(InventoryItem::getProductId).toList());
+
+        List<InventoryResponse> filtered = candidates.stream()
+                .map(item -> toResponse(item, productSummaries.get(item.getProductId())))
                 .filter(response -> matchesStatus(response, status))
                 .filter(response -> matchesKeyword(response, keyword))
                 .sorted(comparatorFor(safePageable.getSort()))
@@ -207,7 +265,7 @@ public class InventoryService {
         InventoryItem saved = inventoryItemRepository.save(item);
         publishStockChangedEvent(saved, "INVENTORY_STOCK_UPDATED", "Warehouse information updated");
         publishLowStockEventIfNeeded(saved);
-        return toResponse(saved);
+        return toResponse(saved, fetchProductSummary(saved.getProductId()).orElse(null));
     }
 
     @Transactional
@@ -412,20 +470,31 @@ public class InventoryService {
         if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
             throw new BadRequestException("Items list must not be empty");
         }
+        for (StockCheckRequest.Item item : request.getItems()) {
+            if (item == null || !StringUtils.hasText(item.getProductId())) {
+                throw new BadRequestException("ProductId is required for every stock item");
+            }
+            if (item.getQuantity() <= 0) {
+                throw new BadRequestException("Quantity must be greater than zero for product: " + item.getProductId());
+            }
+        }
     }
 
-    private InventoryResponse toResponse(InventoryItem item) {
-        int availableQuantity = item.getQuantity() - item.getReservedQuantity();
+    private InventoryResponse toResponse(InventoryItem item, ProductSummary productSummary) {
+        int availableQuantity = Math.max(0, item.getQuantity() - item.getReservedQuantity());
         InventoryResponse.InventoryResponseBuilder builder = InventoryResponse.builder()
                 .id(item.getId())
                 .productId(item.getProductId())
-            .sku(item.getSku())
+                .productName(productSummary != null ? productSummary.getName() : null)
+                .productSlug(productSummary != null ? productSummary.getSlug() : null)
+                .productThumbnail(productSummary != null ? productSummary.getThumbnail() : null)
+                .sku(item.getSku())
                 .quantity(item.getQuantity())
                 .reservedQuantity(item.getReservedQuantity())
-            .availableQuantity(availableQuantity)
+                .availableQuantity(availableQuantity)
                 .reorderLevel(item.getReorderLevel())
                 .warehouseLocation(item.getWarehouseLocation())
-            .status(resolveStatus(availableQuantity, item.getReorderLevel()));
+                .status(resolveStatus(availableQuantity, item.getReorderLevel()));
 
         return builder.build();
     }
@@ -497,12 +566,44 @@ public class InventoryService {
     }
 
     private Optional<ProductSummary> fetchProductSummary(String productId) {
-        try {
-            return Optional.ofNullable(productClient.getProduct(productId))
-                    .map(response -> response.getData());
-        } catch (Exception ignored) {
-            return Optional.empty();
+        return Optional.ofNullable(fetchProductSummaries(List.of(productId)).get(productId));
+    }
+
+    private Map<String, ProductSummary> fetchProductSummaries(Collection<String> productIds) {
+        List<String> normalizedIds = normalizeProductIds(productIds);
+        if (normalizedIds.isEmpty()) {
+            return Map.of();
         }
+
+        Map<String, ProductSummary> summaries = new HashMap<>();
+        for (int start = 0; start < normalizedIds.size(); start += PRODUCT_LOOKUP_BATCH_SIZE) {
+            int end = Math.min(start + PRODUCT_LOOKUP_BATCH_SIZE, normalizedIds.size());
+            List<String> batch = normalizedIds.subList(start, end);
+            try {
+                Optional.ofNullable(productClient.lookupProducts(productInternalApiKey, batch))
+                        .map(response -> response.getData())
+                        .orElse(List.of())
+                        .forEach(summary -> {
+                            if (summary != null && StringUtils.hasText(summary.getId())) {
+                                summaries.put(summary.getId(), summary);
+                            }
+                        });
+            } catch (Exception e) {
+                log.warn("Could not fetch product summaries for {} inventory items: {}", batch.size(), e.getMessage());
+            }
+        }
+        return summaries;
+    }
+
+    private List<String> normalizeProductIds(Collection<String> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+        return productIds.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 
     private String resolveSku(StockUpdateRequest request, String existingSku, ProductSummary productSummary) {
