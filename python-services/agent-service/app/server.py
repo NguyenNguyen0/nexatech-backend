@@ -31,8 +31,13 @@ from app.core.logging import (
 from app.core.settings import SETTINGS
 from app.graph.agent import compile_graph
 from app.mcp_client import MCP_CLIENT
-from app.runtime.copilotkit import attach_copilotkit_middleware
-from app.runtime.checkpointer import close_checkpointer, initialize_checkpointer
+from app.runtime.copilotkit import attach_copilotkit_endpoint
+from app.hitl.timeout_registry import cancel_timeout, schedule_timeout
+from app.runtime.checkpointer import (
+    check_checkpointer_health,
+    close_checkpointer,
+    initialize_checkpointer,
+)
 from app.runtime.conversation_store import initialize_conversation_store
 
 
@@ -376,16 +381,24 @@ async def _register_eureka() -> None:
         )
 
 
-def _initialize_graph_runtime(app: FastAPI) -> None:
+async def _initialize_graph_runtime(app: FastAPI) -> None:
     global COMPILED_GRAPH
 
     try:
-        checkpointer = initialize_checkpointer(SETTINGS.agent_db_url)
+        checkpointer = await initialize_checkpointer(SETTINGS.agent_db_url)
         if checkpointer is None:
             READINESS_CHECKS["checkpointer"] = "disabled"
             logger.info("[STARTUP] - LangGraph checkpointer: disabled")
         else:
-            READINESS_CHECKS["checkpointer"] = "ok"
+            healthy, health_state = await check_checkpointer_health()
+            READINESS_CHECKS["checkpointer"] = health_state
+            if healthy:
+                logger.info("[STARTUP] + LangGraph checkpointer readiness: ok")
+            else:
+                logger.warning(
+                    "[STARTUP] - LangGraph checkpointer readiness: %s",
+                    health_state,
+                )
         COMPILED_GRAPH = compile_graph(checkpointer=checkpointer)
         app.state.compiled_graph = COMPILED_GRAPH
         READINESS_CHECKS["graph"] = "ok"
@@ -399,7 +412,7 @@ def _initialize_graph_runtime(app: FastAPI) -> None:
             exc.__class__.__name__,
         )
 
-    if attach_copilotkit_middleware(
+    if attach_copilotkit_endpoint(
         app,
         agent_name=SETTINGS.agui_agent_name,
         agent_description=SETTINGS.agui_agent_description,
@@ -446,7 +459,7 @@ async def lifespan(app: FastAPI):
     app.state.settings = SETTINGS
     app.state.readiness_checks = READINESS_CHECKS
     app.state.active_stream_runs = {}
-    _initialize_graph_runtime(app)
+    await _initialize_graph_runtime(app)
     await _initialize_conversation_runtime(app)
 
     await _register_eureka()
@@ -454,7 +467,7 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await _deregister_eureka()
-        close_checkpointer()
+        await close_checkpointer()
         conversation_store = getattr(app.state, "conversation_store", None)
         if conversation_store is not None:
             await conversation_store.close()
@@ -568,14 +581,19 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+async def health() -> dict[str, str]:
     return {"status": "UP", "service": SETTINGS.service_name}
 
 
 @app.get("/ready")
-def ready() -> dict[str, object]:
+async def ready() -> dict[str, object]:
     eureka_state = READINESS_CHECKS.get("eureka", "unknown")
-    degraded = eureka_state.startswith("error") or eureka_state == "client_missing"
+    checkpointer_state = READINESS_CHECKS.get("checkpointer", "unknown")
+    degraded = (
+        eureka_state.startswith("error")
+        or eureka_state == "client_missing"
+        or checkpointer_state != "ok"
+    )
     return {
         "ready": True,
         "service": SETTINGS.service_name,
@@ -585,7 +603,7 @@ def ready() -> dict[str, object]:
 
 
 @app.get("/")
-def root() -> dict[str, object]:
+async def root() -> dict[str, object]:
     return {
         "message": "agent-service skeleton is running",
         "layout": [
@@ -844,13 +862,32 @@ async def run_agent_stream(
 
             interrupts = result.get("interrupts") or []
             for interrupt_item in interrupts:
+                interrupt_value = interrupt_item.get("value") or {}
+                # Schedule auto-timeout if checkpointer is enabled
+                if READINESS_CHECKS.get("checkpointer") == "ok":
+                    _timeout_sec = (
+                        interrupt_value.get("timeout_seconds")
+                        or SETTINGS.approval_timeout_seconds
+                    )
+                    graph = getattr(app.state, "compiled_graph", None)
+                    if graph is not None:
+                        schedule_timeout(
+                            thread_id,
+                            graph=graph,
+                            timeout_seconds=_timeout_sec,
+                        )
                 yield _sse_frame(
                     "hitl.interrupt",
                     _run_event(
                         "hitl.interrupt",
                         run_id=run_id,
                         thread_id=thread_id,
-                        data={"interrupt": interrupt_item},
+                        data={
+                            "interrupt": interrupt_item,
+                            "approval_request_id": interrupt_value.get("approval_request_id"),
+                            "timeout_seconds": interrupt_value.get("timeout_seconds"),
+                            "expires_at": interrupt_value.get("expires_at"),
+                        },
                     ),
                 )
 
@@ -913,10 +950,12 @@ async def resume_agent(
         raise HTTPException(
             status_code=503, detail="Resume requires the LangGraph checkpointer"
         )
+    # Cancel any pending auto-timeout before processing the decision
+    cancel_timeout(request.thread_id)
     await _persist_conversation_event(
         thread_id=request.thread_id,
         event_type="approval_decision",
-        payload={"decision": request.decision},
+        payload={"decision": request.decision, "thread_id": request.thread_id},
         request=raw_request,
     )
     result = await _invoke_graph(

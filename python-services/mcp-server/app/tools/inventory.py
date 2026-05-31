@@ -3,14 +3,39 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from app.mcp.server import mcp
+from app.schemas.tool_contract import tool_result, validation_error
+from app.schemas.tool_inputs import InventoryListParams, PagingParams, dump_input
 from app.services.inventory import INVENTORY_API
-from pydantic import Field
+from pydantic import BaseModel, Field
+
+
+class InventoryItemRequest(BaseModel):
+    product_id: str = Field(alias="productId", description="Product ID.")
+    quantity: int = Field(description="Requested quantity.", ge=0)
+    sku: str | None = Field(default=None, description="Optional SKU.")
+
+
+class InventoryImportRequest(BaseModel):
+    product_id: str = Field(alias="productId", description="Product ID.")
+    quantity: int = Field(description="Stock quantity.", ge=0)
+    sku: str | None = Field(default=None, description="Optional SKU.")
+    warehouse_location: str | None = Field(
+        default=None,
+        alias="warehouseLocation",
+        description="Optional warehouse/bin location.",
+    )
+    reorder_level: int | None = Field(
+        default=None,
+        alias="reorderLevel",
+        description="Optional low-stock threshold.",
+        ge=0,
+    )
 
 
 @mcp.tool()
 async def list_inventory(
     params: Annotated[
-        dict[str, Any] | None,
+        InventoryListParams | None,
         Field(
             description=(
                 "Optional inventory list filters. Supported keys: sku, status, "
@@ -26,7 +51,7 @@ async def list_inventory(
     records by keyword/status. The response is returned directly from
     inventory-service after unsupported query parameters are removed.
     """
-    return await INVENTORY_API.list_inventory(params=params)
+    return tool_result(await INVENTORY_API.list_inventory(params=dump_input(params)))
 
 
 @mcp.tool()
@@ -42,7 +67,7 @@ async def get_inventory(
     warehouse location, reorder level, status, or related inventory metadata for
     one product.
     """
-    return await INVENTORY_API.get_inventory(product_id)
+    return tool_result(await INVENTORY_API.get_inventory(product_id))
 
 
 @mcp.tool()
@@ -52,7 +77,7 @@ async def get_inventory_movements(
         Field(description="Product ID whose stock movement history should be listed."),
     ],
     params: Annotated[
-        dict[str, Any] | None,
+        PagingParams | None,
         Field(
             description=(
                 "Optional movement paging/sorting params. Supported keys: page, "
@@ -66,7 +91,12 @@ async def get_inventory_movements(
     Use this to audit inventory changes such as imports, stock adjustments,
     reservations, releases, order deductions, or cancellation returns.
     """
-    return await INVENTORY_API.get_inventory_movements(product_id, params=params)
+    return tool_result(
+        await INVENTORY_API.get_inventory_movements(
+            product_id,
+            params=dump_input(params),
+        )
+    )
 
 
 @mcp.tool()
@@ -92,24 +122,34 @@ async def update_stock(
             ),
         ),
     ] = None,
+    idempotency_key: Annotated[
+        str | None,
+        Field(description="Optional idempotency key for caller-side retry tracking."),
+    ] = None,
 ) -> dict[str, Any]:
     """Update stock for a product.
 
     Use this for manual stock correction or synchronization. Include a reason when
     possible so downstream movement/audit records explain why the value changed.
+
+    This tool has side effects and requires human approval in the agent layer.
     """
     payload: dict[str, Any] = {"productId": product_id, "quantity": quantity}
     if sku:
         payload["sku"] = sku
     if reason:
         payload["reason"] = reason
-    return await INVENTORY_API.update_stock(payload)
+    return tool_result(
+        await INVENTORY_API.update_stock(payload),
+        requires_approval=True,
+        idempotency_key=idempotency_key,
+    )
 
 
 @mcp.tool()
 async def check_inventory(
     items: Annotated[
-        list[dict[str, Any]],
+        list[InventoryItemRequest],
         Field(
             description=(
                 "Items to check. Each item should include productId and quantity; "
@@ -123,7 +163,11 @@ async def check_inventory(
     Use this before checkout or order creation to verify whether requested
     quantities can be fulfilled. This tool does not reserve stock.
     """
-    return await INVENTORY_API.check_inventory({"items": items})
+    return tool_result(
+        await INVENTORY_API.check_inventory(
+            {"items": [item.model_dump(by_alias=True, exclude_none=True) for item in items]}
+        )
+    )
 
 
 @mcp.tool()
@@ -133,13 +177,13 @@ async def get_low_stock_items() -> dict[str, Any]:
     Use this for replenishment, purchasing workflows, or operational monitoring of
     products that need restocking.
     """
-    return await INVENTORY_API.low_stock_items()
+    return tool_result(await INVENTORY_API.low_stock_items())
 
 
 @mcp.tool()
 async def reserve_stock(
     items: Annotated[
-        list[dict[str, Any]],
+        list[InventoryItemRequest],
         Field(
             description=(
                 "Items to reserve. Each item should include productId and quantity; "
@@ -147,19 +191,32 @@ async def reserve_stock(
             ),
         ),
     ],
+    idempotency_key: Annotated[
+        str | None,
+        Field(description="Optional idempotency key for caller-side retry tracking."),
+    ] = None,
 ) -> dict[str, Any]:
     """Reserve stock for one or more items during order placement.
 
     Use this only when stock should be held for a pending order. For read-only
     availability checks, use check_inventory instead.
+
+    This tool has side effects and requires human approval in the agent layer.
     """
-    return await INVENTORY_API.reserve_stock({"items": items})
+    return tool_result(
+        await INVENTORY_API.reserve_stock(
+            {"items": [item.model_dump(by_alias=True, exclude_none=True) for item in items]}
+        ),
+        requires_approval=True,
+        idempotency_key=idempotency_key,
+        rollback_needed=True,
+    )
 
 
 @mcp.tool()
 async def release_stock(
     items: Annotated[
-        list[dict[str, Any]],
+        list[InventoryItemRequest],
         Field(
             description=(
                 "Reserved items to release. Each item should include productId and "
@@ -167,19 +224,31 @@ async def release_stock(
             ),
         ),
     ],
+    idempotency_key: Annotated[
+        str | None,
+        Field(description="Optional idempotency key for caller-side retry tracking."),
+    ] = None,
 ) -> dict[str, Any]:
     """Release previously reserved stock for one or more items.
 
     Use this after order cancellation, payment failure, checkout timeout, or any
     workflow that abandons a previously reserved quantity.
+
+    This tool has side effects and requires human approval in the agent layer.
     """
-    return await INVENTORY_API.release_stock({"items": items})
+    return tool_result(
+        await INVENTORY_API.release_stock(
+            {"items": [item.model_dump(by_alias=True, exclude_none=True) for item in items]}
+        ),
+        requires_approval=True,
+        idempotency_key=idempotency_key,
+    )
 
 
 @mcp.tool()
 async def bulk_import_inventory(
     requests: Annotated[
-        list[dict[str, Any]],
+        list[InventoryImportRequest],
         Field(
             description=(
                 "Bulk inventory records to import. Each record should contain "
@@ -188,13 +257,27 @@ async def bulk_import_inventory(
             ),
         ),
     ],
+    idempotency_key: Annotated[
+        str | None,
+        Field(description="Optional idempotency key for caller-side retry tracking."),
+    ] = None,
 ) -> dict[str, Any]:
     """Bulk import or upsert inventory records.
 
     Use this for initial inventory loading, batch warehouse synchronization, or
     operational imports where multiple product stock records are submitted at once.
+
+    This tool has side effects and requires human approval in the agent layer.
     """
-    return await INVENTORY_API.bulk_import(requests)
+    if len(requests) > 100:
+        return validation_error("bulk_import_inventory accepts at most 100 records")
+    return tool_result(
+        await INVENTORY_API.bulk_import(
+            [item.model_dump(by_alias=True, exclude_none=True) for item in requests]
+        ),
+        requires_approval=True,
+        idempotency_key=idempotency_key,
+    )
 
 
 @mcp.tool()
@@ -217,16 +300,26 @@ async def update_warehouse_info(
             ge=0,
         ),
     ],
+    idempotency_key: Annotated[
+        str | None,
+        Field(description="Optional idempotency key for caller-side retry tracking."),
+    ] = None,
 ) -> dict[str, Any]:
     """Update warehouse location and reorder threshold for a product.
 
     Use this when operations moves stock to a new location or changes the
     replenishment threshold used by low-stock monitoring.
+
+    This tool has side effects and requires human approval in the agent layer.
     """
-    return await INVENTORY_API.update_warehouse_info(
-        product_id,
-        {
-            "warehouseLocation": warehouse_location,
-            "reorderLevel": reorder_level,
-        },
+    return tool_result(
+        await INVENTORY_API.update_warehouse_info(
+            product_id,
+            {
+                "warehouseLocation": warehouse_location,
+                "reorderLevel": reorder_level,
+            },
+        ),
+        requires_approval=True,
+        idempotency_key=idempotency_key,
     )

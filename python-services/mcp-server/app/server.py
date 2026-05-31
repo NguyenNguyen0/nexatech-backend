@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -23,19 +24,33 @@ from app.core.logging import (
     user_role_ctx,
 )
 from app.core.settings import SETTINGS
+from app.mcp.domains import (
+    get_profile_service_apis,
+    get_profile_tool_modules,
+    list_domain_metadata,
+    normalize_profile,
+)
 from app.mcp.server import mcp
-from app.tools import audit as _audit_tools  # noqa: F401
-from app.tools import health as _health_tools  # noqa: F401
-from app.tools import inventory as _inventory_tools  # noqa: F401
-from app.tools import news as _news_tools  # noqa: F401
-from app.tools import order as _order_tools  # noqa: F401
-from app.tools import payment as _payment_tools  # noqa: F401
-from app.tools import promotion as _promotion_tools  # noqa: F401
-from app.tools.health import SERVICE_APIS
 
 
 configure_logging(SETTINGS.service_name, SETTINGS.log_level)
 logger = logging.getLogger(SETTINGS.service_name)
+MCP_PROFILE = normalize_profile(SETTINGS.mcp_server_profile)
+
+
+def _register_profile_tools() -> tuple[str, ...]:
+    modules = get_profile_tool_modules(MCP_PROFILE)
+    for module_name in modules:
+        importlib.import_module(f"app.tools.{module_name}")
+    logger.info(
+        "[STARTUP] MCP profile=%s registered tool modules=%s",
+        MCP_PROFILE,
+        modules,
+    )
+    return modules
+
+
+REGISTERED_TOOL_MODULES = _register_profile_tools()
 mcp_app = mcp.http_app(
     path="/",
     transport="streamable-http",
@@ -43,8 +58,14 @@ mcp_app = mcp.http_app(
     stateless_http=True,
 )
 
+
+# The original FastMCP lifespan context manager is kept on mcp_app.
+# We will manually enter it in the parent app's lifespan below.
+
+
 READINESS_CHECKS: dict[str, str] = {
     "service": "ok",
+    "profile": MCP_PROFILE,
     "eureka": "pending",
     "dependencies": "pending",
 }
@@ -96,7 +117,18 @@ async def _log_dependency_connectivity() -> None:
     connected_services: list[str] = []
     degraded_services: list[str] = []
 
-    for service_name, api in SERVICE_APIS.items():
+    if not SETTINGS.startup_dependency_checks_enabled:
+        READINESS_CHECKS["dependencies"] = "disabled"
+        logger.info("[STARTUP] - Dependency checks: disabled")
+        return
+
+    service_apis = get_profile_service_apis(MCP_PROFILE)
+    if MCP_PROFILE == "meta":
+        READINESS_CHECKS["dependencies"] = "managed_by_meta"
+        logger.info("[STARTUP] meta profile: dependency checks delegated to meta tools")
+        return
+
+    for service_name, api in service_apis.items():
         try:
             health_result = await api.health()
             if isinstance(health_result, dict) and health_result.get("ok") is True:
@@ -126,20 +158,23 @@ async def _log_dependency_connectivity() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with mcp_app.lifespan(mcp_app):
-        app.state.settings = SETTINGS
-        app.state.readiness_checks = READINESS_CHECKS
+    app.state.settings = SETTINGS
+    app.state.readiness_checks = READINESS_CHECKS
 
-        await _log_dependency_connectivity()
-        await _register_eureka()
-        try:
+    await _log_dependency_connectivity()
+    await _register_eureka()
+    try:
+        async with mcp_app.router.lifespan_context(mcp_app):
             yield
-        finally:
-            await _deregister_eureka()
+    finally:
+        await _deregister_eureka()
 
 
-app = FastAPI(title="MCP Server Skeleton", version="0.1.0", lifespan=lifespan)
-app.mount("/mcp", mcp_app)
+app = FastAPI(
+    title=f"NexaTech {MCP_PROFILE} MCP Server",
+    version="0.1.0",
+    lifespan=lifespan,
+)
 
 
 @app.middleware("http")
@@ -249,7 +284,11 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "UP", "service": SETTINGS.service_name}
+    return {
+        "status": "UP",
+        "service": SETTINGS.service_name,
+        "profile": MCP_PROFILE,
+    }
 
 
 @app.get("/ready")
@@ -268,7 +307,10 @@ def ready() -> dict[str, object]:
 def root() -> dict[str, object]:
     return {
         "message": "mcp-server skeleton is running",
-        "mcpEndpoint": "http://localhost:8094/mcp",
+        "profile": MCP_PROFILE,
+        "mcpEndpoint": f"http://localhost:{SETTINGS.port}/mcp",
+        "registeredToolModules": list(REGISTERED_TOOL_MODULES),
+        "managedDomains": list_domain_metadata() if MCP_PROFILE == "meta" else [],
         "layout": [
             "app/core",
             "app/mcp",
@@ -279,3 +321,6 @@ def root() -> dict[str, object]:
             "app/utils",
         ],
     }
+
+
+app.mount("/mcp", mcp_app)

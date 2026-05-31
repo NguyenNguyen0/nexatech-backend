@@ -25,3 +25,9 @@ class AgentState(TypedDict, total=False):
     response_text: str | None
     answer_context: NotRequired[dict[str, Any]]
     final_status: NotRequired[str | None]
+    # Phase 6 — tool-call display state for AG-UI / frontend
+    last_tool_call: NotRequired[dict[str, Any] | None]
+    tool_call_history: NotRequired[list[dict[str, Any]]]
+    # Phase 7 — HITL timeout tracking
+    expires_at: NotRequired[str | None]
+    timeout_seconds: NotRequired[int | None]

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from app.mcp.server import mcp
+from app.schemas.tool_contract import tool_result
 from app.services.news import NEWS_API
 from pydantic import Field
 
@@ -31,7 +32,7 @@ async def list_news(
     applies local pagination and returns items, page, size, totalElements,
     totalPages, and hasMore when the upstream response is a list.
     """
-    return await NEWS_API.list_public_news(page=page, size=size)
+    return tool_result(await NEWS_API.list_public_news(page=page, size=size))
 
 
 @mcp.tool()
@@ -58,7 +59,7 @@ async def list_all_news(
     state, drafts, or internal news metadata. Pagination is applied locally when
     the upstream response is a list.
     """
-    return await NEWS_API.list_all_news(page=page, size=size)
+    return tool_result(await NEWS_API.list_all_news(page=page, size=size))
 
 
 @mcp.tool()
@@ -73,7 +74,7 @@ async def get_news_by_slug(
     Use this when the caller may need fields that are not exposed publicly, such as
     draft status, moderation data, or internal metadata.
     """
-    return await NEWS_API.get_news_by_slug(slug)
+    return tool_result(await NEWS_API.get_news_by_slug(slug))
 
 
 @mcp.tool()
@@ -89,7 +90,7 @@ async def get_public_news_by_slug(
     and returns the raw news-service response, including article body and metadata
     if provided by the service.
     """
-    return await NEWS_API.get_public_news_by_slug(slug)
+    return tool_result(await NEWS_API.get_public_news_by_slug(slug))
 
 
 @mcp.tool()
@@ -104,7 +105,7 @@ async def get_news_images(
     Use this when rendering or auditing a news article's gallery, thumbnail, or
     embedded assets. The response is delegated directly from news-service.
     """
-    return await NEWS_API.get_news_images(news_id)
+    return tool_result(await NEWS_API.get_news_images(news_id))
 
 
 @mcp.tool()
@@ -119,4 +120,4 @@ async def get_news_image(
     Use this for resolving image metadata, URL, alt text, or storage details for a
     specific news asset.
     """
-    return await NEWS_API.get_news_image(image_id)
+    return tool_result(await NEWS_API.get_news_image(image_id))

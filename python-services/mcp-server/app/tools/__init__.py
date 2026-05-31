@@ -1,6 +1,8 @@
+"""MCP tool package.
+
+Tool modules are imported selectively by ``app.server`` based on
+``MCP_SERVER_PROFILE``. Avoid importing domain modules here, otherwise every
+profile would register every tool.
+"""
+
 from __future__ import annotations
-
-"""Tool modules will live here."""
-
-# Import modules for side-effect registration of MCP tools.
-from . import audit, health, inventory, news, order, payment, promotion  # noqa: F401

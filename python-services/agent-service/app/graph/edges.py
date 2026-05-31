@@ -28,6 +28,6 @@ def route_after_needs_approval(state: dict[str, Any]) -> str:
 
 def route_after_interrupt(state: dict[str, Any]) -> str:
     decision = (state.get("approval_result") or "approved").lower()
-    if decision == "approved":
+    if decision in ("approved", "edited"):
         return "execute_tool"
     return "format_response"
