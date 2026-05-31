@@ -24,6 +24,7 @@ from app.services.news import NewsServiceApi
 from app.services.product import ProductServiceApi
 from app.services.promotion import PromotionServiceApi
 from app.server import READINESS_CHECKS, health, ready, root
+from app.tools.meta import get_skill, list_skills
 
 
 @pytest.fixture(autouse=True)
@@ -116,6 +117,33 @@ def test_validation_error_uses_tool_contract_error_shape() -> None:
     assert result["ok"] is False
     assert result["tag"] == "MCP-BAD"
     assert result["error"]["retryAllowed"] is False
+
+
+@pytest.mark.asyncio
+async def test_meta_lists_skills_for_domain() -> None:
+    result = await list_skills("inventory")
+
+    assert result["success"] is True
+    assert result["data"]["domain"] == "inventory"
+    assert "_index.md" in result["data"]["skills"]
+    assert "fulfillment_skill.md" in result["data"]["skills"]
+
+
+@pytest.mark.asyncio
+async def test_meta_get_skill_reads_domain_index() -> None:
+    result = await get_skill("inventory")
+
+    assert result["success"] is True
+    assert result["data"]["skillName"] == "_index.md"
+    assert "# Skill: Inventory Index" in result["data"]["content"]
+
+
+@pytest.mark.asyncio
+async def test_meta_get_skill_rejects_path_traversal() -> None:
+    result = await get_skill("inventory", "../secret")
+
+    assert result["success"] is False
+    assert result["tag"] == "MCP-INVALID-SKILL-NAME"
 
 
 @pytest.mark.asyncio

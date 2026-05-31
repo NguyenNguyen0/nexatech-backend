@@ -25,8 +25,8 @@ independent domain MCP per process. Select the catalog with
 | `audit` | `audit-mcp` | `8107` | audit tools |
 
 The `meta` MCP does not execute business tools. It exposes management tools
-such as `list_mcp_domains`, `get_mcp_domain`, `route_to_mcp_domain`, and
-`check_mcp_domain_health`.
+such as `list_mcp_domains`, `get_mcp_domain`, `route_to_mcp_domain`,
+`check_mcp_domain_health`, `list_skills`, and `get_skill`.
 
 ## What Exists Now
 
@@ -100,7 +100,7 @@ tests/
 - Audit: `search_audit_logs`, `get_audit_entry`, `get_audit_trace`
 - Promotion: `list_promotions`, `get_promotion`, `list_flash_sales`, `get_flash_sale`
 - Health: `check_dependency_health`, `check_all_dependency_health`, and per-service health tools
-- Meta: `list_mcp_domains`, `get_mcp_domain`, `route_to_mcp_domain`, `check_mcp_domain_health`
+- Meta: `list_mcp_domains`, `get_mcp_domain`, `route_to_mcp_domain`, `check_mcp_domain_health`, `list_skills`, `get_skill`
 
 All downstream calls go through a shared retrying HTTP client and return structured errors instead of raising to the top-level MCP server.
 

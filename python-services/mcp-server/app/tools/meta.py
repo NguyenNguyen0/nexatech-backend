@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+from pathlib import Path
 from typing import Annotated, Any
 
 import httpx
@@ -9,6 +11,10 @@ from app.core.settings import SETTINGS
 from app.mcp.domains import DOMAIN_PROFILES, domain_url, list_domain_metadata
 from app.mcp.server import mcp
 from app.schemas.tool_contract import tool_result, validation_error
+
+
+SKILLS_ROOT = Path(__file__).resolve().parents[2] / "skills"
+SAFE_SKILL_NAME = re.compile(r"^[a-zA-Z0-9_-]+(?:\.md)?$")
 
 
 @mcp.tool()
@@ -203,6 +209,109 @@ async def check_mcp_domain_health(
     return tool_result({"ok": ok, "domains": dependencies})
 
 
+@mcp.tool()
+async def list_skills(
+    domain: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Optional skill domain to list. Supported values include shared, "
+                "orchestrator, inventory, product, order, payment, promotion, news, audit."
+            ),
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """List skill files available to the meta MCP.
+
+    Use this before `get_skill` when the agent does not know which concrete skill
+    file to load. This tool reads static markdown skill files from disk and does
+    not execute business logic.
+    """
+    if domain:
+        normalized = domain.strip().lower()
+        domain_dir = SKILLS_ROOT / normalized
+        if not domain_dir.is_dir():
+            return validation_error(
+                f"Unknown skill domain '{domain}'",
+                code="MCP-UNKNOWN-SKILL-DOMAIN",
+            )
+        return tool_result(
+            {
+                "domain": normalized,
+                "skills": _list_skill_files(domain_dir),
+            }
+        )
+
+    domains: dict[str, list[str]] = {}
+    for domain_dir in sorted(SKILLS_ROOT.iterdir()):
+        if domain_dir.is_dir():
+            domains[domain_dir.name] = _list_skill_files(domain_dir)
+    return tool_result({"domains": domains})
+
+
+@mcp.tool()
+async def get_skill(
+    domain: Annotated[
+        str,
+        Field(
+            description=(
+                "Skill domain. Supported values include shared, orchestrator, "
+                "inventory, product, order, payment, promotion, news, audit."
+            ),
+        ),
+    ],
+    skill_name: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Skill file name without extension, for example routing_skill. "
+                "Omit to read the domain _index.md."
+            ),
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """Read a business skill markdown file from disk.
+
+    Call this before complex, multi-step, cross-domain, or rollback-sensitive
+    tasks. When `skill_name` is omitted, the domain index is returned.
+    """
+    normalized_domain = domain.strip().lower()
+    domain_dir = SKILLS_ROOT / normalized_domain
+    if not domain_dir.is_dir():
+        return validation_error(
+            f"Unknown skill domain '{domain}'",
+            code="MCP-UNKNOWN-SKILL-DOMAIN",
+        )
+
+    normalized_skill = _normalize_skill_name(skill_name)
+    if normalized_skill is None:
+        return validation_error(
+            f"Invalid skill name '{skill_name}'",
+            code="MCP-INVALID-SKILL-NAME",
+        )
+
+    skill_path = (domain_dir / normalized_skill).resolve()
+    if not str(skill_path).startswith(str(domain_dir.resolve())):
+        return validation_error(
+            "Invalid skill path",
+            code="MCP-INVALID-SKILL-PATH",
+        )
+    if not skill_path.is_file():
+        return validation_error(
+            f"Skill '{normalized_skill}' not found in domain '{normalized_domain}'",
+            code="MCP-SKILL-NOT-FOUND",
+        )
+
+    content = skill_path.read_text(encoding="utf-8")
+    return tool_result(
+        {
+            "domain": normalized_domain,
+            "skillName": normalized_skill,
+            "content": content,
+        }
+    )
+
+
 def _domain_payload(domain_name: str) -> dict[str, Any]:
     domain_config = DOMAIN_PROFILES[domain_name]
     url = domain_url(domain_config)
@@ -216,6 +325,26 @@ def _domain_payload(domain_name: str) -> dict[str, Any]:
         "toolModules": list(domain_config.tool_modules),
         "defaultPort": domain_config.default_port,
     }
+
+
+def _list_skill_files(domain_dir: Path) -> list[str]:
+    return [
+        path.name
+        for path in sorted(domain_dir.glob("*.md"))
+        if path.is_file()
+    ]
+
+
+def _normalize_skill_name(skill_name: str | None) -> str | None:
+    if skill_name is None or not skill_name.strip():
+        return "_index.md"
+
+    normalized = skill_name.strip()
+    if not SAFE_SKILL_NAME.fullmatch(normalized):
+        return None
+    if not normalized.endswith(".md"):
+        normalized = f"{normalized}.md"
+    return normalized
 
 
 async def _check_domain_health(domain_config: Any) -> dict[str, Any]:
