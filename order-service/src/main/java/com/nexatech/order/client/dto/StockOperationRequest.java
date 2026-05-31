@@ -18,6 +18,8 @@ import java.util.List;
 public class StockOperationRequest {
 
     private List<Item> items;
+    private String reference;
+    private String reason;
 
     @Data
     @Builder

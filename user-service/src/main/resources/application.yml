@@ -23,7 +23,6 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       # Không block startup nếu DB chưa sẵn sàng — pool sẽ retry khi có request đầu tiên
-      initialization-fail-timeout: -1
       connection-timeout: 10000
       validation-timeout: 3000
   jpa:
@@ -47,6 +46,11 @@ spring:
         max-attempts: 4
         max-interval: 5000
         multiplier: 1.5
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 # ─── Fallback defaults khi config-server không phản hồi ──────────────────────
 # Tất cả giá trị này sẽ bị override bởi config-server nếu nó online.
@@ -54,6 +58,13 @@ spring:
 
 server:
   port: ${SERVER_PORT:8083}
+
+aws:
+  s3:
+    region: ${AWS_REGION:ap-southeast-1}
+    bucket: ${AWS_S3_BUCKET:}
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
 
 openfeign:
   identity-service:

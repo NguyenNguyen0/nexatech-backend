@@ -5,6 +5,7 @@ import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.nexatech.product.model.Product;
+import com.nexatech.product.model.Review;
 import com.nexatech.product.model.Wishlist;
 import org.bson.UuidRepresentation;
 import org.slf4j.Logger;
@@ -129,6 +130,27 @@ public class MongoConfig {
                 log.info("[MongoConfig] Wishlist indexes ensured successfully.");
             } catch (Exception ex) {
                 log.error("[MongoConfig] Failed to ensure wishlist indexes: {}", ex.getMessage());
+            }
+
+            try {
+                log.info("[MongoConfig] Ensuring indexes for Review collection...");
+                var reviewIndexOps = mongoTemplate.indexOps(Review.class);
+                reviewIndexOps.getIndexInfo().stream()
+                        .filter(index -> "product_user_unique".equals(index.getName()))
+                        .findFirst()
+                        .ifPresent(index -> {
+                            reviewIndexOps.dropIndex("product_user_unique");
+                            log.info("[MongoConfig] Dropped legacy unique review index product_user_unique");
+                        });
+                reviewIndexOps.createIndex(
+                        new Index()
+                                .on("productId", Sort.Direction.ASC)
+                                .on("userId", Sort.Direction.ASC)
+                                .named("product_user_idx")
+                );
+                log.info("[MongoConfig] Review indexes ensured successfully.");
+            } catch (Exception ex) {
+                log.error("[MongoConfig] Failed to ensure review indexes: {}", ex.getMessage());
             }
         };
     }

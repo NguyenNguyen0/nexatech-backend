@@ -108,14 +108,14 @@ public class CheckoutService {
             }
             paymentId = paymentResp.getData().getId();
 
-            // COD orders: auto-confirm immediately (no upfront payment needed)
-            // This triggers ORDER_STATUS_UPDATED:CONFIRMED → shipping-service creates GHN shipment
+            // COD orders: no upfront payment needed. Request inventory finalization immediately
+            // to finalize stock and trigger shipping via SAGA.
             if (request.getPaymentMethod() == PaymentMethod.COD) {
                 try {
-                    orderService.updateOrderStatus(order.getId(), com.nexatech.order.enums.OrderStatus.CONFIRMED);
-                    log.info("COD order auto-confirmed: orderId={}", order.getId());
+                    orderService.requestInventoryFinalizationAfterPayment(order.getId(), "checkout-service");
+                    log.info("COD order inventory finalization requested: orderId={}", order.getId());
                 } catch (Exception e) {
-                    log.error("Failed to auto-confirm COD order {}: {}", order.getId(), e.getMessage());
+                    log.error("Failed to request inventory finalization for COD order {}: {}", order.getId(), e.getMessage());
                 }
             }
         }

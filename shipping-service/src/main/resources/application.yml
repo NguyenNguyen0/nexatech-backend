@@ -19,8 +19,6 @@ spring:
     username: ${DB_USERNAME:nexatech}
     password: ${DB_PASSWORD:nexatech123}
     driver-class-name: org.postgresql.Driver
-    hikari:
-      initialization-fail-timeout: -1
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
@@ -50,6 +48,9 @@ eureka:
 
 shipping:
   provider: ghn # mock | ghn
+  creation:
+    max-attempts: ${SHIPPING_CREATION_MAX_ATTEMPTS:3}
+    retry-delay-ms: ${SHIPPING_CREATION_RETRY_DELAY_MS:1500}
   ghn:
     base-url: ${GHN_BASE_URL:https://dev-online-gateway.ghn.vn/shiip/public-api}
     token: ${GHN_TOKEN:}

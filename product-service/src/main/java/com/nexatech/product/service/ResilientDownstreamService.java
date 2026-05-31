@@ -10,6 +10,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -42,8 +43,29 @@ public class ResilientDownstreamService {
         return orderClient.checkPurchased(userId, productId).getData();
     }
 
+    @CircuitBreaker(name = "orderService", fallbackMethod = "getPurchaseCountFallback")
+    @Retry(name = "orderService")
+    public int getPurchaseCount(UUID userId, String productId) {
+        try {
+            Integer count = orderClient.getProductPurchaseCount(userId, productId).getData();
+            return count != null ? count : 0;
+        } catch (Exception ex) {
+            return resolvePurchaseCountFallback(userId, productId, ex);
+        }
+    }
+
+    private int resolvePurchaseCountFallback(UUID userId, String productId, Exception cause) {
+        log.warn(
+                "Order purchase-count unavailable for product {}, falling back to check-purchased: {}",
+                productId,
+                cause.getMessage());
+        Boolean purchased = orderClient.checkPurchased(userId, productId).getData();
+        return Boolean.TRUE.equals(purchased) ? 1 : 0;
+    }
+
     @CircuitBreaker(name = "inventoryService", fallbackMethod = "getStockFallback")
     @Retry(name = "inventoryService")
+    @Cacheable(value = "productStock", key = "#productId", unless = "#result == null || #result.data == null")
     public InventoryStockResponse getStock(String productId) {
         return inventoryClient.getStock(productId);
     }
@@ -67,6 +89,12 @@ public class ResilientDownstreamService {
         throw new ServiceUnavailableException(
                 "Order service is temporarily unavailable. Cannot verify purchase right now.",
                 throwable);
+    }
+
+    @SuppressWarnings("unused")
+    private int getPurchaseCountFallback(UUID userId, String productId, Throwable throwable) {
+        return resolvePurchaseCountFallback(userId, productId,
+                throwable instanceof Exception exception ? exception : new RuntimeException(throwable));
     }
 
     @SuppressWarnings("unused")

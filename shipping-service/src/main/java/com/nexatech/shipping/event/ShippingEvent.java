@@ -23,4 +23,5 @@ public class ShippingEvent extends BaseEvent {
     private ShipmentStatus status;
     private BigDecimal shippingFee;
     private String currency;
+    private String failureReason;
 }
