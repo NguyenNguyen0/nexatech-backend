@@ -13,6 +13,7 @@ import org.springframework.util.StringUtils;
 public class ProductCacheInvalidationService {
 
     private final CacheManager cacheManager;
+    private final CatalogCacheVersionService catalogCacheVersionService;
 
     public void evictProductCaches(String productId, String reason) {
         boolean inventoryDriven = reason != null
@@ -35,6 +36,7 @@ public class ProductCacheInvalidationService {
             evictAll("productStock");
         }
 
+        catalogCacheVersionService.bumpVersion(reason);
         log.info("Product cache invalidated: productId={} reason={}", productId, reason);
     }
 

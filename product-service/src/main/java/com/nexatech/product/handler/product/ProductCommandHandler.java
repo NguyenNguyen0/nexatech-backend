@@ -13,6 +13,7 @@ import com.nexatech.product.model.Brand;
 import com.nexatech.product.model.Category;
 import com.nexatech.product.model.Product;
 import com.nexatech.product.repository.ProductRepository;
+import com.nexatech.product.service.CatalogCacheVersionService;
 import com.nexatech.product.service.ProductResponseEnricher;
 import com.nexatech.product.util.MongoIdUtils;
 import com.nexatech.product.util.TextUtils;
@@ -39,6 +40,7 @@ public class ProductCommandHandler {
     private final ProductEventProducer productEventProducer;
     private final ProductResponseEnricher productResponseEnricher;
     private final MongoTemplate mongoTemplate;
+    private final CatalogCacheVersionService catalogCacheVersionService;
 
     @Caching(evict = {
             @CacheEvict(value = "products", allEntries = true),
@@ -60,6 +62,7 @@ public class ProductCommandHandler {
 
         Product saved = productRepository.save(product);
         publishEvent(saved, "PRODUCT_CREATED");
+        catalogCacheVersionService.bumpVersion("PRODUCT_CREATED");
         return productResponseEnricher.enrichCatalogResponse(productMapper.toResponse(saved));
     }
 
@@ -86,6 +89,7 @@ public class ProductCommandHandler {
 
         Product saved = productRepository.save(product);
         publishEvent(saved, "PRODUCT_UPDATED");
+        catalogCacheVersionService.bumpVersion("PRODUCT_UPDATED");
         return productResponseEnricher.enrichCatalogResponse(productMapper.toResponse(saved));
     }
 
@@ -98,6 +102,7 @@ public class ProductCommandHandler {
         product.setActive(false);
         Product saved = productRepository.save(product);
         publishEvent(saved, "PRODUCT_DELETED");
+        catalogCacheVersionService.bumpVersion("PRODUCT_DELETED");
     }
 
     @Caching(evict = {
@@ -117,6 +122,7 @@ public class ProductCommandHandler {
         product.setActive(true);
         Product saved = productRepository.save(product);
         publishEvent(saved, "PRODUCT_RESTORED");
+        catalogCacheVersionService.bumpVersion("PRODUCT_RESTORED");
         return productResponseEnricher.enrichCatalogResponse(productMapper.toResponse(saved));
     }
 

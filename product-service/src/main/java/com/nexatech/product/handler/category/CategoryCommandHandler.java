@@ -11,10 +11,12 @@ import com.nexatech.product.mapper.CategoryMapper;
 import com.nexatech.product.model.Category;
 import com.nexatech.product.repository.CategoryRepository;
 import com.nexatech.product.repository.ProductRepository;
+import com.nexatech.product.service.CatalogCacheVersionService;
 import com.nexatech.product.util.MongoIdUtils;
 import com.nexatech.product.util.TextUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -33,8 +35,13 @@ public class CategoryCommandHandler {
     private final ProductRepository productRepository;
     private final CategoryMapper categoryMapper;
     private final MongoTemplate mongoTemplate;
+    private final CatalogCacheVersionService catalogCacheVersionService;
 
-    @CacheEvict(value = "categories", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "categories", allEntries = true),
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public CategoryResponse handle(CreateCategoryCommand command) {
         String normalizedName = TextUtils.normalizeName(command.name());
         if (existsByNameInParent(normalizedName, command.parentId(), null)) {
@@ -56,10 +63,16 @@ public class CategoryCommandHandler {
                 .metadata(sanitizeMetadata(command.metadata()))
                 .build();
 
-        return categoryMapper.toResponse(categoryRepository.save(category));
+        CategoryResponse response = categoryMapper.toResponse(categoryRepository.save(category));
+        catalogCacheVersionService.bumpVersion("CATEGORY_CREATED");
+        return response;
     }
 
-    @CacheEvict(value = "categories", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "categories", allEntries = true),
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public CategoryResponse handle(UpdateCategoryCommand command) {
         Category category = getActiveCategory(command.id());
         String normalizedName = TextUtils.normalizeName(command.name());
@@ -88,10 +101,16 @@ public class CategoryCommandHandler {
             category.setSlug(generateUniqueSlug(preferredSlug, command.id()));
         }
 
-        return categoryMapper.toResponse(categoryRepository.save(category));
+        CategoryResponse response = categoryMapper.toResponse(categoryRepository.save(category));
+        catalogCacheVersionService.bumpVersion("CATEGORY_UPDATED");
+        return response;
     }
 
-    @CacheEvict(value = "categories", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "categories", allEntries = true),
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public void handle(DeleteCategoryCommand command) {
         Category category = getActiveCategory(command.id());
 
@@ -105,9 +124,14 @@ public class CategoryCommandHandler {
 
         category.setActive(false);
         categoryRepository.save(category);
+        catalogCacheVersionService.bumpVersion("CATEGORY_DELETED");
     }
 
-    @CacheEvict(value = "categories", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "categories", allEntries = true),
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public CategoryResponse handle(RestoreCategoryCommand command) {
         Category category = getCategoryById(command.id());
         if (category.isActive()) {
@@ -119,7 +143,9 @@ public class CategoryCommandHandler {
         }
 
         category.setActive(true);
-        return categoryMapper.toResponse(categoryRepository.save(category));
+        CategoryResponse response = categoryMapper.toResponse(categoryRepository.save(category));
+        catalogCacheVersionService.bumpVersion("CATEGORY_RESTORED");
+        return response;
     }
 
     private Category getActiveCategory(String id) {

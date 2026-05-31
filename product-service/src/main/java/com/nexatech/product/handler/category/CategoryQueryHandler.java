@@ -41,6 +41,9 @@ public class CategoryQueryHandler {
         return categoryMapper.toResponse(getActiveCategoryBySlug(query.slug()));
     }
 
+    @Cacheable(
+            value = "categories",
+            key = "'list:' + (#query.active() == null ? 'all-active' : #query.active()) + ':' + #query.includeDeleted()")
     public List<CategoryResponse> handle(GetAllCategoriesQuery query) {
         Query mongoQuery = new Query().with(Sort.by(Sort.Order.asc("sortOrder"), Sort.Order.asc("name")));
         if (query.active() != null) {
@@ -54,6 +57,7 @@ public class CategoryQueryHandler {
                 .toList();
     }
 
+    @Cacheable(value = "categories", key = "'subcategories:' + #query.parentId()")
     public List<CategoryMenuItemResponse> handle(GetSubCategoriesQuery query) {
         getActiveCategory(query.parentId());
         List<Category> activeCategories = categoryRepository.findByActiveTrue();
@@ -61,6 +65,7 @@ public class CategoryQueryHandler {
         return buildCategoryTree(query.parentId(), childrenByParent);
     }
 
+    @Cacheable(value = "categories", key = "'subcategories:slug:' + #query.slug()")
     public List<CategoryMenuItemResponse> handle(GetSubCategoriesBySlugQuery query) {
         Category parentCategory = getActiveCategoryBySlug(query.slug());
         return handle(new GetSubCategoriesQuery(parentCategory.getId()));
