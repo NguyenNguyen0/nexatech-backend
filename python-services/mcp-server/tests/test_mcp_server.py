@@ -20,6 +20,7 @@ from app.core.logging import (
 from app.services.audit import AuditServiceApi
 from app.services.inventory import InventoryServiceApi
 from app.services.news import NewsServiceApi
+from app.services.product import ProductServiceApi
 from app.services.promotion import PromotionServiceApi
 from app.server import READINESS_CHECKS, app
 
@@ -474,6 +475,217 @@ async def test_inventory_api_uses_real_inventory_service_endpoints() -> None:
         ("GET", "/api/v1/inventory/low-stock"),
         ("POST", "/api/v1/inventory/bulk-import"),
         ("PATCH", "/api/v1/inventory/product-1/warehouse"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_product_api_uses_real_product_and_review_endpoints() -> None:
+    seen_requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_requests.append(request)
+        if request.url.path == "/api/v1/products" and request.method == "GET":
+            assert request.url.params.get("keyword") == "phone"
+            assert request.url.params.get("specs.ram") == "16GB"
+            assert request.url.params.get("ignored") is None
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"content": [{"id": "product-1"}]}},
+            )
+        if request.url.path == "/api/v1/products/search":
+            assert request.url.params.get("keyword") == "laptop"
+            assert request.url.params.get("categorySlug") == "laptops"
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"content": [{"id": "product-2"}]}},
+            )
+        if request.url.path == "/api/v1/products/product-1" and request.method == "GET":
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"id": "product-1", "name": "Phone"}},
+            )
+        if request.url.path == "/api/v1/products/slug/phone-1" and request.method == "GET":
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"id": "product-1", "slug": "phone-1"}},
+            )
+        if request.url.path == "/api/v1/products/featured":
+            assert request.url.params.get("page") == "0"
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"content": [{"id": "featured-1"}]}},
+            )
+        if request.url.path == "/api/v1/products/tags":
+            assert list(request.url.params.get_list("tags")) == ["gaming", "sale"]
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"content": [{"id": "tagged-1"}]}},
+            )
+        if request.url.path == "/api/v1/products/category/category-1":
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"content": [{"id": "category-1"}]}},
+            )
+        if request.url.path == "/api/v1/products/category/slug/laptops":
+            assert request.url.params.get("brandId") == "brand-1"
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"content": [{"id": "laptop-1"}]}},
+            )
+        if request.url.path == "/api/v1/products/product-1/related":
+            return httpx.Response(200, json={"code": 1000, "result": [{"id": "related-1"}]})
+        if request.url.path == "/api/v1/products/slug/phone-1/related":
+            return httpx.Response(200, json={"code": 1000, "result": [{"id": "related-2"}]})
+        if request.url.path == "/api/v1/products" and request.method == "POST":
+            assert json.loads(request.content) == {"name": "Phone", "price": 100}
+            return httpx.Response(
+                201,
+                json={"code": 1000, "result": {"id": "product-new", "name": "Phone"}},
+            )
+        if request.url.path == "/api/v1/products/product-1" and request.method == "PUT":
+            assert json.loads(request.content)["name"] == "Updated Phone"
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"id": "product-1", "name": "Updated Phone"}},
+            )
+        if request.url.path == "/api/v1/products/product-1" and request.method == "DELETE":
+            return httpx.Response(200, json={"code": 1000, "result": None})
+        if request.url.path == "/api/v1/products/product-1/restore":
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"id": "product-1", "active": True}},
+            )
+        if request.url.path == "/api/v1/products/product-1/reviews":
+            if request.method == "GET":
+                assert request.url.params.get("rating") == "5"
+                return httpx.Response(
+                    200,
+                    json={"code": 1000, "result": {"content": [{"id": "review-1"}]}},
+                )
+            assert request.headers.get("X-User-Id") == "user-1"
+            assert json.loads(request.content)["rating"] == 5
+            return httpx.Response(
+                201,
+                json={"code": 1000, "result": {"id": "review-new", "rating": 5}},
+            )
+        if request.url.path == "/api/v1/products/slug/phone-1/reviews":
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"content": [{"id": "review-slug"}]}},
+            )
+        if request.url.path == "/api/v1/products/product-1/reviews/mine":
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"eligible": True, "review": None}},
+            )
+        if request.url.path == "/api/v1/reviews" and request.method == "GET":
+            assert request.url.params.get("productId") == "product-1"
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"content": [{"id": "review-admin"}]}},
+            )
+        if request.url.path == "/api/v1/reviews/review-1" and request.method == "PUT":
+            assert json.loads(request.content)["title"] == "Better title"
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"id": "review-1", "title": "Better title"}},
+            )
+        if request.url.path == "/api/v1/reviews/review-1" and request.method == "DELETE":
+            return httpx.Response(200, json={"code": 1000, "result": None})
+        if request.url.path == "/api/v1/reviews/review-1/helpful":
+            return httpx.Response(
+                200,
+                json={"code": 1000, "result": {"id": "review-1", "helpfulCount": 1}},
+            )
+        return httpx.Response(404, json={"tag": "PRD-404", "message": "not found"})
+
+    api = ProductServiceApi(
+        ServiceClient(
+            ServiceDefinition(name="product-service", base_url="http://example.test"),
+            transport=httpx.MockTransport(handler),
+        )
+    )
+
+    token_user_id = user_id_ctx.set("user-1")
+    try:
+        products = await api.list_products(
+            {"keyword": "phone", "specs.ram": "16GB", "ignored": "drop-me"}
+        )
+        search = await api.search_products("laptop", {"categorySlug": "laptops"})
+        product = await api.get_product("product-1")
+        product_by_slug = await api.get_product_by_slug("phone-1")
+        featured = await api.list_featured_products({"page": 0})
+        tagged = await api.list_products_by_tags(["gaming", "sale"], {"size": 5})
+        category = await api.list_products_by_category("category-1", {"page": 1})
+        category_slug = await api.list_products_by_category_slug("laptops", {"brandId": "brand-1"})
+        related = await api.get_related_products("product-1")
+        related_by_slug = await api.get_related_products_by_slug("phone-1")
+        created = await api.create_product({"name": "Phone", "price": 100})
+        updated = await api.update_product("product-1", {"name": "Updated Phone", "price": 120})
+        deleted = await api.delete_product("product-1")
+        restored = await api.restore_product("product-1")
+        product_reviews = await api.list_reviews_by_product("product-1", {"rating": 5})
+        slug_reviews = await api.list_reviews_by_product_slug("phone-1")
+        my_review = await api.get_my_review_for_product("product-1")
+        created_review = await api.create_review(
+            "product-1",
+            {"rating": 5, "title": "Great", "content": "Works well"},
+        )
+        admin_reviews = await api.list_reviews({"productId": "product-1", "ignored": "drop-me"})
+        updated_review = await api.update_review(
+            "review-1",
+            {"rating": 4, "title": "Better title", "content": "Updated"},
+        )
+        deleted_review = await api.delete_review("review-1")
+        helpful = await api.mark_review_helpful("review-1")
+    finally:
+        user_id_ctx.reset(token_user_id)
+
+    assert products["content"] == [{"id": "product-1"}]
+    assert search["content"] == [{"id": "product-2"}]
+    assert product["id"] == "product-1"
+    assert product_by_slug["slug"] == "phone-1"
+    assert featured["content"] == [{"id": "featured-1"}]
+    assert tagged["content"] == [{"id": "tagged-1"}]
+    assert category["content"] == [{"id": "category-1"}]
+    assert category_slug["content"] == [{"id": "laptop-1"}]
+    assert related == [{"id": "related-1"}]
+    assert related_by_slug == [{"id": "related-2"}]
+    assert created["id"] == "product-new"
+    assert updated["name"] == "Updated Phone"
+    assert deleted is None
+    assert restored["active"] is True
+    assert product_reviews["content"] == [{"id": "review-1"}]
+    assert slug_reviews["content"] == [{"id": "review-slug"}]
+    assert my_review == {"eligible": True, "review": None}
+    assert created_review["id"] == "review-new"
+    assert admin_reviews["content"] == [{"id": "review-admin"}]
+    assert updated_review["title"] == "Better title"
+    assert deleted_review is None
+    assert helpful["helpfulCount"] == 1
+    assert [(request.method, request.url.path) for request in seen_requests] == [
+        ("GET", "/api/v1/products"),
+        ("GET", "/api/v1/products/search"),
+        ("GET", "/api/v1/products/product-1"),
+        ("GET", "/api/v1/products/slug/phone-1"),
+        ("GET", "/api/v1/products/featured"),
+        ("GET", "/api/v1/products/tags"),
+        ("GET", "/api/v1/products/category/category-1"),
+        ("GET", "/api/v1/products/category/slug/laptops"),
+        ("GET", "/api/v1/products/product-1/related"),
+        ("GET", "/api/v1/products/slug/phone-1/related"),
+        ("POST", "/api/v1/products"),
+        ("PUT", "/api/v1/products/product-1"),
+        ("DELETE", "/api/v1/products/product-1"),
+        ("PATCH", "/api/v1/products/product-1/restore"),
+        ("GET", "/api/v1/products/product-1/reviews"),
+        ("GET", "/api/v1/products/slug/phone-1/reviews"),
+        ("GET", "/api/v1/products/product-1/reviews/mine"),
+        ("POST", "/api/v1/products/product-1/reviews"),
+        ("GET", "/api/v1/reviews"),
+        ("PUT", "/api/v1/reviews/review-1"),
+        ("DELETE", "/api/v1/reviews/review-1"),
+        ("POST", "/api/v1/reviews/review-1/helpful"),
     ]
 
 

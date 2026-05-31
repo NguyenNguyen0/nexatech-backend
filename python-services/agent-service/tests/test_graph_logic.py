@@ -8,7 +8,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.graph.agent import compile_graph
-from app.graph.llm_planner import _build_tool_catalog
+from app.graph.llm_planner import (
+    _build_tool_catalog,
+    _extract_tool_call_from_verbose_text,
+    _planner_system_prompt,
+)
 from app.graph.nodes import agent_think, format_response, needs_approval
 from app.graph.tool_registry import plan_tool_call
 
@@ -62,6 +66,36 @@ def test_plan_tool_call_matches_low_stock_listing() -> None:
 
     assert plan is not None
     assert plan.tool_name == "get_low_stock_items"
+
+
+def test_plan_tool_call_matches_product_category_slug_without_llm() -> None:
+    plan = plan_tool_call("Liệt kê sản phẩm danh mục hera-pc")
+
+    assert plan is not None
+    assert plan.tool_name == "list_products_by_category_slug"
+    assert plan.tool_args == {"slug": "hera-pc"}
+
+
+def test_planner_prompt_forbids_verbose_thinking_leak() -> None:
+    prompt = _planner_system_prompt()
+
+    assert "Khong giai thich truoc" in prompt
+    assert "DUY NHAT mot JSON object" in prompt
+    assert "list_products_by_category_slug" in prompt
+
+
+def test_verbose_tool_call_text_can_be_recovered_as_plan() -> None:
+    parsed = _extract_tool_call_from_verbose_text(
+        'Toi se goi tool list_products_by_category_slug(category_slug="hera-pc")',
+        ["list_products_by_category_slug"],
+    )
+
+    assert parsed == {
+        "tool_name": "list_products_by_category_slug",
+        "tool_args": {"slug": "hera-pc"},
+        "required_role": "operator",
+        "rationale": "parsed_from_verbose_tool_call",
+    }
 
 
 @pytest.mark.asyncio

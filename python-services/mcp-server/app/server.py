@@ -30,6 +30,7 @@ from app.tools import inventory as _inventory_tools  # noqa: F401
 from app.tools import news as _news_tools  # noqa: F401
 from app.tools import order as _order_tools  # noqa: F401
 from app.tools import payment as _payment_tools  # noqa: F401
+from app.tools import product as _product_tools  # noqa: F401
 from app.tools import promotion as _promotion_tools  # noqa: F401
 from app.tools.health import SERVICE_APIS
 

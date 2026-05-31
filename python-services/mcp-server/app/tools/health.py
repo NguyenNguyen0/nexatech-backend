@@ -8,12 +8,14 @@ from app.services.inventory import INVENTORY_API
 from app.services.news import NEWS_API
 from app.services.order import ORDER_API
 from app.services.payment import PAYMENT_API
+from app.services.product import PRODUCT_API
 from app.services.promotion import PROMOTION_API
 from pydantic import Field
 
 
 SERVICE_APIS = {
     "news-service": NEWS_API,
+    "product-service": PRODUCT_API,
     "inventory-service": INVENTORY_API,
     "order-service": ORDER_API,
     "payment-service": PAYMENT_API,
@@ -29,8 +31,8 @@ async def check_dependency_health(
         Field(
             description=(
                 "Optional service name to check. Supported values: news-service, "
-                "inventory-service, order-service, payment-service, audit-service, "
-                "promotion-service. Omit to check every dependency."
+                "product-service, inventory-service, order-service, payment-service, "
+                "audit-service, promotion-service. Omit to check every dependency."
             ),
         ),
     ] = None,
@@ -78,6 +80,12 @@ async def check_news_service_health() -> dict[str, Any]:
 async def check_inventory_service_health() -> dict[str, Any]:
     """Check whether inventory-service is reachable from the MCP server."""
     return await INVENTORY_API.health()
+
+
+@mcp.tool()
+async def check_product_service_health() -> dict[str, Any]:
+    """Check whether product-service is reachable from the MCP server."""
+    return await PRODUCT_API.health()
 
 
 @mcp.tool()

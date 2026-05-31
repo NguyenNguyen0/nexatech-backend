@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     groq_api_key: str | None = None
     groq_model: str = "llama-3.3-70b-versatile"
+    groq_temperature: float = Field(default=0.1, ge=0, le=2)
 
     agui_agent_name: str = "nexatech_agent"
     agui_agent_description: str = (

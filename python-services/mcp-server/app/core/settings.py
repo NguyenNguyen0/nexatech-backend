@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     eureka_instance_hostname: str = Field(default_factory=_resolve_hostname)
 
     news_service_base_url: str = "http://localhost:8092"
+    product_service_base_url: str = "http://localhost:8090"
     inventory_service_base_url: str = "http://localhost:8085"
     order_service_base_url: str = "http://localhost:8084"
     payment_service_base_url: str = "http://localhost:8086"
@@ -38,6 +39,7 @@ class Settings(BaseSettings):
     promotion_service_base_url: str = "http://localhost:8093"
 
     news_service_health_path: str = "/actuator/health"
+    product_service_health_path: str = "/actuator/health"
     inventory_service_health_path: str = "/actuator/health"
     order_service_health_path: str = "/actuator/health"
     payment_service_health_path: str = "/actuator/health"

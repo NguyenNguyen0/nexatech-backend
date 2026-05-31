@@ -170,6 +170,162 @@ TOOL_DESCRIPTORS: tuple[ToolDescriptor, ...] = (
         tool_args={"params": {}},
         rationale="Use audit log search when the request asks for audit history or traces.",
     ),
+    # ── Product tools ──────────────────────────────────────────────
+    ToolDescriptor(
+        tool_name="list_products",
+        keywords=(
+            "product",
+            "products",
+            "sản phẩm",
+            "san pham",
+            "catalog",
+            "danh mục sản phẩm",
+            "danh muc san pham",
+        ),
+        tool_args={"params": {}},
+        rationale="Use product listing when the request asks to browse or filter products.",
+    ),
+    ToolDescriptor(
+        tool_name="search_products",
+        keywords=("search products", "tìm sản phẩm", "tim san pham", "tìm kiếm sản phẩm"),
+        rationale="Use product search when the request contains a product search keyword.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_product",
+        keywords=("product id", "mã sản phẩm", "ma san pham", "chi tiết sản phẩm"),
+        rationale="Use product lookup when the request provides a product id.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_product_by_slug",
+        keywords=("product slug", "slug sản phẩm", "slug san pham"),
+        rationale="Use product lookup by slug when the request provides a product slug.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="list_featured_products",
+        keywords=(
+            "featured products",
+            "sản phẩm nổi bật",
+            "san pham noi bat",
+            "hàng nổi bật",
+            "hang noi bat",
+        ),
+        tool_args={"params": {}},
+        rationale="Use featured product listing when the request asks for featured products.",
+    ),
+    ToolDescriptor(
+        tool_name="list_products_by_tags",
+        keywords=("product tags", "tag sản phẩm", "tag san pham", "sản phẩm theo tag"),
+        rationale="Use product-by-tags listing when the request provides product tags.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="list_products_by_category",
+        keywords=("category id", "mã danh mục", "ma danh muc", "sản phẩm danh mục id"),
+        rationale="Use category-id product listing when the request provides a category id.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="list_products_by_category_slug",
+        keywords=(
+            "category slug",
+            "danh mục slug",
+            "danh muc slug",
+            "sản phẩm danh mục",
+            "san pham danh muc",
+            "sản phẩm trong danh mục",
+            "san pham trong danh muc",
+        ),
+        rationale="Use category-slug product listing when the request asks for products in a category slug.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_related_products",
+        keywords=("related products", "sản phẩm liên quan", "san pham lien quan"),
+        rationale="Use related-product lookup when the request provides a product id.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_related_products_by_slug",
+        keywords=("related products slug", "sản phẩm liên quan slug"),
+        rationale="Use related-product lookup by slug when the request provides a product slug.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="create_product",
+        keywords=("create product", "tạo sản phẩm", "tao san pham"),
+        rationale="Use product creation when the request asks to create a catalog product.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="update_product",
+        keywords=("update product", "cập nhật sản phẩm", "cap nhat san pham"),
+        rationale="Use product update when the request asks to modify a catalog product.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="delete_product",
+        keywords=("delete product", "xóa sản phẩm", "xoa san pham", "ẩn sản phẩm"),
+        rationale="Use product deletion when the request asks to remove or hide a product.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="restore_product",
+        keywords=("restore product", "khôi phục sản phẩm", "khoi phuc san pham"),
+        rationale="Use product restore when the request asks to restore a deleted product.",
+        heuristic_enabled=False,
+    ),
+    # ── Review tools ───────────────────────────────────────────────
+    ToolDescriptor(
+        tool_name="list_reviews",
+        keywords=("review", "reviews", "đánh giá", "danh gia", "bình luận", "binh luan"),
+        tool_args={"params": {}},
+        rationale="Use admin review listing when the request asks to browse or moderate reviews.",
+    ),
+    ToolDescriptor(
+        tool_name="list_reviews_by_product",
+        keywords=("product reviews", "review sản phẩm", "danh gia san pham"),
+        rationale="Use product review listing when the request provides a product id.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="list_reviews_by_product_slug",
+        keywords=("product slug reviews", "review slug sản phẩm", "danh gia slug san pham"),
+        rationale="Use product review listing by slug when the request provides a product slug.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="get_my_review_for_product",
+        keywords=("my review", "review của tôi", "danh gia cua toi"),
+        rationale="Use my-review lookup when the current user asks about their review for a product.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="create_review",
+        keywords=("create review", "tạo đánh giá", "tao danh gia", "viết review"),
+        rationale="Use review creation when the request asks to submit a product review.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="update_review",
+        keywords=("update review", "cập nhật đánh giá", "cap nhat danh gia"),
+        rationale="Use review update when the request asks to edit an existing review.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="delete_review",
+        keywords=("delete review", "xóa đánh giá", "xoa danh gia"),
+        rationale="Use review deletion when the request asks to remove a review.",
+        heuristic_enabled=False,
+    ),
+    ToolDescriptor(
+        tool_name="mark_review_helpful",
+        keywords=("helpful review", "đánh dấu hữu ích", "danh dau huu ich"),
+        rationale="Use mark-helpful when the request asks to mark a review as helpful.",
+        heuristic_enabled=False,
+    ),
     # ── Payment tools ──────────────────────────────────────────────
     ToolDescriptor(
         tool_name="get_my_payments",
@@ -331,10 +487,130 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.casefold()).strip()
 
 
+def _extract_slug_after_any(text: str, markers: tuple[str, ...]) -> str | None:
+    for marker in markers:
+        pattern = rf"{re.escape(marker)}\s+([a-zA-Z0-9][a-zA-Z0-9_-]*)"
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _plan_product_request(normalized_text: str) -> ToolPlan | None:
+    has_product_intent = any(
+        term in normalized_text
+        for term in ("product", "products", "sản phẩm", "san pham")
+    )
+    if not has_product_intent:
+        return None
+
+    category_slug = _extract_slug_after_any(
+        normalized_text,
+        (
+            "category slug",
+            "danh mục",
+            "danh muc",
+            "category",
+        ),
+    )
+    if category_slug:
+        return ToolPlan(
+            tool_name="list_products_by_category_slug",
+            tool_args={"slug": category_slug},
+            required_role="operator",
+            rationale="category product listing by slug",
+        )
+
+    product_slug = _extract_slug_after_any(
+        normalized_text,
+        (
+            "product slug",
+            "slug sản phẩm",
+            "slug san pham",
+        ),
+    )
+    if product_slug:
+        return ToolPlan(
+            tool_name="get_product_by_slug",
+            tool_args={"slug": product_slug},
+            required_role="operator",
+            rationale="product detail by slug",
+        )
+
+    search_keyword = _extract_slug_after_any(
+        normalized_text,
+        (
+            "tìm sản phẩm",
+            "tim san pham",
+            "search products",
+            "search product",
+        ),
+    )
+    if search_keyword:
+        return ToolPlan(
+            tool_name="search_products",
+            tool_args={"keyword": search_keyword, "params": {}},
+            required_role="operator",
+            rationale="product keyword search",
+        )
+
+    return None
+
+
+def _plan_review_request(normalized_text: str) -> ToolPlan | None:
+    has_review_intent = any(
+        term in normalized_text
+        for term in ("review", "reviews", "đánh giá", "danh gia")
+    )
+    if not has_review_intent:
+        return None
+
+    product_slug = _extract_slug_after_any(
+        normalized_text,
+        (
+            "product slug",
+            "slug sản phẩm",
+            "slug san pham",
+        ),
+    )
+    if product_slug:
+        return ToolPlan(
+            tool_name="list_reviews_by_product_slug",
+            tool_args={"slug": product_slug},
+            required_role="operator",
+            rationale="product reviews by slug",
+        )
+
+    product_id = _extract_slug_after_any(
+        normalized_text,
+        (
+            "product id",
+            "mã sản phẩm",
+            "ma san pham",
+            "sản phẩm",
+            "san pham",
+            "product",
+        ),
+    )
+    if product_id:
+        return ToolPlan(
+            tool_name="list_reviews_by_product",
+            tool_args={"product_id": product_id, "params": {}},
+            required_role="operator",
+            rationale="product reviews by product id",
+        )
+
+    return None
+
+
 def plan_tool_call(user_text: str) -> ToolPlan | None:
     normalized_text = _normalize(user_text)
     if not normalized_text:
         return None
+
+    specific_plan = _plan_product_request(normalized_text) or _plan_review_request(normalized_text)
+    if specific_plan is not None:
+        return specific_plan
 
     for descriptor in TOOL_DESCRIPTORS:
         if not descriptor.heuristic_enabled:
