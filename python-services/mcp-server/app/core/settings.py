@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     service_name: str = "mcp-server"
     port: int = 8094
     log_level: str = "INFO"
+    mcp_server_profile: str = "all"
+    startup_dependency_checks_enabled: bool = True
     request_timeout_seconds: float = Field(default=5.0, gt=0)
 
     eureka_enabled: bool = True
@@ -37,6 +39,14 @@ class Settings(BaseSettings):
     payment_service_base_url: str = "http://localhost:8086"
     audit_service_base_url: str = "http://localhost:8096"
     promotion_service_base_url: str = "http://localhost:8093"
+
+    inventory_mcp_url: str = "http://localhost:8101"
+    product_mcp_url: str = "http://localhost:8102"
+    order_mcp_url: str = "http://localhost:8103"
+    payment_mcp_url: str = "http://localhost:8104"
+    promotion_mcp_url: str = "http://localhost:8105"
+    news_mcp_url: str = "http://localhost:8106"
+    audit_mcp_url: str = "http://localhost:8107"
 
     news_service_health_path: str = "/actuator/health"
     product_service_health_path: str = "/actuator/health"

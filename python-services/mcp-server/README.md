@@ -6,6 +6,28 @@ FastAPI + FastMCP service for NexaTech with a resilient shared client layer, per
 
 - `8094`
 
+## MCP Profiles
+
+The same codebase can run either the legacy all-tools MCP server or one
+independent domain MCP per process. Select the catalog with
+`MCP_SERVER_PROFILE`.
+
+| Profile | Service name | Port | Tool modules |
+|---|---|---:|---|
+| `all` | `mcp-server` | `8094` | all existing domain tools + health tools |
+| `meta` | `meta-mcp` | `8094` | MCP domain management/routing tools only |
+| `inventory` | `inventory-mcp` | `8101` | inventory tools |
+| `product` | `product-mcp` | `8102` | product + review tools |
+| `order` | `order-mcp` | `8103` | order tools |
+| `payment` | `payment-mcp` | `8104` | payment tools |
+| `promotion` | `promotion-mcp` | `8105` | promotion + flash-sale tools |
+| `news` | `news-mcp` | `8106` | news tools |
+| `audit` | `audit-mcp` | `8107` | audit tools |
+
+The `meta` MCP does not execute business tools. It exposes management tools
+such as `list_mcp_domains`, `get_mcp_domain`, `route_to_mcp_domain`, and
+`check_mcp_domain_health`.
+
 ## What Exists Now
 
 - `GET /health`
@@ -17,7 +39,10 @@ FastAPI + FastMCP service for NexaTech with a resilient shared client layer, per
 - optional Eureka registration at startup
 - retry-aware downstream HTTP client with structured error payloads
 - per-service internal APIs under `app/services/`
-- health tools for each dependency and an aggregate dependency health tool
+- health tools for each dependency and an aggregate dependency health tool in
+  the legacy `all` profile
+- independent domain MCP profiles plus a `meta` MCP profile for discovery,
+  routing metadata, and managed-domain health checks
 
 ## Run
 
@@ -29,6 +54,25 @@ From the repository root:
 
 ```bash
 make run-mcp
+```
+
+Run the independent MCPs from the repository root:
+
+```bash
+make run-mcp-meta
+make run-mcp-inventory
+make run-mcp-product
+make run-mcp-order
+make run-mcp-payment
+make run-mcp-promotion
+make run-mcp-news
+make run-mcp-audit
+```
+
+Or run any profile manually:
+
+```bash
+SERVICE_NAME=inventory-mcp MCP_SERVER_PROFILE=inventory PORT=8101 uv run main.py
 ```
 
 ## Folder Skeleton
@@ -56,6 +100,7 @@ tests/
 - Audit: `search_audit_logs`, `get_audit_entry`, `get_audit_trace`
 - Promotion: `list_promotions`, `get_promotion`, `list_flash_sales`, `get_flash_sale`
 - Health: `check_dependency_health`, `check_all_dependency_health`, and per-service health tools
+- Meta: `list_mcp_domains`, `get_mcp_domain`, `route_to_mcp_domain`, `check_mcp_domain_health`
 
 All downstream calls go through a shared retrying HTTP client and return structured errors instead of raising to the top-level MCP server.
 

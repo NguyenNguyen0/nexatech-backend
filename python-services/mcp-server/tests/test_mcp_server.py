@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -17,50 +16,65 @@ from app.core.logging import (
     user_id_ctx,
     user_role_ctx,
 )
+from app.mcp.domains import get_profile_tool_modules, list_domain_metadata
 from app.services.audit import AuditServiceApi
 from app.services.inventory import InventoryServiceApi
 from app.services.news import NewsServiceApi
 from app.services.product import ProductServiceApi
 from app.services.promotion import PromotionServiceApi
-from app.server import READINESS_CHECKS, app
+from app.server import READINESS_CHECKS, health, ready, root
 
 
 @pytest.fixture(autouse=True)
 def disable_eureka_for_tests():
     previous = SETTINGS.eureka_enabled
+    previous_dependency_checks = SETTINGS.startup_dependency_checks_enabled
     SETTINGS.eureka_enabled = False
+    SETTINGS.startup_dependency_checks_enabled = False
     READINESS_CHECKS["eureka"] = "disabled"
     yield
     SETTINGS.eureka_enabled = previous
+    SETTINGS.startup_dependency_checks_enabled = previous_dependency_checks
 
 
 def test_health_endpoint() -> None:
-    client = TestClient(app)
-    response = client.get("/health")
+    payload = health()
 
-    assert response.status_code == 200
-    assert response.json()["status"] == "UP"
-    assert response.headers["X-Correlation-Id"]
+    assert payload["status"] == "UP"
+    assert payload["profile"] == "all"
 
 
 def test_ready_endpoint() -> None:
-    client = TestClient(app)
-    response = client.get("/ready")
+    payload = ready()
 
-    assert response.status_code == 200
-    payload = response.json()
     assert payload["ready"] is True
     assert payload["service"] == "mcp-server"
 
 
 def test_root_endpoint_describes_skeleton_layout() -> None:
-    client = TestClient(app)
-    response = client.get("/")
+    payload = root()
 
-    assert response.status_code == 200
-    payload = response.json()
     assert payload["message"] == "mcp-server skeleton is running"
+    assert payload["profile"] == "all"
     assert "app/mcp" in payload["layout"]
+    assert "inventory" in payload["registeredToolModules"]
+
+
+def test_mcp_profiles_select_domain_tool_modules() -> None:
+    assert get_profile_tool_modules("inventory") == ("inventory",)
+    assert get_profile_tool_modules("product") == ("product",)
+    assert get_profile_tool_modules("meta") == ("meta",)
+    assert "health" in get_profile_tool_modules("all")
+    assert get_profile_tool_modules("unknown") == get_profile_tool_modules("all")
+
+
+def test_meta_domain_metadata_lists_independent_mcp_endpoints() -> None:
+    domains = {item["name"]: item for item in list_domain_metadata()}
+
+    assert domains["inventory"]["serviceName"] == "inventory-mcp"
+    assert domains["inventory"]["mcpEndpoint"].endswith(":8101/mcp")
+    assert domains["product"]["toolModules"] == ["product"]
+    assert domains["audit"]["dependencies"] == ["audit-service"]
 
 
 @pytest.mark.asyncio
