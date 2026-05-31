@@ -1,8 +1,11 @@
+server:
+  port: ${SERVER_PORT:8092}
+
 spring:
   application:
     name: news-service
   config:
-    import: "optional:file:./.env[.properties],optional:file:./news-service/.env[.properties],optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}/"
+    import: "optional:file:./.env[.properties],optional:file:./news-service/.env[.properties],optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
   cloud:
     config:
       fail-fast: false
@@ -11,3 +14,11 @@ spring:
         max-attempts: 4
         max-interval: 5000
         multiplier: 1.5
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://${EUREKA_INSTANCE_HOSTNAME:localhost}:8761/eureka/}
+    enabled: ${EUREKA_ENABLED:true}
+    register-with-eureka: ${EUREKA_ENABLED:true}
+    fetch-registry: ${EUREKA_ENABLED:true}
