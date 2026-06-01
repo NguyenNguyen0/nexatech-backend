@@ -16,7 +16,9 @@ variables:
 
 detect:changed-services:
   stage: prepare
-  image: alpine/git:2.47.2
+  image:
+    name: alpine/git:2.47.2
+    entrypoint: [""]
   variables:
     GIT_DEPTH: "0"
   script:
@@ -364,7 +366,9 @@ build:recommendation-service:
 
 trigger:infra-deploy:
   stage: deploy
-  image: curlimages/curl:8.10.1
+  image:
+    name: curlimages/curl:8.10.1
+    entrypoint: [""]
   dependencies:
     - detect:changed-services
   script:
