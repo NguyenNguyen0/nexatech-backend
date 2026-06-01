@@ -732,6 +732,13 @@ async def copilotkit_info() -> dict[str, Any]:
             "agentName": SETTINGS.agui_agent_name,
             "agentDescription": SETTINGS.agui_agent_description,
         },
+        "agents": [
+            {
+                "id": SETTINGS.agui_agent_name,
+                "name": SETTINGS.agui_agent_name,
+                "description": SETTINGS.agui_agent_description,
+            }
+        ],
     }
 
 
@@ -932,6 +939,7 @@ async def run_agent_stream(
                     ),
                 )
                 correlation_id = getattr(raw_request.state, "correlation_id", None)
+                last_tool_call = result.get("last_tool_call") or {}
                 if has_tool_error:
                     # Log tool call failure with correlationId for grep
                     logger.error(
@@ -954,6 +962,7 @@ async def run_agent_stream(
                                 "errorMessage": tool_error_message,
                                 "statusCode": tool_error_status,
                                 "correlationId": correlation_id,
+                                "error": last_tool_call.get("error"),
                             },
                         ),
                     )
@@ -969,6 +978,7 @@ async def run_agent_stream(
                                 "toolName": selected_tool,
                                 "name": selected_tool,
                                 "correlationId": correlation_id,
+                                "result": last_tool_call.get("result"),
                             },
                         ),
                     )

@@ -7,6 +7,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -15,6 +16,22 @@ import org.springframework.security.web.SecurityFilterChain;
 public class GatewaySecurityConfig {
 
     @Bean
+    @Order(1)
+    public SecurityFilterChain publicEndpoints(HttpSecurity http) throws Exception {
+        http.securityMatcher(
+                "/api/v1/agent/health",
+                "/api/v1/agent/copilotkit/info",
+                "/api/v1/mcp/health"
+            )
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(Customizer.withDefaults())
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(a -> a.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain gatewayRoutes(HttpSecurity http) throws Exception {
         stateless(http);
         http.authorizeHttpRequests(a -> a
@@ -46,6 +63,7 @@ public class GatewaySecurityConfig {
                 .permitAll()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/agent/health",
+                    "/api/v1/agent/copilotkit/info",
                     "/api/v1/mcp/health")
                 .permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/checkout").permitAll()
