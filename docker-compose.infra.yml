@@ -129,10 +129,219 @@ services:
       echo 'Bucket nexatech-products ready';
       "
 
+  # ====== Kong Gateway (DB-less, declarative config) ======
+  kong:
+    profiles: ["monitoring"]
+    image: kong:3.9
+    container_name: nexatech-kong
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_STATUS_LISTEN: 0.0.0.0:8100
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8100:8100"
+    volumes:
+      - ./_kong/kong.yml:/kong/declarative/kong.yml:ro
+
+  # ====== Monitored business services (optional demo profile) ======
+  order-service:
+    profiles: ["monitored-services"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: order-service
+    container_name: nexatech-order-service
+    environment:
+      CONFIG_SERVER_URI: http://config-server:8888
+      EUREKA_ENABLED: "false"
+      EUREKA_CLIENT_ENABLED: "false"
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/nexatech_orders
+      DB_USERNAME: nexatech
+      DB_PASSWORD: nexatech123
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  inventory-service:
+    profiles: ["monitored-services"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: inventory-service
+    container_name: nexatech-inventory-service
+    environment:
+      CONFIG_SERVER_URI: http://config-server:8888
+      EUREKA_ENABLED: "false"
+      EUREKA_CLIENT_ENABLED: "false"
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      DB_HOST: postgres
+      DB_USERNAME: nexatech
+      DB_PASSWORD: nexatech123
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  payment-service:
+    profiles: ["monitored-services"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: payment-service
+    container_name: nexatech-payment-service
+    environment:
+      CONFIG_SERVER_URI: http://config-server:8888
+      EUREKA_ENABLED: "false"
+      EUREKA_CLIENT_ENABLED: "false"
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/nexatech_payments
+      DB_USERNAME: nexatech
+      DB_PASSWORD: nexatech123
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      VNPAY_TMN_CODE: demo
+      VNPAY_HASH_SECRET: demo
+      VNPAY_RETURN_URL: http://localhost:8080/api/v1/payments/vnpay/return
+      VNPAY_IPN_URL: http://localhost:8080/api/v1/payments/vnpay/ipn
+    ports:
+      - "8086:8086"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  shipping-service:
+    profiles: ["monitored-services"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: shipping-service
+    container_name: nexatech-shipping-service
+    environment:
+      CONFIG_SERVER_URI: http://config-server:8888
+      EUREKA_ENABLED: "false"
+      EUREKA_CLIENT_ENABLED: "false"
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/nexatech_shipping
+      DB_USERNAME: nexatech
+      DB_PASSWORD: nexatech123
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      SHIPPING_PROVIDER: mock
+    ports:
+      - "8091:8091"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  promotion-service:
+    profiles: ["monitored-services"]
+    build:
+      context: ./promotion-service
+      dockerfile: Dockerfile
+    container_name: nexatech-promotion-service
+    environment:
+      NODE_ENV: development
+      PORT: 8093
+      DATABASE_URL: postgresql://nexatech:nexatech123@postgres:5432/nexatech_promotions
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka:19092
+      KAFKA_GROUP_ID: promotion-service-group
+      RESERVATION_TTL_SECONDS: 300
+      SERVICE_NAME: promotion-service
+      EUREKA_ENABLED: "false"
+      EUREKA_INSTANCE_HOSTNAME: promotion-service
+      EUREKA_INSTANCE_PORT: 8093
+    ports:
+      - "8093:8093"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # ====== Prometheus ======
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v2.55.1
+    container_name: nexatech-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - kong
+
+  # ====== Grafana ======
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:11.4.0
+    container_name: nexatech-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3005:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
 volumes:
   postgres_data:
   mongodb_data:
   minio_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   default:

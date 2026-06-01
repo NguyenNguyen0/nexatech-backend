@@ -38,6 +38,30 @@ public class GatewaySecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/**", "/api/v1/auth", "/api/v1/auth/**", "/ws/chat", "/ws/chat/**")
                 .permitAll()
+                .requestMatchers(
+                    "/api/v1/cart",
+                    "/api/v1/cart/**",
+                    "/api/v1/checkout",
+                    "/api/v1/orders",
+                    "/api/v1/orders/**",
+                    "/api/v1/returns",
+                    "/api/v1/returns/**",
+                    "/api/v1/admin/orders",
+                    "/api/v1/admin/orders/**",
+                    "/api/v1/payments",
+                    "/api/v1/payments/**",
+                    "/api/v1/admin/payments",
+                    "/api/v1/admin/payments/**",
+                    "/payment/vnpay/**",
+                    "/api/v1/shipping",
+                    "/api/v1/shipping/**",
+                    "/api/v1/promotions",
+                    "/api/v1/promotions/**",
+                    "/api/v1/flash-sales",
+                    "/api/v1/flash-sales/**",
+                    "/api/v1/conversations",
+                    "/api/v1/conversations/**")
+                .permitAll()
                 .requestMatchers("/api/v1/products/wishlist/**").authenticated()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/products",
@@ -52,8 +76,16 @@ public class GatewaySecurityConfig {
                     "/api/v1/recommend/**",
                     "/api/v1/news",
                     "/api/v1/news/**",
-                    "/api/v1/conversations",
-                    "/api/v1/conversations/**")
+                    "/api/v1/conversations/current",
+                    "/api/v1/conversations/*/messages")
+                .permitAll()
+                .requestMatchers(HttpMethod.POST,
+                    "/api/v1/conversations/current",
+                    "/api/v1/conversations/*/messages")
+                .permitAll()
+                .requestMatchers(HttpMethod.PUT,
+                    "/api/v1/conversations/*/messages/*/delivered",
+                    "/api/v1/conversations/*/messages/*/seen")
                 .permitAll()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/promotions",
