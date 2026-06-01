@@ -499,15 +499,22 @@ async def _initialize_graph_runtime(app: FastAPI) -> None:
             exc.__class__.__name__,
         )
 
-    if attach_copilotkit_endpoint(
-        app,
-        agent_name=SETTINGS.agui_agent_name,
-        agent_description=SETTINGS.agui_agent_description,
-        graph=COMPILED_GRAPH,
-    ):
-        READINESS_CHECKS["copilotkit"] = "ok"
-    else:
-        READINESS_CHECKS["copilotkit"] = "unavailable"
+    copilotkit_paths = [
+        "/api/v1/agent/copilotkit",
+        "/copilotkit",
+    ]
+    mounted = False
+    for path in copilotkit_paths:
+        if attach_copilotkit_endpoint(
+            app,
+            agent_name=SETTINGS.agui_agent_name,
+            agent_description=SETTINGS.agui_agent_description,
+            graph=COMPILED_GRAPH,
+            path=path,
+        ):
+            mounted = True
+
+    READINESS_CHECKS["copilotkit"] = "ok" if mounted else "unavailable"
 
 
 async def _initialize_conversation_runtime(app: FastAPI) -> None:
@@ -710,6 +717,21 @@ async def get_delegation_metrics() -> dict[str, Any]:
     return {
         "service": SETTINGS.service_name,
         "metrics": DELEGATION_METRICS.snapshot(),
+    }
+
+
+@app.get("/copilotkit/info")
+@app.get("/api/v1/agent/copilotkit/info")
+async def copilotkit_info() -> dict[str, Any]:
+    """Return runtime metadata used by CopilotKit frontend handshake."""
+    return {
+        "status": "ok",
+        "service": SETTINGS.service_name,
+        "runtime": {
+            "agui": True,
+            "agentName": SETTINGS.agui_agent_name,
+            "agentDescription": SETTINGS.agui_agent_description,
+        },
     }
 
 

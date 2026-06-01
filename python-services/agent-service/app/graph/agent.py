@@ -12,7 +12,6 @@ from app.graph.edges import (
     route_after_permission,
 )
 from app.graph.nodes import (
-    agent_think,
     build_preview,
     classify_request,
     domain_executor,
@@ -32,7 +31,6 @@ def compile_graph(checkpointer: Any | None = None):
 
     workflow.add_node("classify_request", classify_request)
     workflow.add_node("permission_gate", permission_gate)
-    workflow.add_node("agent_think", agent_think)
     workflow.add_node("domain_router", domain_router)
     workflow.add_node("domain_executor", domain_executor)
     workflow.add_node("needs_approval", needs_approval)
