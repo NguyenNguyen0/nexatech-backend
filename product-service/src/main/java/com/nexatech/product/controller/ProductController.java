@@ -4,6 +4,7 @@ import com.nexatech.product.command.product.CreateProductCommand;
 import com.nexatech.product.command.product.DeleteProductCommand;
 import com.nexatech.product.command.product.RestoreProductCommand;
 import com.nexatech.product.command.product.UpdateProductCommand;
+import com.nexatech.product.constant.PermissionsAccept;
 import com.nexatech.product.dto.request.ProductRequest;
 import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.CatalogCacheVersionResponse;
@@ -17,6 +18,7 @@ import com.nexatech.product.handler.review.ReviewQueryHandler;
 import com.nexatech.product.query.product.*;
 import com.nexatech.product.query.review.GetReviewsByProductSlugQuery;
 import com.nexatech.product.service.CatalogCacheVersionService;
+import com.nexatech.product.security.RequiresPermission;
 import com.nexatech.product.util.TextUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,11 +48,13 @@ public class ProductController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @RequiresPermission(PermissionsAccept.Product.CREATE)
     public ApiResponse<ProductResponse> createProduct(@Valid @RequestBody ProductRequest request) {
         return ApiResponse.ok(productCommandHandler.handle(toCreateCommand(request)));
     }
 
     @PutMapping("/{id}")
+    @RequiresPermission(PermissionsAccept.Product.UPDATE)
     public ApiResponse<ProductResponse> updateProduct(
             @PathVariable String id,
             @Valid @RequestBody ProductRequest request) {
@@ -220,12 +224,14 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
+    @RequiresPermission(PermissionsAccept.Product.DELETE)
     public ApiResponse<Void> deleteProduct(@PathVariable String id) {
         productCommandHandler.handle(new DeleteProductCommand(id));
         return ApiResponse.ok(null);
     }
 
     @PatchMapping("/{id}/restore")
+    @RequiresPermission(PermissionsAccept.Product.UPDATE)
     public ApiResponse<ProductResponse> restoreProduct(@PathVariable String id) {
         return ApiResponse.ok(productCommandHandler.handle(new RestoreProductCommand(id)));
     }

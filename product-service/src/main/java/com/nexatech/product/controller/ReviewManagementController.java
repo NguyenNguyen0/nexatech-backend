@@ -3,6 +3,7 @@ package com.nexatech.product.controller;
 import com.nexatech.product.command.review.DeleteReviewCommand;
 import com.nexatech.product.command.review.MarkHelpfulCommand;
 import com.nexatech.product.command.review.UpdateReviewCommand;
+import com.nexatech.product.constant.PermissionsAccept;
 import com.nexatech.product.dto.request.ReviewRequest;
 import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.PageResponse;
@@ -10,6 +11,7 @@ import com.nexatech.product.dto.response.ReviewResponse;
 import com.nexatech.product.handler.review.ReviewCommandHandler;
 import com.nexatech.product.handler.review.ReviewQueryHandler;
 import com.nexatech.product.query.review.GetReviewsForAdminQuery;
+import com.nexatech.product.security.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +29,7 @@ public class ReviewManagementController {
     private final ReviewQueryHandler reviewQueryHandler;
 
     @GetMapping
+    @RequiresPermission(PermissionsAccept.Product.REVIEW_READ)
     public ApiResponse<PageResponse<ReviewResponse>> getReviews(
             @RequestParam(required = false) String productId,
             @RequestParam(required = false) Integer rating,
@@ -39,6 +42,7 @@ public class ReviewManagementController {
     }
 
     @PutMapping("/{id}")
+    @RequiresPermission(PermissionsAccept.Product.REVIEW_MODERATE)
     public ApiResponse<ReviewResponse> updateReview(
             @PathVariable String id,
             @RequestHeader("X-User-Id") UUID userId,
@@ -56,6 +60,7 @@ public class ReviewManagementController {
     }
 
     @DeleteMapping("/{id}")
+    @RequiresPermission(PermissionsAccept.Product.REVIEW_MODERATE)
     public ApiResponse<Void> deleteReview(
             @PathVariable String id,
             @RequestHeader("X-User-Id") UUID userId,

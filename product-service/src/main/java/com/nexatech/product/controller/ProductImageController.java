@@ -1,9 +1,11 @@
 package com.nexatech.product.controller;
 
+import com.nexatech.product.constant.PermissionsAccept;
 import com.nexatech.product.dto.request.ImageDeleteRequest;
 import com.nexatech.product.dto.request.ImageReorderRequest;
 import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.ProductResponse;
+import com.nexatech.product.security.RequiresPermission;
 import com.nexatech.product.service.ProductImageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ public class ProductImageController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
+    @RequiresPermission(PermissionsAccept.Product.IMAGE_WRITE)
     public ApiResponse<ProductResponse> uploadImages(
             @PathVariable String id,
             @RequestPart("files") List<MultipartFile> files) {
@@ -30,6 +33,7 @@ public class ProductImageController {
     }
 
     @DeleteMapping
+    @RequiresPermission(PermissionsAccept.Product.IMAGE_WRITE)
     public ApiResponse<ProductResponse> deleteImage(
             @PathVariable String id,
             @Valid @RequestBody ImageDeleteRequest request) {
@@ -37,6 +41,7 @@ public class ProductImageController {
     }
 
     @PutMapping("/reorder")
+    @RequiresPermission(PermissionsAccept.Product.IMAGE_WRITE)
     public ApiResponse<ProductResponse> reorderImages(
             @PathVariable String id,
             @Valid @RequestBody ImageReorderRequest request) {
