@@ -487,6 +487,22 @@ GET /actuator/info
 GET /actuator/prometheus
 ```
 
+Local monitoring is defined in [`docker-compose.infra.yml`](docker-compose.infra.yml) and [`monitoring/prometheus.yml`](monitoring/prometheus.yml).
+
+```bash
+docker compose -f docker-compose.infra.yml --profile monitoring up -d
+```
+
+Open Prometheus at `http://localhost:9090` and Grafana at `http://localhost:3005` (`admin` / `admin`). Grafana auto-loads the Prometheus datasource and the `NexaTech Microservices Overview` dashboard.
+
+For a Docker-only demo of the monitored services, use the optional profile:
+
+```bash
+docker compose -f docker-compose.infra.yml --profile monitoring --profile monitored-services up -d --build
+```
+
+Prometheus scrapes service container names on the `nexatech-infra-net` Docker network, for example `order-service:8084` and `promotion-service:8093`.
+
 Eureka registration can be inspected at:
 
 ```text
