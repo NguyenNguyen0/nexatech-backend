@@ -573,30 +573,30 @@ async def test_product_api_uses_real_product_and_review_endpoints() -> None:
             assert request.url.params.get("ignored") is None
             return httpx.Response(
                 200,
-                json={"code": 1000, "result": {"content": [{"id": "product-1"}]}},
+                json={"code": 1000, "result": {"content": [{"id": "product-1", "thumbnail": "http://example.com/thumbnail-1.png"}]}},
             )
         if request.url.path == "/api/v1/products/search":
             assert request.url.params.get("keyword") == "laptop"
             assert request.url.params.get("categorySlug") == "laptops"
             return httpx.Response(
                 200,
-                json={"code": 1000, "result": {"content": [{"id": "product-2"}]}},
+                json={"code": 1000, "result": {"content": [{"id": "product-2", "thumbnail": "http://example.com/thumbnail-2.png"}]}},
             )
         if request.url.path == "/api/v1/products/product-1" and request.method == "GET":
             return httpx.Response(
                 200,
-                json={"code": 1000, "result": {"id": "product-1", "name": "Phone"}},
+                json={"code": 1000, "result": {"id": "product-1", "name": "Phone", "thumbnail": "http://example.com/thumbnail-1.png"}},
             )
         if request.url.path == "/api/v1/products/slug/phone-1" and request.method == "GET":
             return httpx.Response(
                 200,
-                json={"code": 1000, "result": {"id": "product-1", "slug": "phone-1"}},
+                json={"code": 1000, "result": {"id": "product-1", "slug": "phone-1", "thumbnail": "http://example.com/thumbnail-1.png"}},
             )
         if request.url.path == "/api/v1/products/featured":
             assert request.url.params.get("page") == "0"
             return httpx.Response(
                 200,
-                json={"code": 1000, "result": {"content": [{"id": "featured-1"}]}},
+                json={"code": 1000, "result": {"content": [{"id": "featured-1", "thumbnail": "http://example.com/thumbnail-featured.png"}]}},
             )
         if request.url.path == "/api/v1/products/tags":
             assert list(request.url.params.get_list("tags")) == ["gaming", "sale"]
@@ -724,11 +724,13 @@ async def test_product_api_uses_real_product_and_review_endpoints() -> None:
     finally:
         user_id_ctx.reset(token_user_id)
 
-    assert products["content"] == [{"id": "product-1"}]
-    assert search["content"] == [{"id": "product-2"}]
+    assert products["content"] == [{"id": "product-1", "thumbnail": "http://example.com/thumbnail-1.png"}]
+    assert search["content"] == [{"id": "product-2", "thumbnail": "http://example.com/thumbnail-2.png"}]
     assert product["id"] == "product-1"
+    assert product["thumbnail"] == "http://example.com/thumbnail-1.png"
     assert product_by_slug["slug"] == "phone-1"
-    assert featured["content"] == [{"id": "featured-1"}]
+    assert product_by_slug["thumbnail"] == "http://example.com/thumbnail-1.png"
+    assert featured["content"] == [{"id": "featured-1", "thumbnail": "http://example.com/thumbnail-featured.png"}]
     assert tagged["content"] == [{"id": "tagged-1"}]
     assert category["content"] == [{"id": "category-1"}]
     assert category_slug["content"] == [{"id": "laptop-1"}]
