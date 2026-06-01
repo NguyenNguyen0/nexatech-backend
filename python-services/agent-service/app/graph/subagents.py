@@ -5,6 +5,7 @@ from typing import Any
 
 from app.graph.llm_planner import plan_tool_call_with_llm
 from app.graph.tool_registry import extract_latest_user_text, plan_tool_call
+from app.runtime.delegation_metrics import DELEGATION_METRICS
 
 
 _DOMAIN_TOOL_ALLOWLIST: dict[str, set[str]] = {
@@ -135,19 +136,25 @@ async def plan_with_subagent(state: dict[str, Any]) -> dict[str, Any]:
     input_text = state.get("input_text") or extract_latest_user_text(state)
     available_tools = list(state.get("available_tools") or [])
     scoped_tools = _scope_tools_by_domain(domain, available_tools)
+    DELEGATION_METRICS.record("delegation_requests_total", domain=domain)
+    DELEGATION_METRICS.record("scoped_tools_count", domain=domain, increment=len(scoped_tools))
 
     # If domain filtering over-constrains a request, gracefully fall back to
     # the runtime-provided tool catalog instead of failing hard.
     effective_tools = scoped_tools or available_tools
+    if not scoped_tools and available_tools:
+        DELEGATION_METRICS.record("scope_fallback_total", domain=domain)
 
     plan = plan_tool_call(input_text, available_tools=effective_tools)
     if plan is None:
+        DELEGATION_METRICS.record("llm_fallback_total", domain=domain)
         plan = await plan_tool_call_with_llm(
             input_text,
             available_tools=effective_tools,
         )
 
     if plan is None:
+        DELEGATION_METRICS.record("no_matching_tool_total", domain=domain)
         return {
             "final_status": "no_matching_tool",
             "answer_context": {

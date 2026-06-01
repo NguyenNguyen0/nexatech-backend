@@ -7,6 +7,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.settings import SETTINGS
+from app.runtime.delegation_metrics import DELEGATION_METRICS
 from app.server import READINESS_CHECKS, app
 import app.server as server
 
@@ -16,8 +17,10 @@ def disable_eureka_for_tests():
     previous = SETTINGS.eureka_enabled
     SETTINGS.eureka_enabled = False
     READINESS_CHECKS["eureka"] = "disabled"
+    DELEGATION_METRICS.reset()
     yield
     SETTINGS.eureka_enabled = previous
+    DELEGATION_METRICS.reset()
 
 
 @pytest.mark.asyncio
@@ -103,3 +106,22 @@ async def test_root_endpoint_describes_skeleton_layout() -> None:
     payload = response.json()
     assert payload["message"] == "agent-service skeleton is running"
     assert "app/graph" in payload["layout"]
+
+
+@pytest.mark.asyncio
+async def test_delegation_metrics_endpoint_returns_snapshot() -> None:
+    DELEGATION_METRICS.record("route_domain_total", domain="product")
+    DELEGATION_METRICS.record("delegation_requests_total", domain="product")
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get("/api/v1/agent/metrics/delegation")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["service"] == "agent-service"
+    assert payload["metrics"]["totals"]["route_domain_total"] == 1
+    assert payload["metrics"]["totals"]["delegation_requests_total"] == 1
+    assert payload["metrics"]["byDomain"]["product"]["route_domain_total"] == 1

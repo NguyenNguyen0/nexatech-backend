@@ -14,6 +14,7 @@ from app.graph.tool_descriptions import TOOL_DESCRIPTIONS
 from app.graph.tool_registry import extract_latest_user_text, plan_tool_call
 from app.hitl.sensitivity import TOOL_SENSITIVITY
 from app.mcp_client import MCP_CLIENT
+from app.runtime.delegation_metrics import DELEGATION_METRICS
 
 
 logger = logging.getLogger(__name__)
@@ -156,6 +157,7 @@ async def domain_router(state: dict[str, Any]) -> dict[str, Any]:
 
     # Meta-intent requests should be delegated to the meta subagent.
     if "skill" in input_text or "mcp" in input_text:
+        DELEGATION_METRICS.record("route_meta_intent_total", domain="meta")
         return {
             "mcp_target_domain": "meta",
             "mcp_target_url": state.get("mcp_meta_url") or state.get("mcp_target_url"),
@@ -163,14 +165,17 @@ async def domain_router(state: dict[str, Any]) -> dict[str, Any]:
         }
 
     if domain == "meta":
+        DELEGATION_METRICS.record("route_meta_domain_total", domain="meta")
         return {
             "mcp_target_url": state.get("mcp_meta_url") or state.get("mcp_target_url"),
             "subagent_name": "meta_subagent",
         }
 
     if domain == "general":
+        DELEGATION_METRICS.record("route_general_total", domain="general")
         return {"subagent_name": "general_subagent"}
 
+    DELEGATION_METRICS.record("route_domain_total", domain=domain)
     return {"subagent_name": f"{domain}_subagent"}
 
 

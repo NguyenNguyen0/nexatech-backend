@@ -24,6 +24,7 @@ from app.graph.nodes import (
 from app.graph.routing.keyword_matcher import KeywordToolMatcher
 from app.graph.tool_registry import TOOL_DESCRIPTORS
 from app.graph.tool_registry import plan_tool_call
+from app.runtime.delegation_metrics import DELEGATION_METRICS
 
 
 def test_plan_tool_call_matches_promotions() -> None:
@@ -403,6 +404,27 @@ async def test_domain_executor_returns_no_matching_when_scoped_tools_cannot_plan
     assert result["subagent_name"] == "audit_subagent"
     assert result["answer_context"]["domain"] == "audit"
     assert result["answer_context"]["error"] == "no_matching_tool"
+
+
+@pytest.mark.asyncio
+async def test_domain_executor_updates_delegation_metrics() -> None:
+    DELEGATION_METRICS.reset()
+
+    result = await domain_executor(
+        {
+            "messages": [{"role": "user", "content": "liệt kê sản phẩm"}],
+            "mcp_target_domain": "product",
+            "available_tools": ["list_products", "get_order"],
+            "tool_results": [],
+            "tool_errors": [],
+        }
+    )
+
+    snapshot = DELEGATION_METRICS.snapshot()
+    assert result["selected_tool"] == "list_products"
+    assert snapshot["totals"]["delegation_requests_total"] >= 1
+    assert snapshot["byDomain"]["product"]["delegation_requests_total"] >= 1
+    assert snapshot["byDomain"]["product"]["scoped_tools_count"] >= 1
 
 
 def test_compile_graph_without_checkpointer() -> None:

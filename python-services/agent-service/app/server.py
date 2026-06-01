@@ -39,6 +39,7 @@ from app.runtime.checkpointer import (
     initialize_checkpointer,
 )
 from app.runtime.conversation_store import initialize_conversation_store
+from app.runtime.delegation_metrics import DELEGATION_METRICS
 
 
 configure_runtime_environment()
@@ -394,20 +395,28 @@ async def _resolve_mcp_runtime_context(message: str) -> dict[str, Any]:
             base_url=SETTINGS.mcp_meta_url,
         )
         routed_domain = _extract_routed_domain(route_result)
+        if routed_domain:
+            DELEGATION_METRICS.record("runtime_domain_route_total", domain=routed_domain)
+        else:
+            DELEGATION_METRICS.record("runtime_domain_route_miss_total", domain="unknown")
 
     if routed_domain is None:
         routed_domain = SETTINGS.mcp_default_domain.strip().lower() if SETTINGS.mcp_default_domain else None
+        if routed_domain:
+            DELEGATION_METRICS.record("runtime_default_domain_total", domain=routed_domain)
 
     target_url = _resolve_domain_mcp_url(routed_domain) or SETTINGS.mcp_server_url
     available_tools = await _log_connected_mcp_tools(message, base_url=target_url)
 
     # Fallback to default MCP endpoint if selected domain catalog is unavailable.
     if not available_tools and target_url.rstrip("/") != SETTINGS.mcp_server_url.rstrip("/"):
+        DELEGATION_METRICS.record("runtime_domain_catalog_empty_total", domain=routed_domain)
         fallback_tools = await _log_connected_mcp_tools(
             message,
             base_url=SETTINGS.mcp_server_url,
         )
         if fallback_tools:
+            DELEGATION_METRICS.record("runtime_catalog_fallback_total", domain=routed_domain)
             return {
                 "mcp_target_domain": None,
                 "mcp_target_url": SETTINGS.mcp_server_url,
@@ -692,6 +701,15 @@ async def root() -> dict[str, object]:
             "app/mcp_client.py",
             "app/config.py",
         ],
+    }
+
+
+@app.get("/metrics/delegation")
+@app.get("/api/v1/agent/metrics/delegation")
+async def get_delegation_metrics() -> dict[str, Any]:
+    return {
+        "service": SETTINGS.service_name,
+        "metrics": DELEGATION_METRICS.snapshot(),
     }
 
 
