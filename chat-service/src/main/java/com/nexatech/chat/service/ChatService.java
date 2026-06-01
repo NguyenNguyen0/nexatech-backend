@@ -30,7 +30,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -164,10 +167,11 @@ public class ChatService {
 
         ensureRecipient(resolveActorId(userId, guestSessionId), message, userRole);
 
-        if (message.getDeliveredAt() == null) {
-            message.setDeliveredAt(Instant.now());
+        if (message.getDeliveredAt() != null) {
+            return toMessageResponse(message);
         }
 
+        message.setDeliveredAt(Instant.now());
         MessageResponse response = toMessageResponse(messageRepository.save(message));
         publishMessageUpdate(response);
         return response;
@@ -180,6 +184,10 @@ public class ChatService {
 
         UUID actorId = resolveActorId(userId, guestSessionId);
         ensureRecipient(actorId, message, userRole);
+
+        if (message.getSeenAt() != null) {
+            return toMessageResponse(message);
+        }
 
         Instant now = Instant.now();
         List<ChatMessage> unseenMessages = messageRepository
@@ -559,17 +567,27 @@ public class ChatService {
     }
 
     private boolean isAdmin(String userRole) {
-        return userRole != null && userRole.trim().equalsIgnoreCase("ADMIN");
+        return hasAnyRole(userRole, Set.of("ADMIN"));
     }
 
     private boolean canAccessAdminInbox(String userRole) {
+        return hasAnyRole(userRole, Set.of("ADMIN", "MANAGER", "STAFF"));
+    }
+
+    private boolean hasAnyRole(String userRole, Set<String> allowedRoles) {
         if (userRole == null || userRole.isBlank()) {
             return false;
         }
-        String normalizedRole = userRole.trim().toUpperCase(java.util.Locale.ROOT);
-        return normalizedRole.equals("ADMIN")
-                || normalizedRole.equals("MANAGER")
-                || normalizedRole.equals("STAFF");
+        return Arrays.stream(userRole.split("[,;\\s]+"))
+                .map(this::normalizeRole)
+                .anyMatch(allowedRoles::contains);
+    }
+
+    private String normalizeRole(String role) {
+        return role.trim()
+                .toUpperCase(Locale.ROOT)
+                .replaceFirst("^ROLE_", "")
+                .replaceFirst("^SCOPE_", "");
     }
 
     private int normalizeSize(Integer size) {

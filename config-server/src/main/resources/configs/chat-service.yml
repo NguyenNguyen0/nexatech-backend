@@ -31,6 +31,9 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:${REDIS_PASSWORD:}}
       ssl:
         enabled: ${SPRING_DATA_REDIS_SSL_ENABLED:${REDIS_SSL_ENABLED:false}}
+  mongodb:
+    uri: ${MONGO_CHAT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_chats?authSource=admin&authMechanism=SCRAM-SHA-256}
+    uuid-representation: standard
 
 app:
   presence-ttl-seconds: 90
