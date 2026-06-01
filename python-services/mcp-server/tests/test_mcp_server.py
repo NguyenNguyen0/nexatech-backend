@@ -695,7 +695,7 @@ async def test_product_api_uses_real_product_and_review_endpoints() -> None:
             {"keyword": "phone", "specs.ram": "16GB", "ignored": "drop-me"}
         )
         search = await api.search_products("laptop", {"categorySlug": "laptops"})
-        product = await api.get_product("product-1")
+        product = await api.get_product_by_id("product-1")
         product_by_slug = await api.get_product_by_slug("phone-1")
         featured = await api.list_featured_products({"page": 0})
         tagged = await api.list_products_by_tags(["gaming", "sale"], {"size": 5})

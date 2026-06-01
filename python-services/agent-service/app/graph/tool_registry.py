@@ -259,7 +259,7 @@ TOOL_DESCRIPTORS: tuple[ToolDescriptor, ...] = (
         heuristic_enabled=False,
     ),
     ToolDescriptor(
-        tool_name="get_product",
+        tool_name="get_product_by_id",
         description="Get product detail by product_id",
         keywords=("product id", "mã sản phẩm", "ma san pham", "chi tiết sản phẩm"),
         rationale="Use product lookup when the request provides a product id.",

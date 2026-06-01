@@ -32,7 +32,7 @@ _DOMAIN_TOOL_ALLOWLIST: dict[str, set[str]] = {
     "product": {
         "list_products",
         "search_products",
-        "get_product",
+        "get_product_by_id",
         "get_product_by_slug",
         "list_featured_products",
         "list_products_by_tags",

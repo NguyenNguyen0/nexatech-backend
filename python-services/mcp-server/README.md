@@ -92,7 +92,7 @@ tests/
 ## Tool Groups
 
 - News: `list_news`, `get_news_by_slug`, `get_public_news_by_slug`, `get_news_images`
-- Product: `list_products`, `search_products`, `get_product`, `get_product_by_slug`, `list_featured_products`, `list_products_by_tags`, `list_products_by_category`, `list_products_by_category_slug`, `get_related_products`, `get_related_products_by_slug`, `create_product`, `update_product`, `delete_product`, `restore_product`
+- Product: `list_products`, `search_products`, `get_product_by_id`, `get_product_by_slug`, `list_featured_products`, `list_products_by_tags`, `list_products_by_category`, `list_products_by_category_slug`, `get_related_products`, `get_related_products_by_slug`, `create_product`, `update_product`, `delete_product`, `restore_product`
 - Review: `list_reviews_by_product`, `list_reviews_by_product_slug`, `get_my_review_for_product`, `create_review`, `list_reviews`, `update_review`, `delete_review`, `mark_review_helpful`
 - Inventory: `list_inventory`, `get_inventory`, `get_inventory_movements`, `check_inventory`, `get_low_stock_items`
 - Order: `get_order`, `get_my_orders`, `check_purchased`, `get_order_stats`, `get_order_trace`

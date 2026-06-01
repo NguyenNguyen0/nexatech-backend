@@ -10,7 +10,7 @@ Do not use for: inventory availability; use inventory tools for stock.
 
 ## Steps
 ### Step 1 - Prefer exact identifiers
-Tool: `get_product(product_id)` or `get_product_by_slug(slug)`
+Tool: `get_product_by_id(product_id)` or `get_product_by_slug(slug)`
 If an ID or slug is present, use exact lookup before broad search.
 
 ### Step 2 - Search or list

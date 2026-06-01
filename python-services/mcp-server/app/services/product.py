@@ -84,7 +84,7 @@ class ProductServiceApi(BaseServiceApi):
         }
         return await self.client.request("GET", "/api/v1/products/search", params=query_params)
 
-    async def get_product(self, product_id: str) -> object:
+    async def get_product_by_id(self, product_id: str) -> object:
         return await self.client.request("GET", f"/api/v1/products/{product_id}")
 
     async def get_product_by_slug(self, slug: str) -> object:
