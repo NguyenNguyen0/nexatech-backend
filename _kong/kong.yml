@@ -1,25 +1,31 @@
 _format_version: "3.0"
 
 services:
-  - name: identity-service
-    url: http://identity-service:8081
+  - name: api-gateway
+    url: http://api-gateway:8080
+    connect_timeout: 10000
+    read_timeout: 60000
+    write_timeout: 10000
+    retries: 3
     routes:
       - name: identity-route
         paths:
           - /api/v1/auth
         strip_path: false
 
-  - name: user-service
-    url: http://user-service:8082
-    routes:
+      - name: api-gateway-health-route
+        paths:
+          - /actuator/health
+        strip_path: false
+
       - name: user-route
         paths:
           - /api/v1/users
+          - /api/v1/groups
+          - /api/v1/roles
+          - /api/v1/permissions
         strip_path: false
 
-  - name: product-service
-    url: http://product-service:8090
-    routes:
       - name: product-route
         paths:
           - /api/v1/products
@@ -29,13 +35,6 @@ services:
           - /api/v1/admin/products
         strip_path: false
 
-  - name: order-service
-    url: http://order-service:8084
-    connect_timeout: 10000
-    read_timeout: 60000
-    write_timeout: 10000
-    retries: 3
-    routes:
       - name: order-route
         paths:
           - /api/v1/orders
@@ -47,91 +46,55 @@ services:
           - /api/v1/admin/audit/trace
         strip_path: false
 
-  - name: inventory-service
-    url: http://inventory-service:8085
-    routes:
       - name: inventory-route
         paths:
           - /api/v1/inventory
         strip_path: false
 
-  - name: payment-service
-    url: http://payment-service:8086
-    connect_timeout: 10000
-    read_timeout: 60000
-    write_timeout: 10000
-    retries: 3
-    routes:
       - name: payment-route
         paths:
           - /api/v1/payments
           - /api/v1/admin/payments
           - /api/v1/admin/audit/payments
+          - /payment/vnpay
         strip_path: false
 
-  - name: shipping-service
-    url: http://shipping-service:8091
-    connect_timeout: 10000
-    read_timeout: 60000
-    write_timeout: 10000
-    retries: 3
-    routes:
       - name: shipping-route
         paths:
           - /api/v1/shipping
         strip_path: false
 
-  - name: notification-service
-    url: http://notification-service:8087
-    routes:
       - name: notification-route
         paths:
           - /api/v1/notifications
+          - /api/v1/admin/notifications
         strip_path: false
 
-  - name: chat-service
-    url: http://chat-service:8089
-    routes:
       - name: chat-route
         paths:
           - /api/v1/conversations
         strip_path: false
+
       - name: chat-ws-route
         paths:
           - /ws/chat
         strip_path: false
 
-  - name: storage-service
-    url: http://storage-service:8088
-    routes:
       - name: storage-route
         paths:
           - /api/v1/files
         strip_path: false
 
-  - name: news-service
-    url: http://news-service:8092
-    routes:
       - name: news-route
         paths:
           - /api/v1/news
         strip_path: false
 
-  - name: audit-service
-    url: http://audit-service:8096/audit
-    routes:
       - name: audit-route
         paths:
           - /api/v1/admin/audit
-        strip_path: true
+        strip_path: false
 
-  - name: promotion-service
-    url: http://promotion-service:8093
-    connect_timeout: 10000
-    read_timeout: 30000
-    write_timeout: 10000
-    retries: 3
-    routes:
       - name: promotion-route
         paths:
           - /api/v1/promotions
@@ -141,28 +104,21 @@ services:
           - /api/v1/internal/promotions
         strip_path: false
 
-  - name: agent-service
-    url: http://agent-service:8093
-    routes:
       - name: agent-route
         paths:
           - /api/v1/agent
         strip_path: false
 
-  - name: mcp-server
-    url: http://mcp-server:8094
-    routes:
       - name: mcp-route
         paths:
           - /api/v1/mcp
         strip_path: false
 
-  - name: recommendation-service
-    url: http://recommendation-service:8095
-    routes:
       - name: recommendation-route
         paths:
+          - /api/v1/recommend
           - /api/v1/recommendations
+          - /api/v1/behaviors
         strip_path: false
 
 plugins:
@@ -189,10 +145,12 @@ plugins:
         - X-User-Role
         - X-User-Email
         - X-Guest-Session-Id
+        - X-Correlation-Id
         - Idempotency-Key
         - X-Requested-With
       exposed_headers:
         - X-Total-Count
+        - X-Correlation-Id
       credentials: true
       max_age: 3600
   - name: rate-limiting

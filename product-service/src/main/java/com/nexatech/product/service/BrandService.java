@@ -11,6 +11,9 @@ import com.nexatech.product.repository.ProductRepository;
 import com.nexatech.product.util.MongoIdUtils;
 import com.nexatech.product.util.TextUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -28,7 +31,12 @@ public class BrandService {
     private final ProductRepository productRepository;
     private final BrandMapper brandMapper;
     private final MongoTemplate mongoTemplate;
+    private final CatalogCacheVersionService catalogCacheVersionService;
 
+    @Caching(evict = {
+            @CacheEvict(value = "brands", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public BrandResponse createBrand(BrandRequest request) {
         String normalizedName = TextUtils.normalizeName(request.getName());
         if (brandRepository.existsByNameIgnoreCase(normalizedName)) {
@@ -42,9 +50,16 @@ public class BrandService {
         brand.setSlug(generateUniqueSlug(normalizedName, null));
         brand.setActive(true);
 
-        return brandMapper.toResponse(brandRepository.save(brand));
+        BrandResponse response = brandMapper.toResponse(brandRepository.save(brand));
+        catalogCacheVersionService.bumpVersion("BRAND_CREATED");
+        return response;
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "brands", allEntries = true),
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public BrandResponse updateBrand(String id, BrandRequest request) {
         Brand brand = getActiveBrand(id);
         String normalizedName = TextUtils.normalizeName(request.getName());
@@ -62,13 +77,17 @@ public class BrandService {
             brand.setSlug(generateUniqueSlug(normalizedName, id));
         }
 
-        return brandMapper.toResponse(brandRepository.save(brand));
+        BrandResponse response = brandMapper.toResponse(brandRepository.save(brand));
+        catalogCacheVersionService.bumpVersion("BRAND_UPDATED");
+        return response;
     }
 
+    @Cacheable(value = "brands", key = "#id", unless = "#result == null")
     public BrandResponse getBrand(String id) {
         return brandMapper.toResponse(getActiveBrand(id));
     }
 
+    @Cacheable(value = "brands", key = "'slug:' + #slug", unless = "#result == null")
     public BrandResponse getBrandBySlug(String slug) {
         Brand brand = brandRepository.findBySlug(slug)
                 .filter(Brand::isActive)
@@ -76,6 +95,10 @@ public class BrandService {
         return brandMapper.toResponse(brand);
     }
 
+    @Cacheable(
+            value = "brands",
+            key = "'list:' + (#active == null ? 'all-active' : #active) + ':' + #includeDeleted",
+            unless = "#result == null")
     public List<BrandResponse> getAllBrands(Boolean active, boolean includeDeleted) {
         Query query = new Query().with(Sort.by(Sort.Order.asc("name")));
         if (active != null) {
@@ -89,6 +112,10 @@ public class BrandService {
                 .toList();
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "brands", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public void deleteBrand(String id) {
         Brand brand = getActiveBrand(id);
 
@@ -98,8 +125,13 @@ public class BrandService {
 
         brand.setActive(false);
         brandRepository.save(brand);
+        catalogCacheVersionService.bumpVersion("BRAND_DELETED");
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "brands", allEntries = true),
+            @CacheEvict(value = "productPages", allEntries = true)
+    })
     public BrandResponse restoreBrand(String id) {
         Brand brand = getBrandById(id);
         if (brand.isActive()) {
@@ -109,7 +141,9 @@ public class BrandService {
         validateParentBrand(brand.getParentBrandId(), id);
 
         brand.setActive(true);
-        return brandMapper.toResponse(brandRepository.save(brand));
+        BrandResponse response = brandMapper.toResponse(brandRepository.save(brand));
+        catalogCacheVersionService.bumpVersion("BRAND_RESTORED");
+        return response;
     }
 
     private Brand getActiveBrand(String id) {

@@ -118,7 +118,7 @@ spring:
             - id: recommendation-service
               uri: lb://recommendation-service
               predicates:
-                - Path=/api/v1/recommend,/api/v1/recommend/**
+                - Path=/api/v1/recommend,/api/v1/recommend/**,/api/v1/recommendations,/api/v1/recommendations/**
               filters:
                 - StripPrefix=2
             - id: recommendation-behavior-ingestion

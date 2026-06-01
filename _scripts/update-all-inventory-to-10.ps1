@@ -3,7 +3,8 @@ param(
     [string]$InventoryBaseUrl = "http://localhost:8085/api/v1/inventory",
     [int]$Quantity = 10,
     [int]$PageSize = 100,
-    [string]$BearerToken = ""
+    [string]$BearerToken = "",
+    [string]$CorrelationId = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,6 +16,11 @@ if ($Quantity -lt 0) {
 $headers = @{}
 if ($BearerToken.Trim()) {
     $headers["Authorization"] = "Bearer $($BearerToken.Trim())"
+}
+if ($CorrelationId.Trim()) {
+    $headers["X-Correlation-Id"] = $CorrelationId.Trim()
+} else {
+    $headers["X-Correlation-Id"] = [guid]::NewGuid().ToString()
 }
 
 function Get-EnvelopeData {
