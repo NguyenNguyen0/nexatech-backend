@@ -1,6 +1,7 @@
 package com.nexatech.product.exception;
 
 import com.nexatech.product.dto.response.ErrorResponse;
+import feign.FeignException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -106,11 +107,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(response);
     }
 
+    @ExceptionHandler(FeignException.class)
+    public ResponseEntity<ErrorResponse> handleFeignException(FeignException ex, HttpServletRequest request) {
+        String correlationId = resolveCorrelationId(request);
+        String tag = buildTag(HttpStatus.SERVICE_UNAVAILABLE);
+        log.warn("[{}] {} {} correlationId={} userId={} — Downstream service error: status={} message={}",
+                tag,
+                request.getMethod(),
+                request.getRequestURI(),
+                correlationId,
+                resolveUserId(request),
+                ex.status(),
+                ex.getMessage());
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "A downstream service is temporarily unavailable. Please retry later.", request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex, HttpServletRequest request) {
         String correlationId = resolveCorrelationId(request);
         String tag = buildTag(HttpStatus.INTERNAL_SERVER_ERROR);
-        log.error("[{}] {} {} correlationId={} userId={} - {}",
+        log.error("[{}] {} {} correlationId={} userId={} — {}",
                 tag,
                 request.getMethod(),
                 request.getRequestURI(),
@@ -118,7 +134,7 @@ public class GlobalExceptionHandler {
                 resolveUserId(request),
                 ex.getMessage(),
                 ex);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error: " + ex.getMessage(), request);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", request);
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String message, HttpServletRequest request) {
