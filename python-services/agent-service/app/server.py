@@ -56,6 +56,16 @@ READINESS_CHECKS: dict[str, str] = {
 
 COMPILED_GRAPH: Any | None = None
 
+_DOMAIN_MCP_URLS: dict[str, str] = {
+    "inventory": SETTINGS.mcp_inventory_url,
+    "product": SETTINGS.mcp_product_url,
+    "order": SETTINGS.mcp_order_url,
+    "payment": SETTINGS.mcp_payment_url,
+    "promotion": SETTINGS.mcp_promotion_url,
+    "news": SETTINGS.mcp_news_url,
+    "audit": SETTINGS.mcp_audit_url,
+}
+
 
 class AgentRunRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -319,30 +329,98 @@ def _extract_tool_summary(
     return selected_tool, has_error, error_message, status_code
 
 
-async def _log_connected_mcp_tools(message: str) -> list[str]:
+async def _log_connected_mcp_tools(message: str, *, base_url: str | None = None) -> list[str]:
     """Log and return only tools actually available from MCP server."""
-    available_tools = await MCP_CLIENT.list_available_tools()
-    health = await MCP_CLIENT.health()
+    target_base_url = (base_url or SETTINGS.mcp_server_url).rstrip("/")
+    available_tools = await MCP_CLIENT.list_available_tools(base_url=target_base_url)
+    health = await MCP_CLIENT.health(base_url=target_base_url)
     if health.get("ok"):
         if available_tools:
             logger.info(
-                "[CHAT] incoming='%s' mcp=connected tools=%s",
+                "[CHAT] incoming='%s' mcp=connected baseUrl=%s tools=%s",
                 message,
+                target_base_url,
                 available_tools,
             )
         else:
             logger.error(
-                "[CHAT] incoming='%s' mcp=connected tools=[] error=empty_tool_catalog",
+                "[CHAT] incoming='%s' mcp=connected baseUrl=%s tools=[] error=empty_tool_catalog",
                 message,
+                target_base_url,
             )
     else:
         logger.warning(
-            "[CHAT] incoming='%s' mcp=unreachable reason=%s tools=%s",
+            "[CHAT] incoming='%s' mcp=unreachable baseUrl=%s reason=%s tools=%s",
             message,
+            target_base_url,
             health.get("message") or "unknown",
             available_tools,
         )
     return available_tools
+
+
+def _resolve_domain_mcp_url(domain: str | None) -> str | None:
+    if not domain:
+        return None
+    return _DOMAIN_MCP_URLS.get(domain.strip().lower())
+
+
+def _extract_routed_domain(route_result: dict[str, Any]) -> str | None:
+    if not route_result.get("ok"):
+        return None
+    data = route_result.get("data")
+    if not isinstance(data, dict):
+        return None
+    domains = data.get("domains")
+    if not isinstance(domains, list) or not domains:
+        return None
+    first_domain = domains[0]
+    if not isinstance(first_domain, dict):
+        return None
+    domain_name = first_domain.get("name")
+    if isinstance(domain_name, str) and domain_name.strip():
+        return domain_name.strip().lower()
+    return None
+
+
+async def _resolve_mcp_runtime_context(message: str) -> dict[str, Any]:
+    routed_domain: str | None = None
+    target_url: str | None = None
+
+    if SETTINGS.mcp_enable_domain_routing:
+        route_result = await MCP_CLIENT.invoke_tool(
+            "route_to_mcp_domain",
+            {"intent": message},
+            base_url=SETTINGS.mcp_meta_url,
+        )
+        routed_domain = _extract_routed_domain(route_result)
+
+    if routed_domain is None:
+        routed_domain = SETTINGS.mcp_default_domain.strip().lower() if SETTINGS.mcp_default_domain else None
+
+    target_url = _resolve_domain_mcp_url(routed_domain) or SETTINGS.mcp_server_url
+    available_tools = await _log_connected_mcp_tools(message, base_url=target_url)
+
+    # Fallback to default MCP endpoint if selected domain catalog is unavailable.
+    if not available_tools and target_url.rstrip("/") != SETTINGS.mcp_server_url.rstrip("/"):
+        fallback_tools = await _log_connected_mcp_tools(
+            message,
+            base_url=SETTINGS.mcp_server_url,
+        )
+        if fallback_tools:
+            return {
+                "mcp_target_domain": None,
+                "mcp_target_url": SETTINGS.mcp_server_url,
+                "mcp_meta_url": SETTINGS.mcp_meta_url,
+                "available_tools": fallback_tools,
+            }
+
+    return {
+        "mcp_target_domain": routed_domain,
+        "mcp_target_url": target_url,
+        "mcp_meta_url": SETTINGS.mcp_meta_url,
+        "available_tools": available_tools,
+    }
 
 
 def _utc_timestamp() -> str:
@@ -622,7 +700,7 @@ async def root() -> dict[str, object]:
 async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str, Any]:
     thread_id = request.thread_id or str(uuid.uuid4())
     caller = _build_caller_context(request, raw_request)
-    available_tools = await _log_connected_mcp_tools(request.message)
+    mcp_runtime = await _resolve_mcp_runtime_context(request.message)
     graph_input = {
         "messages": [{"role": "user", "content": request.message}],
         "caller": caller,
@@ -635,7 +713,10 @@ async def run_agent(request: AgentRunRequest, raw_request: Request) -> dict[str,
         "tool_errors": [],
         "thread_id": thread_id,
         "request_id": correlation_id_ctx.get(),
-        "available_tools": available_tools,
+        "available_tools": mcp_runtime["available_tools"],
+        "mcp_target_domain": mcp_runtime["mcp_target_domain"],
+        "mcp_target_url": mcp_runtime["mcp_target_url"],
+        "mcp_meta_url": mcp_runtime["mcp_meta_url"],
     }
     await _persist_conversation_event(
         thread_id=thread_id,
@@ -668,7 +749,7 @@ async def run_agent_stream(
     run_id = request.run_id or str(uuid.uuid4())
     thread_id = request.thread_id or str(uuid.uuid4())
     caller = _build_caller_context(request, raw_request)
-    available_tools = await _log_connected_mcp_tools(request.message)
+    mcp_runtime = await _resolve_mcp_runtime_context(request.message)
     graph_input = {
         "messages": [{"role": "user", "content": request.message}],
         "caller": caller,
@@ -681,7 +762,10 @@ async def run_agent_stream(
         "tool_errors": [],
         "thread_id": thread_id,
         "request_id": correlation_id_ctx.get(),
-        "available_tools": available_tools,
+        "available_tools": mcp_runtime["available_tools"],
+        "mcp_target_domain": mcp_runtime["mcp_target_domain"],
+        "mcp_target_url": mcp_runtime["mcp_target_url"],
+        "mcp_meta_url": mcp_runtime["mcp_meta_url"],
     }
 
     await _persist_conversation_event(

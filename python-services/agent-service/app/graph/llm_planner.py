@@ -137,11 +137,16 @@ def _planner_system_prompt() -> str:
     )
 
 
-async def plan_tool_call_with_llm(user_text: str) -> ToolPlan | None:
+async def plan_tool_call_with_llm(
+    user_text: str,
+    *,
+    available_tools: list[str] | None = None,
+) -> ToolPlan | None:
     if not user_text.strip() or not SETTINGS.groq_api_key:
         return None
 
-    available_tools = await MCP_CLIENT.list_available_tools()
+    if available_tools is None:
+        available_tools = await MCP_CLIENT.list_available_tools()
     if not available_tools:
         logger.error("No available tools from MCP server for planner.")
         return None

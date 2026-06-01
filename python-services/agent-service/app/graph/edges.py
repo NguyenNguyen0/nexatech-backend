@@ -6,7 +6,19 @@ from typing import Any
 def route_after_permission(state: dict[str, Any]) -> str:
     if state.get("approval_result") == "denied":
         return "format_response"
-    return "agent_think"
+    return "domain_router"
+
+
+def route_after_domain_router(state: dict[str, Any]) -> str:
+    if state.get("approval_result") == "denied":
+        return "format_response"
+    return "domain_executor"
+
+
+def route_after_domain_executor(state: dict[str, Any]) -> str:
+    if not state.get("selected_tool"):
+        return "format_response"
+    return "needs_approval"
 
 
 def route_after_agent_think(state: dict[str, Any]) -> str:

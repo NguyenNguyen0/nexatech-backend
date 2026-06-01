@@ -12,6 +12,11 @@ class AgentState(TypedDict, total=False):
     thread_id: NotRequired[str]
     request_id: NotRequired[str]
     available_tools: NotRequired[list[str]]
+    mcp_target_domain: NotRequired[str | None]
+    mcp_target_url: NotRequired[str | None]
+    mcp_meta_url: NotRequired[str | None]
+    subagent_name: NotRequired[str | None]
+    delegation_trace: NotRequired[list[dict[str, Any]]]
     input_text: NotRequired[str]
     required_role: str | None
     request_sensitivity: str | None

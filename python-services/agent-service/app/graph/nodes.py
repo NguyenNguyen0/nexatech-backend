@@ -9,6 +9,7 @@ from langgraph.types import interrupt
 
 from app.core.settings import SETTINGS
 from app.graph.llm_planner import plan_tool_call_with_llm, synthesize_agent_response
+from app.graph.subagents import plan_with_subagent
 from app.graph.tool_descriptions import TOOL_DESCRIPTIONS
 from app.graph.tool_registry import extract_latest_user_text, plan_tool_call
 from app.hitl.sensitivity import TOOL_SENSITIVITY
@@ -16,6 +17,15 @@ from app.mcp_client import MCP_CLIENT
 
 
 logger = logging.getLogger(__name__)
+
+_META_TOOLS: set[str] = {
+    "list_mcp_domains",
+    "get_mcp_domain",
+    "route_to_mcp_domain",
+    "check_mcp_domain_health",
+    "list_skills",
+    "get_skill",
+}
 
 # Decision normalization map — canonical form used in state and routing.
 _DECISION_NORMALIZE: dict[str, str] = {
@@ -112,7 +122,10 @@ async def agent_think(state: dict[str, Any]) -> dict[str, Any]:
             available_tools=state.get("available_tools"),
         )
         if plan is None:
-            plan = await plan_tool_call_with_llm(input_text)
+            plan = await plan_tool_call_with_llm(
+                input_text,
+                available_tools=state.get("available_tools"),
+            )
         if plan is None:
             logger.warning(
                 "No matching tool plan for input. available_tools=%s input=%r",
@@ -134,6 +147,36 @@ async def agent_think(state: dict[str, Any]) -> dict[str, Any]:
             "response_text": None,
         }
     return {"selected_tool_args": selected_tool_args, "response_text": None}
+
+
+async def domain_router(state: dict[str, Any]) -> dict[str, Any]:
+    """Select the subagent responsible for this request domain."""
+    domain = (state.get("mcp_target_domain") or "").strip().lower() or "general"
+    input_text = (state.get("input_text") or extract_latest_user_text(state)).casefold()
+
+    # Meta-intent requests should be delegated to the meta subagent.
+    if "skill" in input_text or "mcp" in input_text:
+        return {
+            "mcp_target_domain": "meta",
+            "mcp_target_url": state.get("mcp_meta_url") or state.get("mcp_target_url"),
+            "subagent_name": "meta_subagent",
+        }
+
+    if domain == "meta":
+        return {
+            "mcp_target_url": state.get("mcp_meta_url") or state.get("mcp_target_url"),
+            "subagent_name": "meta_subagent",
+        }
+
+    if domain == "general":
+        return {"subagent_name": "general_subagent"}
+
+    return {"subagent_name": f"{domain}_subagent"}
+
+
+async def domain_executor(state: dict[str, Any]) -> dict[str, Any]:
+    """Delegate planning to the selected domain subagent."""
+    return await plan_with_subagent(state)
 
 
 async def needs_approval(state: dict[str, Any]) -> dict[str, Any]:
@@ -286,6 +329,10 @@ async def execute_tool(state: dict[str, Any]) -> dict[str, Any]:
     if not tool_name:
         return {}
 
+    target_base_url = state.get("mcp_target_url")
+    if tool_name in _META_TOOLS:
+        target_base_url = state.get("mcp_meta_url")
+
     tool_call_id = str(uuid4())
     started_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
@@ -301,7 +348,11 @@ async def execute_tool(state: dict[str, Any]) -> dict[str, Any]:
         "completed_at": None,
     }
 
-    result = await MCP_CLIENT.invoke_tool(tool_name, tool_args)
+    result = await MCP_CLIENT.invoke_tool(
+        tool_name,
+        tool_args,
+        base_url=target_base_url,
+    )
     completed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
     existing_results = list(state.get("tool_results") or [])

@@ -31,7 +31,7 @@ def isolate_runtime_dependencies_for_tests(monkeypatch: pytest.MonkeyPatch):
     READINESS_CHECKS["checkpointer"] = "disabled"
     READINESS_CHECKS["conversation_store"] = "disabled"
 
-    async def fake_available_tools(_: str) -> list[str]:
+    async def fake_available_tools(_: str, **__: object) -> list[str]:
         return [
             "list_promotions",
             "list_products",
@@ -252,7 +252,7 @@ async def test_stream_endpoint_lets_graph_handle_empty_tool_catalog(
         async def close(self):
             return None
 
-    async def no_available_tools(_: str) -> list[str]:
+    async def no_available_tools(_: str, **__: object) -> list[str]:
         return []
 
     async def fake_invoke_graph(
