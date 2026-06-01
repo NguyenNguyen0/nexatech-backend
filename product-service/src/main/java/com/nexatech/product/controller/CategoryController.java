@@ -4,6 +4,7 @@ import com.nexatech.product.command.category.CreateCategoryCommand;
 import com.nexatech.product.command.category.DeleteCategoryCommand;
 import com.nexatech.product.command.category.RestoreCategoryCommand;
 import com.nexatech.product.command.category.UpdateCategoryCommand;
+import com.nexatech.product.constant.PermissionsAccept;
 import com.nexatech.product.dto.request.CategoryRequest;
 import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.CategoryMenuItemResponse;
@@ -18,6 +19,7 @@ import com.nexatech.product.query.category.GetCategoryMenuQuery;
 import com.nexatech.product.query.category.GetCategoryMetaBySlugQuery;
 import com.nexatech.product.query.category.GetSubCategoriesBySlugQuery;
 import com.nexatech.product.query.category.GetSubCategoriesQuery;
+import com.nexatech.product.security.RequiresPermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -35,11 +37,13 @@ public class CategoryController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @RequiresPermission(PermissionsAccept.Category.WRITE)
     public ApiResponse<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest request) {
         return ApiResponse.ok(categoryCommandHandler.handle(toCreateCommand(request)));
     }
 
     @PutMapping("/{id}")
+    @RequiresPermission(PermissionsAccept.Category.WRITE)
     public ApiResponse<CategoryResponse> updateCategory(
             @PathVariable String id,
             @Valid @RequestBody CategoryRequest request) {
@@ -84,12 +88,14 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
+    @RequiresPermission(PermissionsAccept.Category.WRITE)
     public ApiResponse<Void> deleteCategory(@PathVariable String id) {
         categoryCommandHandler.handle(new DeleteCategoryCommand(id));
         return ApiResponse.ok(null);
     }
 
     @PatchMapping("/{id}/restore")
+    @RequiresPermission(PermissionsAccept.Category.WRITE)
     public ApiResponse<CategoryResponse> restoreCategory(@PathVariable String id) {
         return ApiResponse.ok(categoryCommandHandler.handle(new RestoreCategoryCommand(id)));
     }

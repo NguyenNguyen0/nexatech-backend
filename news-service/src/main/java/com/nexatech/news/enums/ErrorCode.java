@@ -9,6 +9,7 @@ public enum ErrorCode {
 
     UNCATEGORIZED_EXCEPTION(9999, "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_KEY(1001, "Invalid request", HttpStatus.BAD_REQUEST),
+    UNAUTHORIZED(1002, "You do not have permission", HttpStatus.FORBIDDEN),
 
     NEWS_NOT_FOUND(3100, "News not found", HttpStatus.NOT_FOUND),
     NEWS_SLUG_EXISTED(3101, "News slug already exists", HttpStatus.BAD_REQUEST),

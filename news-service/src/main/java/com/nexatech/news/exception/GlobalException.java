@@ -5,6 +5,7 @@ import com.nexatech.news.enums.ErrorCode;
 
 import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +17,18 @@ import lombok.extern.slf4j.Slf4j;
 public class GlobalException {
 
     private static final String SERVICE_PREFIX = "NWS";
+
+    @ExceptionHandler(value = AccessDeniedException.class)
+    ResponseEntity<ApiResponse<Void>> handlingAccessDeniedException(AccessDeniedException exception) {
+        ErrorCode errorCode = ErrorCode.UNAUTHORIZED;
+        return ResponseEntity.status(errorCode.getStatusCode())
+                .body(ApiResponse.<Void>builder()
+                        .code(errorCode.getCode())
+                        .tag(toTag(errorCode))
+                        .message(errorCode.getMessage())
+                        .correlationId(resolveCorrelationId())
+                        .build());
+    }
 
     @ExceptionHandler(value = Exception.class)
     ResponseEntity<ApiResponse<Void>> handlingRuntimeException(Exception exception) {
