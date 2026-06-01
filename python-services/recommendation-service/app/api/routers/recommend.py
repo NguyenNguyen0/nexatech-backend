@@ -1,4 +1,8 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Query, Request
+
+logger = logging.getLogger("recommendation-service.recommend-api")
 
 router = APIRouter(prefix="/recommend", tags=["recommendation"])
 
@@ -20,7 +24,21 @@ async def recommend_for_user(
     pipeline = getattr(request.app.state, "training_pipeline", None)
     if pipeline is None:
         raise HTTPException(status_code=503, detail="Recommendation pipeline unavailable")
-    payload = await pipeline.recommend_for_user(user_id, top_k)
+    try:
+        payload = await pipeline.recommend_for_user(user_id, top_k)
+    except Exception:
+        logger.exception(
+            "User recommendation failed; falling back to popular recommendations user_id=%s top_k=%s",
+            user_id,
+            top_k,
+        )
+        payload = await pipeline.popular_products(top_k)
+        payload = {
+            "userId": user_id,
+            "topK": top_k,
+            "source": "popular-fallback",
+            "recommendations": payload.get("popular") or [],
+        }
     if enrich:
         payload["recommendations"] = await _enrich_items_if_available(request, payload.get("recommendations") or [])
     return payload

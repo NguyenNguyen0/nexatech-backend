@@ -38,6 +38,11 @@ class FakeTrainingPipeline:
         }
 
 
+class FailingUserRecommendationPipeline(FakeTrainingPipeline):
+    async def recommend_for_user(self, user_id: str, top_k: int):
+        raise RuntimeError("model failed")
+
+
 class FakeRecommendationEnricher:
     async def enrich_ranked_items(self, items):
         return [
@@ -61,6 +66,14 @@ def _build_test_app() -> FastAPI:
     return app
 
 
+def _build_test_app_with_pipeline(pipeline) -> FastAPI:
+    app = FastAPI()
+    app.state.training_pipeline = pipeline
+    app.state.recommendation_enricher = FakeRecommendationEnricher()
+    app.include_router(recommend_router)
+    return app
+
+
 def test_recommend_user_endpoint_returns_ranked_payload():
     client = TestClient(_build_test_app())
     response = client.get("/recommend/user/u-1?top_k=2")
@@ -70,6 +83,17 @@ def test_recommend_user_endpoint_returns_ranked_payload():
     assert payload["source"] == "hybrid"
     assert len(payload["recommendations"]) == 2
     assert payload["recommendations"][0]["product"]["id"] == "p1"
+
+
+def test_recommend_user_endpoint_falls_back_to_popular_when_user_pipeline_fails():
+    client = TestClient(_build_test_app_with_pipeline(FailingUserRecommendationPipeline()))
+    response = client.get("/recommend/user/u-1?top_k=2")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["userId"] == "u-1"
+    assert payload["source"] == "popular-fallback"
+    assert len(payload["recommendations"]) == 2
+    assert payload["recommendations"][0]["product"]["id"] == "p100"
 
 
 def test_recommend_similar_endpoint_returns_ranked_payload():
