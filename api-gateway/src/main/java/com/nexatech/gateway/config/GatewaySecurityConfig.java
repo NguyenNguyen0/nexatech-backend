@@ -35,8 +35,16 @@ public class GatewaySecurityConfig {
                     "/api/v1/recommend/**",
                     "/api/v1/news",
                     "/api/v1/news/**",
-                    "/api/v1/conversations",
-                    "/api/v1/conversations/**")
+                    "/api/v1/conversations/current",
+                    "/api/v1/conversations/*/messages")
+                .permitAll()
+                .requestMatchers(HttpMethod.POST,
+                    "/api/v1/conversations/current",
+                    "/api/v1/conversations/*/messages")
+                .permitAll()
+                .requestMatchers(HttpMethod.PUT,
+                    "/api/v1/conversations/*/messages/*/delivered",
+                    "/api/v1/conversations/*/messages/*/seen")
                 .permitAll()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/promotions",

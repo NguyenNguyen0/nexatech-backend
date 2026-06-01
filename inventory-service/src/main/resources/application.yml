@@ -3,6 +3,11 @@ spring:
     name: inventory-service
   config:
     import: "optional:file:./.env[.properties],optional:file:./inventory-service/.env[.properties],optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/nexatech_inventory
+    username: ${DB_USERNAME:nexatech}
+    password: ${DB_PASSWORD:nexatech123}
+    driver-class-name: org.postgresql.Driver
   cloud:
     config:
       fail-fast: false
@@ -11,3 +16,25 @@ spring:
         max-attempts: 4
         max-interval: 5000
         multiplier: 1.5
+
+server:
+  port: 8085
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}

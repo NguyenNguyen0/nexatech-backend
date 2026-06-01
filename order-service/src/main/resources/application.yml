@@ -55,3 +55,25 @@ eureka:
 order:
   idempotency:
     processing-timeout-seconds: ${ORDER_IDEMPOTENCY_PROCESSING_TIMEOUT_SECONDS:120}
+
+server:
+  port: 8084
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
