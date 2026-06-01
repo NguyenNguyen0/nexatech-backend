@@ -67,22 +67,61 @@ public class JwtHeaderRelayFilter extends OncePerRequestFilter {
     }
 
     private String extractRole(Jwt jwt) {
+        List<String> roles = new ArrayList<>();
+
         Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
-        if (realmAccess == null) {
-            return null;
+        if (realmAccess != null) {
+            collectRoles(realmAccess.get("roles"), roles);
         }
-        Object roles = realmAccess.get("roles");
-        if (roles instanceof List<?> roleList) {
-            return roleList.stream()
+
+        Map<String, Object> resourceAccess = jwt.getClaimAsMap("resource_access");
+        if (resourceAccess != null) {
+            resourceAccess.values().forEach(resource -> {
+                if (resource instanceof Map<?, ?> resourceMap) {
+                    collectRoles(resourceMap.get("roles"), roles);
+                }
+            });
+        }
+
+        Set<String> normalizedRoles = new LinkedHashSet<>();
+        roles.stream()
+                .map(this::normalizeRole)
+                .filter(Objects::nonNull)
+                .forEach(normalizedRoles::add);
+
+        for (String preferredRole : List.of("ADMIN", "MANAGER", "STAFF", "WAREHOUSE", "ACCOUNTANT", "CUSTOMER")) {
+            if (normalizedRoles.contains(preferredRole)) {
+                return preferredRole;
+            }
+        }
+
+        return normalizedRoles.stream().findFirst().orElse(null);
+    }
+
+    private void collectRoles(Object rawRoles, List<String> roles) {
+        if (rawRoles instanceof Collection<?> roleCollection) {
+            roleCollection.stream()
                     .filter(String.class::isInstance)
                     .map(String.class::cast)
-                    .filter(r -> !r.startsWith("default-roles-"))
-                    .filter(r -> !"offline_access".equals(r))
-                    .filter(r -> !"uma_authorization".equals(r))
-                    .findFirst()
-                    .orElse(null);
+                    .forEach(roles::add);
         }
-        return null;
+    }
+
+    private String normalizeRole(String role) {
+        String normalized = role.trim().toUpperCase(Locale.ROOT);
+        if (normalized.startsWith("ROLE_")) {
+            normalized = normalized.substring("ROLE_".length());
+        }
+        if (normalized.startsWith("SCOPE_")) {
+            normalized = normalized.substring("SCOPE_".length());
+        }
+        if (normalized.isBlank()
+                || normalized.startsWith("DEFAULT-ROLES-")
+                || "OFFLINE_ACCESS".equals(normalized)
+                || "UMA_AUTHORIZATION".equals(normalized)) {
+            return null;
+        }
+        return normalized;
     }
 
     /**
