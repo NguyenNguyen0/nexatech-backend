@@ -166,6 +166,7 @@ services:
         strip_path: false
 
 plugins:
+  - name: prometheus
   - name: cors
     config:
       origins:
