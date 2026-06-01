@@ -222,7 +222,11 @@ async def test_execute_tool_emits_tool_call_history_on_success(
 ) -> None:
     from app.graph.nodes import execute_tool
 
-    async def fake_invoke_tool(tool_name: str, tool_args: dict) -> dict:
+    async def fake_invoke_tool(
+        tool_name: str,
+        tool_args: dict,
+        **__: object,
+    ) -> dict:
         return {"ok": True, "tool": tool_name, "data": {}, "raw": {}}
 
     monkeypatch.setattr("app.graph.nodes.MCP_CLIENT.invoke_tool", fake_invoke_tool)
@@ -253,7 +257,11 @@ async def test_execute_tool_emits_error_call_on_failure(
 ) -> None:
     from app.graph.nodes import execute_tool
 
-    async def fake_invoke_tool(tool_name: str, tool_args: dict) -> dict:
+    async def fake_invoke_tool(
+        tool_name: str,
+        tool_args: dict,
+        **__: object,
+    ) -> dict:
         return {"ok": False, "statusCode": 500, "tag": "ERR", "message": "fail"}
 
     monkeypatch.setattr("app.graph.nodes.MCP_CLIENT.invoke_tool", fake_invoke_tool)

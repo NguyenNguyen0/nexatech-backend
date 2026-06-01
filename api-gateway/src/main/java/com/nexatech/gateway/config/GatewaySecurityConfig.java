@@ -7,6 +7,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -15,11 +16,51 @@ import org.springframework.security.web.SecurityFilterChain;
 public class GatewaySecurityConfig {
 
     @Bean
+    @Order(1)
+    public SecurityFilterChain publicEndpoints(HttpSecurity http) throws Exception {
+        http.securityMatcher(
+                "/api/v1/agent/health",
+                "/api/v1/agent/copilotkit/info",
+                "/api/v1/mcp/health"
+            )
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(Customizer.withDefaults())
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(a -> a.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain gatewayRoutes(HttpSecurity http) throws Exception {
         stateless(http);
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/**", "/api/v1/auth", "/api/v1/auth/**", "/ws/chat", "/ws/chat/**")
+                .permitAll()
+                .requestMatchers(
+                    "/api/v1/cart",
+                    "/api/v1/cart/**",
+                    "/api/v1/checkout",
+                    "/api/v1/orders",
+                    "/api/v1/orders/**",
+                    "/api/v1/returns",
+                    "/api/v1/returns/**",
+                    "/api/v1/admin/orders",
+                    "/api/v1/admin/orders/**",
+                    "/api/v1/payments",
+                    "/api/v1/payments/**",
+                    "/api/v1/admin/payments",
+                    "/api/v1/admin/payments/**",
+                    "/payment/vnpay/**",
+                    "/api/v1/shipping",
+                    "/api/v1/shipping/**",
+                    "/api/v1/promotions",
+                    "/api/v1/promotions/**",
+                    "/api/v1/flash-sales",
+                    "/api/v1/flash-sales/**",
+                    "/api/v1/conversations",
+                    "/api/v1/conversations/**")
                 .permitAll()
                 .requestMatchers("/api/v1/products/wishlist/**").authenticated()
                 .requestMatchers(HttpMethod.GET,
@@ -35,8 +76,16 @@ public class GatewaySecurityConfig {
                     "/api/v1/recommend/**",
                     "/api/v1/news",
                     "/api/v1/news/**",
-                    "/api/v1/conversations",
-                    "/api/v1/conversations/**")
+                    "/api/v1/conversations/current",
+                    "/api/v1/conversations/*/messages")
+                .permitAll()
+                .requestMatchers(HttpMethod.POST,
+                    "/api/v1/conversations/current",
+                    "/api/v1/conversations/*/messages")
+                .permitAll()
+                .requestMatchers(HttpMethod.PUT,
+                    "/api/v1/conversations/*/messages/*/delivered",
+                    "/api/v1/conversations/*/messages/*/seen")
                 .permitAll()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/promotions",
@@ -46,6 +95,7 @@ public class GatewaySecurityConfig {
                 .permitAll()
                 .requestMatchers(HttpMethod.GET,
                     "/api/v1/agent/health",
+                    "/api/v1/agent/copilotkit/info",
                     "/api/v1/mcp/health")
                 .permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/checkout").permitAll()

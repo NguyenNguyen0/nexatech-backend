@@ -5,15 +5,17 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 
 from app.graph.edges import (
-    route_after_agent_think,
+    route_after_domain_executor,
+    route_after_domain_router,
     route_after_interrupt,
     route_after_needs_approval,
     route_after_permission,
 )
 from app.graph.nodes import (
-    agent_think,
     build_preview,
     classify_request,
+    domain_executor,
+    domain_router,
     execute_tool,
     format_response,
     interrupt_caller,
@@ -29,7 +31,8 @@ def compile_graph(checkpointer: Any | None = None):
 
     workflow.add_node("classify_request", classify_request)
     workflow.add_node("permission_gate", permission_gate)
-    workflow.add_node("agent_think", agent_think)
+    workflow.add_node("domain_router", domain_router)
+    workflow.add_node("domain_executor", domain_executor)
     workflow.add_node("needs_approval", needs_approval)
     workflow.add_node("build_preview", build_preview)
     workflow.add_node("interrupt_caller", interrupt_caller)
@@ -44,14 +47,23 @@ def compile_graph(checkpointer: Any | None = None):
         "permission_gate",
         route_after_permission,
         {
-            "agent_think": "agent_think",
+            "domain_router": "domain_router",
             "format_response": "format_response",
         },
     )
 
     workflow.add_conditional_edges(
-        "agent_think",
-        route_after_agent_think,
+        "domain_router",
+        route_after_domain_router,
+        {
+            "domain_executor": "domain_executor",
+            "format_response": "format_response",
+        },
+    )
+
+    workflow.add_conditional_edges(
+        "domain_executor",
+        route_after_domain_executor,
         {
             "needs_approval": "needs_approval",
             "format_response": "format_response",

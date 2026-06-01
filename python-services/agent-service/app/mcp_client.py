@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -19,8 +20,19 @@ logger = logging.getLogger("agent-mcp")
 
 
 class MCPClient:
-    async def list_available_tools(self) -> list[str]:
+    async def list_available_tools(
+        self,
+        *,
+        base_url: str | None = None,
+        use_cache: bool = True,
+    ) -> list[str]:
         """Query MCP server for available tool names (tools that are actually registered and callable)."""
+        target_base_url = self._resolve_base_url(base_url)
+        if use_cache:
+            cached = self._get_cached_tools(target_base_url)
+            if cached is not None:
+                return cached
+
         async with httpx.AsyncClient(
             timeout=self.timeout,
             transport=self.transport,
@@ -28,7 +40,7 @@ class MCPClient:
         ) as client:
             try:
                 response = await client.post(
-                    f"{self.base_url}/mcp/",
+                    f"{target_base_url}/mcp/",
                     json={
                         "jsonrpc": "2.0",
                         "id": correlation_id_ctx.get() or "agent-service",
@@ -38,9 +50,16 @@ class MCPClient:
                     headers=self._build_headers(),
                 )
                 response.raise_for_status()
-                return self._extract_tool_names(response.json())
+                tool_names = self._extract_tool_names(response.json())
+                if use_cache:
+                    self._set_cached_tools(target_base_url, tool_names)
+                return tool_names
             except Exception as exc:
-                logger.warning("[MCP-TOOLS] Failed to fetch available tools: %s", exc)
+                logger.warning(
+                    "[MCP-TOOLS] Failed to fetch available tools from %s: %s",
+                    target_base_url,
+                    exc,
+                )
                 return []
 
     def __init__(
@@ -53,6 +72,32 @@ class MCPClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = httpx.Timeout(timeout_seconds)
         self.transport = transport
+        self._tool_catalog_cache_ttl_seconds = max(
+            0,
+            int(SETTINGS.mcp_tool_catalog_cache_ttl_seconds),
+        )
+        self._tool_catalog_cache: dict[str, tuple[float, list[str]]] = {}
+
+    def _resolve_base_url(self, base_url: str | None) -> str:
+        return (base_url or self.base_url).rstrip("/")
+
+    def _get_cached_tools(self, base_url: str) -> list[str] | None:
+        if self._tool_catalog_cache_ttl_seconds <= 0:
+            return None
+        cached = self._tool_catalog_cache.get(base_url)
+        if cached is None:
+            return None
+        expires_at, tools = cached
+        if time.monotonic() >= expires_at:
+            self._tool_catalog_cache.pop(base_url, None)
+            return None
+        return list(tools)
+
+    def _set_cached_tools(self, base_url: str, tools: list[str]) -> None:
+        if self._tool_catalog_cache_ttl_seconds <= 0:
+            return
+        expires_at = time.monotonic() + float(self._tool_catalog_cache_ttl_seconds)
+        self._tool_catalog_cache[base_url] = (expires_at, list(tools))
 
     def _build_headers(self) -> dict[str, str]:
         correlation_id = correlation_id_ctx.get()
@@ -152,14 +197,18 @@ class MCPClient:
             "raw": result,
         }
 
-    async def health(self) -> dict[str, Any]:
+    async def health(self, *, base_url: str | None = None) -> dict[str, Any]:
+        target_base_url = self._resolve_base_url(base_url)
         async with httpx.AsyncClient(
             timeout=self.timeout,
             transport=self.transport,
             follow_redirects=True,
         ) as client:
             try:
-                response = await client.get(f"{self.base_url}/health", headers=self._build_headers())
+                response = await client.get(
+                    f"{target_base_url}/health",
+                    headers=self._build_headers(),
+                )
                 response.raise_for_status()
                 return {"ok": True, "result": response.json()}
             except Exception as exc:
@@ -169,7 +218,14 @@ class MCPClient:
                     "message": f"MCP health check failed: {exc.__class__.__name__}",
                 }
 
-    async def invoke_tool(self, tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
+    async def invoke_tool(
+        self,
+        tool_name: str,
+        tool_args: dict[str, Any],
+        *,
+        base_url: str | None = None,
+    ) -> dict[str, Any]:
+        target_base_url = self._resolve_base_url(base_url)
         payload = {
             "jsonrpc": "2.0",
             "id": correlation_id_ctx.get() if correlation_id_ctx.get() != "-" else "agent-service",
@@ -187,7 +243,7 @@ class MCPClient:
         ) as client:
             try:
                 response = await client.post(
-                    f"{self.base_url}/mcp/",
+                    f"{target_base_url}/mcp/",
                     json=payload,
                     headers=self._build_headers(),
                 )

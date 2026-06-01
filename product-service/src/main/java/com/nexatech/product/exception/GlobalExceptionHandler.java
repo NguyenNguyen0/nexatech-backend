@@ -1,12 +1,14 @@
 package com.nexatech.product.exception;
 
 import com.nexatech.product.dto.response.ErrorResponse;
+import feign.FeignException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,6 +46,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex, HttpServletRequest request) {
         log.warn("Forbidden: {}", ex.getMessage());
         return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
+        log.warn("Access denied: {}", ex.getMessage());
+        return buildResponse(HttpStatus.FORBIDDEN, "You do not have permission", request);
     }
 
     @ExceptionHandler(ServiceUnavailableException.class)
@@ -106,11 +114,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(response);
     }
 
+    @ExceptionHandler(FeignException.class)
+    public ResponseEntity<ErrorResponse> handleFeignException(FeignException ex, HttpServletRequest request) {
+        String correlationId = resolveCorrelationId(request);
+        String tag = buildTag(HttpStatus.SERVICE_UNAVAILABLE);
+        log.warn("[{}] {} {} correlationId={} userId={} — Downstream service error: status={} message={}",
+                tag,
+                request.getMethod(),
+                request.getRequestURI(),
+                correlationId,
+                resolveUserId(request),
+                ex.status(),
+                ex.getMessage());
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "A downstream service is temporarily unavailable. Please retry later.", request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex, HttpServletRequest request) {
         String correlationId = resolveCorrelationId(request);
         String tag = buildTag(HttpStatus.INTERNAL_SERVER_ERROR);
-        log.error("[{}] {} {} correlationId={} userId={} - {}",
+        log.error("[{}] {} {} correlationId={} userId={} — {}",
                 tag,
                 request.getMethod(),
                 request.getRequestURI(),
@@ -118,7 +141,7 @@ public class GlobalExceptionHandler {
                 resolveUserId(request),
                 ex.getMessage(),
                 ex);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error: " + ex.getMessage(), request);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", request);
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String message, HttpServletRequest request) {

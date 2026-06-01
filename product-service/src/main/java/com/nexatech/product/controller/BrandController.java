@@ -1,8 +1,10 @@
 package com.nexatech.product.controller;
 
+import com.nexatech.product.constant.PermissionsAccept;
 import com.nexatech.product.dto.request.BrandRequest;
 import com.nexatech.product.dto.response.ApiResponse;
 import com.nexatech.product.dto.response.BrandResponse;
+import com.nexatech.product.security.RequiresPermission;
 import com.nexatech.product.service.BrandService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,11 +22,13 @@ public class BrandController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @RequiresPermission(PermissionsAccept.Brand.WRITE)
     public ApiResponse<BrandResponse> createBrand(@Valid @RequestBody BrandRequest request) {
         return ApiResponse.ok(brandService.createBrand(request));
     }
 
     @PutMapping("/{id}")
+    @RequiresPermission(PermissionsAccept.Brand.WRITE)
     public ApiResponse<BrandResponse> updateBrand(
             @PathVariable String id,
             @Valid @RequestBody BrandRequest request) {
@@ -49,12 +53,14 @@ public class BrandController {
     }
 
     @DeleteMapping("/{id}")
+    @RequiresPermission(PermissionsAccept.Brand.WRITE)
     public ApiResponse<Void> deleteBrand(@PathVariable String id) {
         brandService.deleteBrand(id);
         return ApiResponse.ok(null);
     }
 
     @PatchMapping("/{id}/restore")
+    @RequiresPermission(PermissionsAccept.Brand.WRITE)
     public ApiResponse<BrandResponse> restoreBrand(@PathVariable String id) {
         return ApiResponse.ok(brandService.restoreBrand(id));
     }

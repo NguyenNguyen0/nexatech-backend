@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -9,13 +10,30 @@ from langgraph.types import interrupt
 
 from app.core.settings import SETTINGS
 from app.graph.llm_planner import plan_tool_call_with_llm, synthesize_agent_response
+from app.graph.subagents import plan_with_subagent
 from app.graph.tool_descriptions import TOOL_DESCRIPTIONS
 from app.graph.tool_registry import extract_latest_user_text, plan_tool_call
 from app.hitl.sensitivity import TOOL_SENSITIVITY
 from app.mcp_client import MCP_CLIENT
+from app.runtime.delegation_metrics import DELEGATION_METRICS
+
+try:
+    from langchain_core.messages import AIMessage, ToolMessage
+    _LC_MESSAGES_AVAILABLE = True
+except Exception:
+    _LC_MESSAGES_AVAILABLE = False
 
 
 logger = logging.getLogger(__name__)
+
+_META_TOOLS: set[str] = {
+    "list_mcp_domains",
+    "get_mcp_domain",
+    "route_to_mcp_domain",
+    "check_mcp_domain_health",
+    "list_skills",
+    "get_skill",
+}
 
 # Decision normalization map — canonical form used in state and routing.
 _DECISION_NORMALIZE: dict[str, str] = {
@@ -59,6 +77,37 @@ async def permission_gate(state: dict[str, Any]) -> dict[str, Any]:
     return {"approval_result": None}
 
 
+_CONVERSATIONAL_PATTERNS: tuple[str, ...] = (
+    # Greetings
+    "xin chào", "chào", "hello", "hi ", "hi!", "hey", "chao ban", "chào bạn",
+    # Thanks
+    "cảm ơn", "cam on", "thanks", "thank you", "cảm ơn bạn",
+    # Identity
+    "bạn là ai", "ban la ai", "bạn tên gì", "who are you", "what are you",
+    # Capabilities — phrased as open question (not "liệt kê tool")
+    "bạn có thể làm gì", "bạn giúp được gì", "can you help", "help me",
+    "bạn làm được gì", "ban lam duoc gi",
+    # Affirmations / acknowledgements
+    "ok", "okay", "được", "được rồi", "great", "got it", "hiểu rồi",
+    # Goodbye
+    "tạm biệt", "bye", "goodbye",
+)
+
+
+def _is_conversational(input_text: str) -> bool:
+    """Return True when the message is a greeting, chitchat, or general conversational
+    exchange that does not require any MCP tool invocation."""
+    stripped = input_text.strip().casefold()
+    if not stripped:
+        return True
+    # Short messages with no domain keywords are almost always conversational.
+    # 6 words ≈ upper bound for a greeting/ack.
+    word_count = len(stripped.split())
+    if word_count <= 6 and any(p in stripped for p in _CONVERSATIONAL_PATTERNS):
+        return True
+    return False
+
+
 def _is_tool_catalog_request(input_text: str) -> bool:
     """Return True only when user is asking ABOUT the tool catalog itself.
 
@@ -95,6 +144,13 @@ async def agent_think(state: dict[str, Any]) -> dict[str, Any]:
     selected_tool_args = state.get("selected_tool_args") or {}
     if not selected_tool:
         input_text = state.get("input_text") or extract_latest_user_text(state)
+        if _is_conversational(input_text):
+            logger.info("Conversational input detected — skipping tool planning. input=%r", input_text)
+            return {
+                "selected_tool_args": selected_tool_args,
+                "final_status": "conversational",
+                "answer_context": {"intent": "conversational", "input_text": input_text},
+            }
         if _is_tool_catalog_request(input_text):
             available_tools = state.get("available_tools") or []
             if not available_tools:
@@ -112,7 +168,10 @@ async def agent_think(state: dict[str, Any]) -> dict[str, Any]:
             available_tools=state.get("available_tools"),
         )
         if plan is None:
-            plan = await plan_tool_call_with_llm(input_text)
+            plan = await plan_tool_call_with_llm(
+                input_text,
+                available_tools=state.get("available_tools"),
+            )
         if plan is None:
             logger.warning(
                 "No matching tool plan for input. available_tools=%s input=%r",
@@ -134,6 +193,40 @@ async def agent_think(state: dict[str, Any]) -> dict[str, Any]:
             "response_text": None,
         }
     return {"selected_tool_args": selected_tool_args, "response_text": None}
+
+
+async def domain_router(state: dict[str, Any]) -> dict[str, Any]:
+    """Select the subagent responsible for this request domain."""
+    domain = (state.get("mcp_target_domain") or "").strip().lower() or "general"
+    input_text = (state.get("input_text") or extract_latest_user_text(state)).casefold()
+
+    # Meta-intent requests should be delegated to the meta subagent.
+    if "skill" in input_text or "mcp" in input_text:
+        DELEGATION_METRICS.record("route_meta_intent_total", domain="meta")
+        return {
+            "mcp_target_domain": "meta",
+            "mcp_target_url": state.get("mcp_meta_url") or state.get("mcp_target_url"),
+            "subagent_name": "meta_subagent",
+        }
+
+    if domain == "meta":
+        DELEGATION_METRICS.record("route_meta_domain_total", domain="meta")
+        return {
+            "mcp_target_url": state.get("mcp_meta_url") or state.get("mcp_target_url"),
+            "subagent_name": "meta_subagent",
+        }
+
+    if domain == "general":
+        DELEGATION_METRICS.record("route_general_total", domain="general")
+        return {"subagent_name": "general_subagent"}
+
+    DELEGATION_METRICS.record("route_domain_total", domain=domain)
+    return {"subagent_name": f"{domain}_subagent"}
+
+
+async def domain_executor(state: dict[str, Any]) -> dict[str, Any]:
+    """Delegate planning to the selected domain subagent."""
+    return await plan_with_subagent(state)
 
 
 async def needs_approval(state: dict[str, Any]) -> dict[str, Any]:
@@ -279,17 +372,34 @@ async def route_escalation(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _safe_json(value: Any) -> str:
+    """Serialize value to JSON string, falling back to str() on failure."""
+    try:
+        return json.dumps(value, ensure_ascii=False, default=str)
+    except Exception:
+        return str(value)
+
+
 async def execute_tool(state: dict[str, Any]) -> dict[str, Any]:
-    """Invoke the selected MCP tool and emit tool-call lifecycle state (Phase 6)."""
+    """Invoke the selected MCP tool.
+
+    Emits an AIMessage with a tool_call and a ToolMessage with the result
+    into ``state["messages"]`` so that the AG-UI / CopilotKit wire protocol
+    can stream TOOL_CALL_START, TOOL_CALL_END, and TOOL_CALL_RESULT events
+    to the frontend without any extra plumbing.
+    """
     tool_name = state.get("selected_tool")
     tool_args = state.get("selected_tool_args") or {}
     if not tool_name:
         return {}
 
+    target_base_url = state.get("mcp_target_url")
+    if tool_name in _META_TOOLS:
+        target_base_url = state.get("mcp_meta_url")
+
     tool_call_id = str(uuid4())
     started_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
-    # --- pending state snapshot (written before the actual call) ---
     pending_call: dict[str, Any] = {
         "id": tool_call_id,
         "name": tool_name,
@@ -301,12 +411,42 @@ async def execute_tool(state: dict[str, Any]) -> dict[str, Any]:
         "completed_at": None,
     }
 
-    result = await MCP_CLIENT.invoke_tool(tool_name, tool_args)
+    result = await MCP_CLIENT.invoke_tool(
+        tool_name,
+        tool_args,
+        base_url=target_base_url,
+    )
     completed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
     existing_results = list(state.get("tool_results") or [])
     existing_errors = list(state.get("tool_errors") or [])
     existing_history = list(state.get("tool_call_history") or [])
+
+    # Build AG-UI-compatible messages (AIMessage + ToolMessage) when
+    # langchain_core is available. These are appended to state["messages"]
+    # via the Annotated[list, add_messages] reducer so LangGraphAGUIAgent
+    # can stream them as TOOL_CALL_* events to the frontend.
+    agui_messages: list[Any] = []
+    if _LC_MESSAGES_AVAILABLE:
+        ai_msg = AIMessage(
+            id=str(uuid4()),
+            content="",
+            tool_calls=[
+                {
+                    "id": tool_call_id,
+                    "name": tool_name,
+                    "args": tool_args,
+                }
+            ],
+        )
+        tool_result_content = _safe_json(result.get("data") or result)
+        tool_msg = ToolMessage(
+            id=str(uuid4()),
+            tool_call_id=tool_call_id,
+            name=tool_name,
+            content=tool_result_content,
+        )
+        agui_messages = [ai_msg, tool_msg]
 
     if result.get("ok"):
         completed_call: dict[str, Any] = {
@@ -317,12 +457,15 @@ async def execute_tool(state: dict[str, Any]) -> dict[str, Any]:
         }
         existing_results.append({"tool": tool_name, "result": result})
         existing_history.append(completed_call)
-        return {
+        update: dict[str, Any] = {
             "tool_results": existing_results,
             "final_status": "executed",
             "last_tool_call": completed_call,
             "tool_call_history": existing_history,
         }
+        if agui_messages:
+            update["messages"] = agui_messages
+        return update
 
     error_call: dict[str, Any] = {
         **pending_call,
@@ -339,7 +482,7 @@ async def execute_tool(state: dict[str, Any]) -> dict[str, Any]:
         result.get("tag"),
         result.get("message"),
     )
-    return {
+    error_update: dict[str, Any] = {
         "tool_results": existing_results,
         "tool_errors": existing_errors,
         "final_status": "tool_error",
@@ -351,12 +494,29 @@ async def execute_tool(state: dict[str, Any]) -> dict[str, Any]:
             "tool_error": result,
         },
     }
+    if agui_messages:
+        error_update["messages"] = agui_messages
+    return error_update
 
 
 async def format_response(state: dict[str, Any]) -> dict[str, Any]:
+    """Synthesize a natural-language response and emit it as an AIMessage.
+
+    Writing the final text into ``state["messages"]`` as an AIMessage is
+    what allows LangGraphAGUIAgent to stream TEXT_MESSAGE_* events to the
+    CopilotKit frontend. ``response_text`` is kept for the legacy SSE path.
+    """
     if state.get("response_text"):
         return {}
-    return {
-        "response_text": await synthesize_agent_response(state),
+
+    text = await synthesize_agent_response(state)
+    update: dict[str, Any] = {
+        "response_text": text,
         "final_status": state.get("final_status") or "completed",
     }
+
+    # Append AIMessage so AG-UI streams the text as TEXT_MESSAGE events.
+    if _LC_MESSAGES_AVAILABLE and text:
+        update["messages"] = [AIMessage(id=str(uuid4()), content=text)]
+
+    return update

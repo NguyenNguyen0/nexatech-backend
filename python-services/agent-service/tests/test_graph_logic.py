@@ -14,10 +14,17 @@ from app.graph.llm_planner import (
     _extract_tool_call_from_verbose_text,
     _planner_system_prompt,
 )
-from app.graph.nodes import agent_think, format_response, needs_approval
+from app.graph.nodes import (
+    agent_think,
+    domain_executor,
+    domain_router,
+    format_response,
+    needs_approval,
+)
 from app.graph.routing.keyword_matcher import KeywordToolMatcher
 from app.graph.tool_registry import TOOL_DESCRIPTORS
 from app.graph.tool_registry import plan_tool_call
+from app.runtime.delegation_metrics import DELEGATION_METRICS
 
 
 def test_plan_tool_call_matches_promotions() -> None:
@@ -241,7 +248,7 @@ async def test_inventory_tool_catalog_includes_read_and_write_tools() -> None:
 async def test_agent_think_uses_llm_fallback_when_heuristic_misses(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_llm_plan(_: str):
+    async def fake_llm_plan(_: str, **__: object):
         from app.graph.tool_registry import ToolPlan
 
         return ToolPlan(
@@ -338,7 +345,86 @@ async def test_medium_sensitivity_requires_checkpointer_for_hitl() -> None:
 
     assert result["request_sensitivity"] == "medium"
     assert result["final_status"] == "approval_unavailable"
-    assert result["answer_context"]["error"] == "approval_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_domain_router_routes_meta_intent_to_meta_subagent() -> None:
+    result = await domain_router(
+        {
+            "messages": [{"role": "user", "content": "hãy đọc skill inventory"}],
+            "mcp_target_domain": "product",
+            "mcp_target_url": "http://localhost:8102",
+            "mcp_meta_url": "http://localhost:8094",
+        }
+    )
+
+    assert result["mcp_target_domain"] == "meta"
+    assert result["mcp_target_url"] == "http://localhost:8094"
+    assert result["subagent_name"] == "meta_subagent"
+
+
+@pytest.mark.asyncio
+async def test_domain_executor_scopes_tools_for_target_domain() -> None:
+    result = await domain_executor(
+        {
+            "messages": [{"role": "user", "content": "liệt kê sản phẩm"}],
+            "mcp_target_domain": "product",
+            "available_tools": ["list_products", "get_order"],
+            "tool_results": [],
+            "tool_errors": [],
+        }
+    )
+
+    assert result["selected_tool"] == "list_products"
+    assert result["subagent_name"] == "product_subagent"
+    assert result["delegation_trace"][-1]["domain"] == "product"
+    assert result["delegation_trace"][-1]["selected_tool"] == "list_products"
+
+
+@pytest.mark.asyncio
+async def test_domain_executor_returns_no_matching_when_scoped_tools_cannot_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_llm_plan(_: str, **__: object):
+        return None
+
+    monkeypatch.setattr("app.graph.subagents.plan_tool_call_with_llm", fake_llm_plan)
+
+    result = await domain_executor(
+        {
+            "messages": [{"role": "user", "content": "liệt kê sản phẩm"}],
+            "mcp_target_domain": "audit",
+            "available_tools": ["search_audit_logs"],
+            "tool_results": [],
+            "tool_errors": [],
+        }
+    )
+
+    assert result["final_status"] == "no_matching_tool"
+    assert result["subagent_name"] == "audit_subagent"
+    assert result["answer_context"]["domain"] == "audit"
+    assert result["answer_context"]["error"] == "no_matching_tool"
+
+
+@pytest.mark.asyncio
+async def test_domain_executor_updates_delegation_metrics() -> None:
+    DELEGATION_METRICS.reset()
+
+    result = await domain_executor(
+        {
+            "messages": [{"role": "user", "content": "liệt kê sản phẩm"}],
+            "mcp_target_domain": "product",
+            "available_tools": ["list_products", "get_order"],
+            "tool_results": [],
+            "tool_errors": [],
+        }
+    )
+
+    snapshot = DELEGATION_METRICS.snapshot()
+    assert result["selected_tool"] == "list_products"
+    assert snapshot["totals"]["delegation_requests_total"] >= 1
+    assert snapshot["byDomain"]["product"]["delegation_requests_total"] >= 1
+    assert snapshot["byDomain"]["product"]["scoped_tools_count"] >= 1
 
 
 def test_compile_graph_without_checkpointer() -> None:

@@ -8,8 +8,18 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { randomUUID } from 'crypto';
+import { collectDefaultMetrics, Histogram, register } from 'prom-client';
 
 const logger = new Logger('Bootstrap');
+const serviceName = 'promotion-service';
+const httpRequestDuration = new Histogram({
+  name: 'http_server_requests_seconds',
+  help: 'HTTP request duration in seconds',
+  labelNames: ['service', 'method', 'route', 'status'],
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+});
+
+collectDefaultMetrics({ labels: { service: serviceName } });
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -49,12 +59,35 @@ async function bootstrap() {
   });
 
   const fastify = app.getHttpAdapter().getInstance();
+  fastify.get('/actuator/health', async () => ({ status: 'UP', service: serviceName }));
+  fastify.get('/actuator/info', async () => ({ app: { name: serviceName } }));
+  fastify.get('/actuator/prometheus', async (_request: any, reply: any) => {
+    reply.header('Content-Type', register.contentType);
+    return register.metrics();
+  });
+  fastify.get('/metrics', async (_request: any, reply: any) => {
+    reply.header('Content-Type', register.contentType);
+    return register.metrics();
+  });
+
   fastify.addHook('onRequest', (request: any, reply: any, done: any) => {
     const incoming = request.headers['x-correlation-id'];
     const correlationId =
       typeof incoming === 'string' && incoming.trim().length > 0 ? incoming : randomUUID();
     request.headers['x-correlation-id'] = correlationId;
+    request.metricsStart = process.hrtime.bigint();
     reply.header('X-Correlation-Id', correlationId);
+    done();
+  });
+  fastify.addHook('onResponse', (request: any, reply: any, done: any) => {
+    const path = request.url?.split('?')[0] ?? 'unknown';
+    if (path !== '/actuator/prometheus' && path !== '/metrics' && request.metricsStart) {
+      const durationSeconds = Number(process.hrtime.bigint() - request.metricsStart) / 1e9;
+      const route = request.routeOptions?.url ?? request.routerPath ?? path;
+      httpRequestDuration
+        .labels(serviceName, request.method ?? 'UNKNOWN', route, String(reply.statusCode))
+        .observe(durationSeconds);
+    }
     done();
   });
 
@@ -93,6 +126,7 @@ async function bootstrap() {
   logger.log(`Promotion Service started  [env=${env}] [port=${port}]`);
   logger.log(`Health:  http://localhost:${port}/health`);
   logger.log(`Ready:   http://localhost:${port}/health/ready`);
+  logger.log(`Metrics: http://localhost:${port}/actuator/prometheus`);
 }
 
 bootstrap().catch((err) => {

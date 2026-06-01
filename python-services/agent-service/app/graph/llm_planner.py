@@ -137,11 +137,16 @@ def _planner_system_prompt() -> str:
     )
 
 
-async def plan_tool_call_with_llm(user_text: str) -> ToolPlan | None:
+async def plan_tool_call_with_llm(
+    user_text: str,
+    *,
+    available_tools: list[str] | None = None,
+) -> ToolPlan | None:
     if not user_text.strip() or not SETTINGS.groq_api_key:
         return None
 
-    available_tools = await MCP_CLIENT.list_available_tools()
+    if available_tools is None:
+        available_tools = await MCP_CLIENT.list_available_tools()
     if not available_tools:
         logger.error("No available tools from MCP server for planner.")
         return None
@@ -253,12 +258,6 @@ async def synthesize_agent_response(state: dict[str, Any]) -> str:
         )
         return "Hệ thống đã chọn tool nhưng chưa nhận được kết quả từ MCP server. Vui lòng thử lại."
 
-    if final_status == "no_matching_tool":
-        available = state.get("available_tools") or []
-        if available:
-            return f"Không tìm thấy tool phù hợp cho yêu cầu này. Các tool hiện có: {', '.join(available)}."
-        return "Không tìm thấy tool phù hợp cho yêu cầu này."
-
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
         from langchain_groq import ChatGroq
@@ -272,11 +271,6 @@ async def synthesize_agent_response(state: dict[str, Any]) -> str:
     response_context = {
         "user_text": user_text,
         "final_status": state.get("final_status"),
-        "available_tools": (
-            state.get("available_tools") or []
-            if state.get("final_status") == "no_matching_tool"
-            else []
-        ),
         "selected_tool": state.get("selected_tool"),
         "selected_tool_args": state.get("selected_tool_args") or {},
         "tool_results": _truncate_data(state.get("tool_results") or []),
@@ -298,7 +292,8 @@ async def synthesize_agent_response(state: dict[str, Any]) -> str:
         "TUYỆT ĐỐI KHÔNG: viết 'tôi sẽ gọi tool', 'đang kiểm tra', 'trước tiên cần', "
         "'xin xác nhận', hoặc bất kỳ mô tả nào về quá trình nội bộ.\n"
         "Nếu tool_results có dữ liệu → tóm tắt dữ liệu thực từ tool_results.\n"
-        "Nếu final_status là 'no_matching_tool' → thông báo ngắn gọn rằng không tìm thấy tool phù hợp.\n"
+        "Nếu final_status là 'conversational' → trả lời tự nhiên, thân thiện theo nội dung input_text. "
+        "Ví dụ: chào hỏi → chào lại; cảm ơn → phản hồi lịch sự. Không nhắc tới tool.\n"
         "Nếu final_status là 'tool_error' → thông báo lỗi từ answer_context.\n"
         "Không bịa dữ liệu. Không suy đoán. Không dùng template cố định."
     )

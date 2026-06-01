@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     eureka_instance_hostname: str = Field(default_factory=_resolve_hostname)
 
     mcp_server_url: str = "http://localhost:8094"
+    mcp_meta_url: str = "http://localhost:8094"
+    mcp_enable_domain_routing: bool = True
+    mcp_default_domain: str = "product"
+    mcp_inventory_url: str = "http://localhost:8101"
+    mcp_product_url: str = "http://localhost:8102"
+    mcp_order_url: str = "http://localhost:8103"
+    mcp_payment_url: str = "http://localhost:8104"
+    mcp_promotion_url: str = "http://localhost:8105"
+    mcp_news_url: str = "http://localhost:8106"
+    mcp_audit_url: str = "http://localhost:8107"
+    mcp_tool_catalog_cache_ttl_seconds: int = Field(default=30, ge=0, le=3600)
     request_timeout_seconds: float = Field(default=8.0, gt=0)
 
     langsmith_tracing: bool = True

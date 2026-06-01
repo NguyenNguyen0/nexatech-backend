@@ -54,6 +54,14 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   EUREKA_INSTANCE_PORT?: string;
+
+  @IsOptional()
+  @IsString()
+  KEYCLOAK_ISSUER_URI?: string;
+
+  @IsOptional()
+  @IsString()
+  KEYCLOAK_JWKS_URI?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

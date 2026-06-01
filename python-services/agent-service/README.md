@@ -19,6 +19,7 @@ FastAPI skeleton service for NexaTech agent orchestration. This setup introduces
 - `GET /api/v1/agent/runs/{threadId}`
 - `GET /api/v1/agent/conversations?userId=...`
 - `GET /api/v1/agent/conversations/{threadId}`
+- `GET /api/v1/agent/metrics/delegation`
 - `POST /api/v1/agent/sessions`
 - `PATCH /api/v1/agent/sessions/{threadId}`
 - `DELETE /api/v1/agent/sessions/{threadId}`
@@ -114,6 +115,17 @@ Key variables:
 - `EUREKA_SERVER_URL`
 - `EUREKA_INSTANCE_HOSTNAME`
 - `MCP_SERVER_URL`
+- `MCP_META_URL`
+- `MCP_ENABLE_DOMAIN_ROUTING`
+- `MCP_DEFAULT_DOMAIN`
+- `MCP_INVENTORY_URL`
+- `MCP_PRODUCT_URL`
+- `MCP_ORDER_URL`
+- `MCP_PAYMENT_URL`
+- `MCP_PROMOTION_URL`
+- `MCP_NEWS_URL`
+- `MCP_AUDIT_URL`
+- `MCP_TOOL_CATALOG_CACHE_TTL_SECONDS`
 - `REQUEST_TIMEOUT_SECONDS`
 - `LANGSMITH_TRACING`
 - `LANGSMITH_ENDPOINT`
@@ -138,3 +150,21 @@ Key variables:
 - Service supports both prefixed and stripped routes (`/api/v1/agent/...` and `/runs`, `/conversations`, ...) for gateway compatibility.
 - Stream event schema includes: `message.chunk`, `tool.started`, `tool.completed`, `tool.error`, `hitl.interrupt`, `run.completed`, `run.cancelled`, `run.error`.
 - `MCP_SERVER_URL` must point to MCP server base URL (example: `http://localhost:8094`), because agent internally calls `${MCP_SERVER_URL}/mcp`.
+- Runtime now supports domain-aware MCP routing:
+  - Agent asks `route_to_mcp_domain` on `MCP_META_URL`.
+  - Agent then fetches tool catalog from the routed domain MCP URL (`MCP_*_URL`) instead of loading a global catalog.
+  - If domain MCP is unavailable, agent falls back to `MCP_SERVER_URL`.
+  - Tool catalog discovery is cached for `MCP_TOOL_CATALOG_CACHE_TTL_SECONDS` seconds.
+- LLM fallback planner now uses the already-filtered `available_tools` from runtime state and does not re-fetch the full MCP tool list unless `available_tools` is missing.
+
+## Phase D Delegation Metrics
+
+Agent-service now tracks in-memory delegation metrics for domain routing and
+subagent planning quality.
+
+- Endpoint: `GET /api/v1/agent/metrics/delegation` (also available at `/metrics/delegation`)
+- Metric groups include:
+  - runtime routing (`runtime_domain_route_total`, `runtime_default_domain_total`)
+  - catalog fallback (`runtime_domain_catalog_empty_total`, `runtime_catalog_fallback_total`)
+  - subagent planning (`delegation_requests_total`, `llm_fallback_total`, `no_matching_tool_total`)
+  - router decisions (`route_domain_total`, `route_meta_intent_total`, `route_general_total`)

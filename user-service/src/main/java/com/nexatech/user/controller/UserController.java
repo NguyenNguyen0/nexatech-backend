@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.nexatech.user.constant.PermissionsAccept;
 import com.nexatech.user.dto.base.ApiResponse;
 import com.nexatech.user.dto.base.PageResponse;
 import com.nexatech.user.dto.request.AdminUserCreateRequest;
@@ -27,6 +28,7 @@ import com.nexatech.user.dto.response.OnboardingStatusResponse;
 import com.nexatech.user.dto.response.UserResponse;
 import com.nexatech.user.exception.AppException;
 import com.nexatech.user.exception.ErrorCode;
+import com.nexatech.user.security.RequiresPermission;
 import com.nexatech.user.service.AdminUserService;
 import com.nexatech.user.service.AvatarStorageService;
 import com.nexatech.user.service.UserService;
@@ -48,7 +50,7 @@ public class UserController {
     AvatarStorageService avatarStorageService;
 
     @PostMapping
-    // @RequiresPermission(PermissionsAccept.User.CREATE)
+    @RequiresPermission(PermissionsAccept.User.CREATE)
     public ApiResponse<UserResponse> createUser(@Valid @RequestBody AdminUserCreateRequest request) {
         return ApiResponse.<UserResponse>builder()
                 .result(adminUserService.createUserWithKeycloakProvision(request))
@@ -77,7 +79,7 @@ public class UserController {
     }
 
     @GetMapping
-    // @RequiresPermission(PermissionsAccept.User.READ) // enable for production
+    @RequiresPermission(PermissionsAccept.User.READ) // enable for production
     public ApiResponse<PageResponse<UserResponse>> getAllUsers(
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
@@ -91,7 +93,7 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
-    // @RequiresPermission(PermissionsAccept.User.READ)
+    @RequiresPermission(PermissionsAccept.User.READ)
     public ApiResponse<UserResponse> getUserById(@PathVariable String userId) {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.getUserById(userId))
@@ -110,7 +112,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}")
-    // @RequiresPermission(PermissionsAccept.User.UPDATE)
+    @RequiresPermission(PermissionsAccept.User.UPDATE)
     public ApiResponse<UserResponse> updateUser(@PathVariable String userId,
             @Valid @RequestBody UserUpdatenRequest request) {
         UserResponse result = userService.updateUser(userId, request);
@@ -136,7 +138,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{userId}")
-    // @RequiresPermission(PermissionsAccept.User.DELETE)
+    @RequiresPermission(PermissionsAccept.User.DELETE)
     public ApiResponse<Void> deleteUser(@PathVariable String userId) {
         userService.deleteUser(userId);
         return ApiResponse.<Void>builder()
@@ -150,7 +152,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}/enable")
-    // @RequiresPermission(PermissionsAccept.User.ENABLE)
+    @RequiresPermission(PermissionsAccept.User.ENABLE)
     public ApiResponse<Void> enableUser(@PathVariable String userId) {
         userService.enableUser(userId);
         return ApiResponse.<Void>builder()

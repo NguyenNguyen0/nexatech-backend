@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.mcp_client import MCPClient
 from app.core.logging import authorization_ctx
+from app.core.settings import SETTINGS
 
 
 @pytest.mark.asyncio
@@ -111,3 +112,56 @@ async def test_invoke_tool_normalizes_jsonrpc_error() -> None:
     assert result["ok"] is False
     assert result["tag"] == "MCP-DOWNSTREAM"
     assert result["tool"] == "list_promotions"
+
+
+@pytest.mark.asyncio
+async def test_list_available_tools_supports_base_url_override() -> None:
+    seen_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_paths.append(request.url.path)
+        return httpx.Response(
+            200,
+            json={
+                "jsonrpc": "2.0",
+                "id": "agent-service",
+                "result": {
+                    "tools": [{"name": "list_inventory"}],
+                },
+            },
+        )
+
+    client = MCPClient("http://default.test", 5, transport=httpx.MockTransport(handler))
+    tools = await client.list_available_tools(base_url="http://inventory.test")
+
+    assert tools == ["list_inventory"]
+    assert seen_paths == ["/mcp/"]
+
+
+@pytest.mark.asyncio
+async def test_list_available_tools_uses_cache_within_ttl(monkeypatch: pytest.MonkeyPatch) -> None:
+    call_count = 0
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        return httpx.Response(
+            200,
+            json={
+                "jsonrpc": "2.0",
+                "id": "agent-service",
+                "result": {
+                    "tools": [{"name": "list_promotions"}],
+                },
+            },
+        )
+
+    monkeypatch.setattr(SETTINGS, "mcp_tool_catalog_cache_ttl_seconds", 30)
+    client = MCPClient("http://example.test", 5, transport=httpx.MockTransport(handler))
+
+    first = await client.list_available_tools()
+    second = await client.list_available_tools()
+
+    assert first == ["list_promotions"]
+    assert second == ["list_promotions"]
+    assert call_count == 1

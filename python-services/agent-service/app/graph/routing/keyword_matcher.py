@@ -352,7 +352,7 @@ class KeywordToolMatcher:
         )
         if product_id:
             return self._plan(
-                "get_product",
+                "get_product_by_id",
                 {"product_id": product_id},
                 "product detail by id",
                 available,

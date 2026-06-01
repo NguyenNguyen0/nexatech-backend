@@ -2,6 +2,11 @@ server:
   port: 8085
 
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9000/realms/nexatech}
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:5432/nexatech_inventory
     username: ${DB_USERNAME:nexatech}

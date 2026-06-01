@@ -168,7 +168,15 @@ public class ProductResponseEnricher {
                 .filter(StringUtils::hasText)
                 .distinct()
                 .toList();
-        Map<String, InventoryStockResponse.StockData> stockByProductId = resilientDownstreamService.getStocks(productIds);
+        Map<String, InventoryStockResponse.StockData> stockByProductId;
+        try {
+            stockByProductId = resilientDownstreamService.getStocks(productIds);
+        } catch (Exception e) {
+            log.warn("[PRD] enrichStocks: inventory unavailable for {} products, marking all OUT_OF_STOCK: {}",
+                    productIds.size(), e.getMessage());
+            responses.forEach(this::markOutOfStock);
+            return;
+        }
 
         responses.forEach(response -> {
             InventoryStockResponse.StockData stock = stockByProductId.get(response.getId());

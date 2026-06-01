@@ -59,7 +59,7 @@ async def search_products(
     """Search products by keyword with optional catalog filters.
 
     Use this when the user's intent is textual search. For exact product ID lookup,
-    use get_product; for exact slug lookup, use get_product_by_slug.
+    use get_product_by_id; for exact slug lookup, use get_product_by_slug.
     """
     return tool_result(
         await PRODUCT_API.search_products(keyword, params=dump_input(params))
@@ -67,7 +67,7 @@ async def search_products(
 
 
 @mcp.tool()
-async def get_product(
+async def get_product_by_id(
     product_id: Annotated[
         str,
         Field(description="Product ID string to retrieve. Do not convert to ObjectId."),
@@ -79,7 +79,7 @@ async def get_product(
     details such as name, price, categories, brand, images, specs, tags, metadata,
     rating, and active/deleted state.
     """
-    return tool_result(await PRODUCT_API.get_product(product_id))
+    return tool_result(await PRODUCT_API.get_product_by_id(product_id))
 
 
 @mcp.tool()

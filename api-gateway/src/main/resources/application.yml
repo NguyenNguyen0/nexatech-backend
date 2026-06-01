@@ -2,7 +2,12 @@ spring:
   application:
     name: api-gateway
   config:
-    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}"
+    import: "optional:file:../.env[.properties],optional:file:./.env[.properties],optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9000/realms/nexatech}
   cloud:
     config:
       fail-fast: false
@@ -11,3 +16,29 @@ spring:
         max-attempts: 4
         max-interval: 5000
         multiplier: 1.5
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+gateway:
+  cors:
+    allowed-origin-patterns: ${GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
