@@ -30,7 +30,7 @@ public class InventoryController {
     private final InventoryService inventoryService;
 
     @GetMapping("/list")
-    @RequiresPermission(PermissionsAccept.Inventory.READ)
+    // @RequiresPermission(PermissionsAccept.Inventory.READ)
     @Cacheable(
             value = "inventoryLists",
             key = "T(com.nexatech.inventory.util.InventoryCacheKey).of('list', #sku, #status, #keyword, #warehouseLocation, #pageable)",
@@ -61,7 +61,7 @@ public class InventoryController {
     }
 
     @GetMapping("/{productId}/movements")
-    @RequiresPermission(PermissionsAccept.Inventory.READ)
+    // @RequiresPermission(PermissionsAccept.Inventory.READ)
     @Cacheable(
             value = "inventoryMovements",
             key = "T(com.nexatech.inventory.util.InventoryCacheKey).of(#productId, #pageable)",
@@ -73,7 +73,7 @@ public class InventoryController {
     }
 
     @PutMapping
-    @RequiresPermission(PermissionsAccept.Inventory.WRITE)
+    // @RequiresPermission(PermissionsAccept.Inventory.WRITE)
     @CachePut(value = "inventoryStock", key = "#request.productId", unless = "#result == null || #result.data == null")
     public ApiResponse<InventoryResponse> updateStock(@Valid @RequestBody StockUpdateRequest request) {
         return ApiResponse.ok(inventoryService.updateStock(request));
@@ -102,26 +102,26 @@ public class InventoryController {
     }
 
     @GetMapping("/low-stock")
-    @RequiresPermission(PermissionsAccept.Inventory.READ)
+    // @RequiresPermission(PermissionsAccept.Inventory.READ)
     @Cacheable(value = "lowStockInventory", key = "'all'", unless = "#result == null || #result.data == null")
     public ApiResponse<List<InventoryResponse>> getLowStockItems() {
         return ApiResponse.ok(inventoryService.getLowStockItems());
     }
 
     @PostMapping("/bulk-import")
-    @RequiresPermission(PermissionsAccept.Inventory.IMPORT)
+    // @RequiresPermission(PermissionsAccept.Inventory.IMPORT)
     public ApiResponse<BulkImportResult> bulkImport(@Valid @RequestBody List<StockUpdateRequest> requests) {
         return ApiResponse.ok(inventoryService.bulkImport(requests));
     }
 
     @PostMapping("/import")
-    @RequiresPermission(PermissionsAccept.Inventory.IMPORT)
+    // @RequiresPermission(PermissionsAccept.Inventory.IMPORT)
     public ApiResponse<CSVImportResult> importFromCSV(@RequestParam("file") MultipartFile file) {
         return ApiResponse.ok(inventoryService.importFromCSV(file));
     }
 
     @PatchMapping("/{productId}/warehouse")
-    @RequiresPermission(PermissionsAccept.Inventory.WRITE)
+    // @RequiresPermission(PermissionsAccept.Inventory.WRITE)
     @CachePut(value = "inventoryStock", key = "#productId", unless = "#result == null || #result.data == null")
     public ApiResponse<InventoryResponse> updateWarehouseInfo(
             @PathVariable String productId,

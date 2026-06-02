@@ -48,13 +48,13 @@ public class ProductController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @RequiresPermission(PermissionsAccept.Product.CREATE)
+    // @RequiresPermission(PermissionsAccept.Product.CREATE)
     public ApiResponse<ProductResponse> createProduct(@Valid @RequestBody ProductRequest request) {
         return ApiResponse.ok(productCommandHandler.handle(toCreateCommand(request)));
     }
 
     @PutMapping("/{id}")
-    @RequiresPermission(PermissionsAccept.Product.UPDATE)
+    // @RequiresPermission(PermissionsAccept.Product.UPDATE)
     public ApiResponse<ProductResponse> updateProduct(
             @PathVariable String id,
             @Valid @RequestBody ProductRequest request) {
@@ -224,14 +224,14 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
-    @RequiresPermission(PermissionsAccept.Product.DELETE)
+    // @RequiresPermission(PermissionsAccept.Product.DELETE)
     public ApiResponse<Void> deleteProduct(@PathVariable String id) {
         productCommandHandler.handle(new DeleteProductCommand(id));
         return ApiResponse.ok(null);
     }
 
     @PatchMapping("/{id}/restore")
-    @RequiresPermission(PermissionsAccept.Product.UPDATE)
+    // @RequiresPermission(PermissionsAccept.Product.UPDATE)
     public ApiResponse<ProductResponse> restoreProduct(@PathVariable String id) {
         return ApiResponse.ok(productCommandHandler.handle(new RestoreProductCommand(id)));
     }

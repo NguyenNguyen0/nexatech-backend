@@ -33,7 +33,7 @@ public class NotificationController {
     private final SseEmitterService sseEmitterService;
 
     @GetMapping
-    @RequiresPermission(PermissionsAccept.Notification.READ)
+    // @RequiresPermission(PermissionsAccept.Notification.READ)
     public ResponseEntity<ApiResponse<PageResponse<NotificationResponse>>> getNotifications(
             @RequestHeader("X-User-Id") UUID userId,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -48,7 +48,7 @@ public class NotificationController {
      * GET /api/v1/notifications/unread-count — get the number of unread notifications.
      */
     @GetMapping("/unread-count")
-    @RequiresPermission(PermissionsAccept.Notification.READ)
+    // @RequiresPermission(PermissionsAccept.Notification.READ)
     public ResponseEntity<ApiResponse<Map<String, Long>>> getUnreadCount(
             @RequestHeader("X-User-Id") UUID userId) {
         long count = notificationService.getUnreadCount(userId);
@@ -61,7 +61,7 @@ public class NotificationController {
      * PUT /api/v1/notifications/{id}/read — mark a single notification as read.
      */
     @PutMapping("/{id}/read")
-    @RequiresPermission(PermissionsAccept.Notification.WRITE)
+    // @RequiresPermission(PermissionsAccept.Notification.WRITE)
     public ResponseEntity<ApiResponse<Void>> markAsRead(@PathVariable UUID id) {
         notificationService.markAsRead(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "Notification marked as read"));
@@ -71,7 +71,7 @@ public class NotificationController {
      * PATCH /api/v1/notifications/{id}/read — mark a single notification as read (PATCH variant).
      */
     @PatchMapping("/{id}/read")
-    @RequiresPermission(PermissionsAccept.Notification.WRITE)
+    // @RequiresPermission(PermissionsAccept.Notification.WRITE)
     public ResponseEntity<ApiResponse<Void>> markAsReadPatch(@PathVariable UUID id) {
         notificationService.markAsRead(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "Notification marked as read"));
@@ -81,7 +81,7 @@ public class NotificationController {
      * PUT /api/v1/notifications/read-all — mark all notifications as read for a user.
      */
     @PutMapping("/read-all")
-    @RequiresPermission(PermissionsAccept.Notification.WRITE)
+    // @RequiresPermission(PermissionsAccept.Notification.WRITE)
     public ResponseEntity<ApiResponse<Void>> markAllAsRead(
             @RequestHeader("X-User-Id") UUID userId) {
         notificationService.markAllAsRead(userId);
@@ -92,7 +92,7 @@ public class NotificationController {
      * PATCH /api/v1/notifications/read-all — mark all as read (PATCH variant).
      */
     @PatchMapping("/read-all")
-    @RequiresPermission(PermissionsAccept.Notification.WRITE)
+    // @RequiresPermission(PermissionsAccept.Notification.WRITE)
     public ResponseEntity<ApiResponse<Void>> markAllAsReadPatch(
             @RequestHeader("X-User-Id") UUID userId) {
         notificationService.markAllAsRead(userId);
@@ -105,7 +105,7 @@ public class NotificationController {
      * GET /api/v1/notifications/preferences — get current user's notification preferences.
      */
     @GetMapping("/preferences")
-    @RequiresPermission(PermissionsAccept.Notification.READ)
+    // @RequiresPermission(PermissionsAccept.Notification.READ)
     public ResponseEntity<ApiResponse<List<NotificationPreferenceResponse>>> getPreferences(
             @RequestHeader("X-User-Id") UUID userId) {
         List<NotificationPreferenceResponse> preferences = preferenceService.getPreferences(userId);
@@ -116,7 +116,7 @@ public class NotificationController {
      * PUT /api/v1/notifications/preferences — update a notification preference.
      */
     @PutMapping("/preferences")
-    @RequiresPermission(PermissionsAccept.Notification.WRITE)
+    // @RequiresPermission(PermissionsAccept.Notification.WRITE)
     public ResponseEntity<ApiResponse<NotificationPreferenceResponse>> updatePreference(
             @RequestHeader("X-User-Id") UUID userId,
             @Valid @RequestBody NotificationPreferenceRequest request) {

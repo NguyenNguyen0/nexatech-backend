@@ -37,13 +37,13 @@ public class CategoryController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @RequiresPermission(PermissionsAccept.Category.WRITE)
+    // @RequiresPermission(PermissionsAccept.Category.WRITE)
     public ApiResponse<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest request) {
         return ApiResponse.ok(categoryCommandHandler.handle(toCreateCommand(request)));
     }
 
     @PutMapping("/{id}")
-    @RequiresPermission(PermissionsAccept.Category.WRITE)
+    // @RequiresPermission(PermissionsAccept.Category.WRITE)
     public ApiResponse<CategoryResponse> updateCategory(
             @PathVariable String id,
             @Valid @RequestBody CategoryRequest request) {
@@ -88,14 +88,14 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
-    @RequiresPermission(PermissionsAccept.Category.WRITE)
+    // @RequiresPermission(PermissionsAccept.Category.WRITE)
     public ApiResponse<Void> deleteCategory(@PathVariable String id) {
         categoryCommandHandler.handle(new DeleteCategoryCommand(id));
         return ApiResponse.ok(null);
     }
 
     @PatchMapping("/{id}/restore")
-    @RequiresPermission(PermissionsAccept.Category.WRITE)
+    // @RequiresPermission(PermissionsAccept.Category.WRITE)
     public ApiResponse<CategoryResponse> restoreCategory(@PathVariable String id) {
         return ApiResponse.ok(categoryCommandHandler.handle(new RestoreCategoryCommand(id)));
     }

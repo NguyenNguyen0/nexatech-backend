@@ -22,13 +22,13 @@ public class BrandController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @RequiresPermission(PermissionsAccept.Brand.WRITE)
+    // @RequiresPermission(PermissionsAccept.Brand.WRITE)
     public ApiResponse<BrandResponse> createBrand(@Valid @RequestBody BrandRequest request) {
         return ApiResponse.ok(brandService.createBrand(request));
     }
 
     @PutMapping("/{id}")
-    @RequiresPermission(PermissionsAccept.Brand.WRITE)
+    // @RequiresPermission(PermissionsAccept.Brand.WRITE)
     public ApiResponse<BrandResponse> updateBrand(
             @PathVariable String id,
             @Valid @RequestBody BrandRequest request) {
@@ -53,14 +53,14 @@ public class BrandController {
     }
 
     @DeleteMapping("/{id}")
-    @RequiresPermission(PermissionsAccept.Brand.WRITE)
+    // @RequiresPermission(PermissionsAccept.Brand.WRITE)
     public ApiResponse<Void> deleteBrand(@PathVariable String id) {
         brandService.deleteBrand(id);
         return ApiResponse.ok(null);
     }
 
     @PatchMapping("/{id}/restore")
-    @RequiresPermission(PermissionsAccept.Brand.WRITE)
+    // @RequiresPermission(PermissionsAccept.Brand.WRITE)
     public ApiResponse<BrandResponse> restoreBrand(@PathVariable String id) {
         return ApiResponse.ok(brandService.restoreBrand(id));
     }

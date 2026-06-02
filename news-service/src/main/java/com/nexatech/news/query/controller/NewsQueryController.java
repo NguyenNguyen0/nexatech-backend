@@ -59,7 +59,7 @@ public class NewsQueryController {
     }
 
     @GetMapping
-    @RequiresPermission(PermissionsAccept.News.READ)
+    // @RequiresPermission(PermissionsAccept.News.READ)
     public ResponseEntity<ApiResponse<List<NewsListResponse>>> getAllNews() {
         log.info("Request to get all news (admin)");
 
@@ -74,7 +74,7 @@ public class NewsQueryController {
     }
 
     @GetMapping("/{slug}")
-    @RequiresPermission(PermissionsAccept.News.READ)
+    // @RequiresPermission(PermissionsAccept.News.READ)
     public ResponseEntity<ApiResponse<NewsResponse>> getNewsBySlug(@PathVariable String slug) {
         log.info("Request to get news by slug (admin): {}", slug);
 
@@ -89,7 +89,7 @@ public class NewsQueryController {
     }
 
     @GetMapping("/{newsId}/images")
-    @RequiresPermission(PermissionsAccept.News.READ)
+    // @RequiresPermission(PermissionsAccept.News.READ)
     public ResponseEntity<ApiResponse<List<ImageAssetResponse>>> getNewsImages(@PathVariable String newsId) {
         log.info("Request to get all images for news: newsId={}", newsId);
 
@@ -104,7 +104,7 @@ public class NewsQueryController {
     }
 
     @GetMapping("/images/{imageId}")
-    @RequiresPermission(PermissionsAccept.News.READ)
+    // @RequiresPermission(PermissionsAccept.News.READ)
     public ResponseEntity<ApiResponse<ImageAssetResponse>> getNewsImage(@PathVariable String imageId) {
         log.info("Request to get news image: imageId={}", imageId);
 

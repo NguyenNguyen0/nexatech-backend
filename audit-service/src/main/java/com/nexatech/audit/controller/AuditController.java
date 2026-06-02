@@ -34,7 +34,7 @@ public class AuditController {
     AuditLogService auditLogService;
 
     @GetMapping
-    @RequiresPermission(PermissionsAccept.Audit.READ)
+    // @RequiresPermission(PermissionsAccept.Audit.READ)
     public ApiResponse<PageResponse<AuditLogResponse>> search(
             @RequestParam(required = false) String action,
             @RequestParam(required = false) String entityType,
@@ -64,7 +64,7 @@ public class AuditController {
     }
 
     @GetMapping("/{id}")
-    @RequiresPermission(PermissionsAccept.Audit.READ)
+    // @RequiresPermission(PermissionsAccept.Audit.READ)
     public ApiResponse<AuditLogResponse> getById(@PathVariable String id) {
         return ApiResponse.<AuditLogResponse>builder()
                 .result(auditLogService.getById(id))
@@ -72,7 +72,7 @@ public class AuditController {
     }
 
     @GetMapping("/trace/{lookupId}")
-    @RequiresPermission(PermissionsAccept.Audit.READ)
+    // @RequiresPermission(PermissionsAccept.Audit.READ)
     public ApiResponse<List<AuditLogResponse>> trace(@PathVariable String lookupId) {
         return ApiResponse.<List<AuditLogResponse>>builder()
                 .result(auditLogService.trace(lookupId))
@@ -86,7 +86,7 @@ public class AuditController {
      * they emit their first audit event.
      */
     @GetMapping("/facets")
-    @RequiresPermission(PermissionsAccept.Audit.READ)
+    // @RequiresPermission(PermissionsAccept.Audit.READ)
     public ApiResponse<AuditFacets> facets() {
         return ApiResponse.<AuditFacets>builder()
                 .result(auditLogService.facets())
