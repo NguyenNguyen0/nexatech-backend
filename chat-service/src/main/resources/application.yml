@@ -3,3 +3,12 @@ spring:
     name: chat-service
   config:
     import: "optional:file:../.env[.properties],optional:file:./.env[.properties],optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}/"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
