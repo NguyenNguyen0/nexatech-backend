@@ -1,5 +1,7 @@
 package com.nexatech.gateway.config;
 
+import com.nexatech.gateway.filter.JwtHeaderRelayFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -9,6 +11,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -17,7 +21,7 @@ public class GatewaySecurityConfig {
 
     @Bean
     @Order(1)
-    public SecurityFilterChain publicEndpoints(HttpSecurity http) throws Exception {
+    public SecurityFilterChain publicEndpoints(HttpSecurity http, JwtHeaderRelayFilter jwtHeaderRelayFilter) throws Exception {
         http.securityMatcher(
                 "/api/v1/agent/health",
                 "/api/v1/agent/copilotkit/info",
@@ -26,18 +30,20 @@ public class GatewaySecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(Customizer.withDefaults())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(a -> a.anyRequest().permitAll());
+            .authorizeHttpRequests(a -> a.anyRequest().permitAll())
+            .addFilterBefore(jwtHeaderRelayFilter, AuthorizationFilter.class);
         return http.build();
     }
 
     @Bean
     @Order(2)
-    public SecurityFilterChain gatewayRoutes(HttpSecurity http) throws Exception {
+    public SecurityFilterChain gatewayRoutes(HttpSecurity http, JwtHeaderRelayFilter jwtHeaderRelayFilter) throws Exception {
         stateless(http);
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/actuator/**", "/api/v1/auth", "/api/v1/auth/**", "/ws/chat", "/ws/chat/**")
                 .permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/orders/my").authenticated()
                 .requestMatchers(
                     "/api/v1/cart",
                     "/api/v1/cart/**",
@@ -115,8 +121,17 @@ public class GatewaySecurityConfig {
                     "/api/v1/shipping/shipments/*/tracking")
                 .permitAll()
                 .anyRequest().authenticated())
-                .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()));
+                .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))
+                .addFilterAfter(jwtHeaderRelayFilter, BearerTokenAuthenticationFilter.class);
         return http.build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<JwtHeaderRelayFilter> jwtHeaderRelayFilterRegistration(
+            JwtHeaderRelayFilter jwtHeaderRelayFilter) {
+        FilterRegistrationBean<JwtHeaderRelayFilter> registration = new FilterRegistrationBean<>(jwtHeaderRelayFilter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     private static void stateless(HttpSecurity http) throws Exception {
