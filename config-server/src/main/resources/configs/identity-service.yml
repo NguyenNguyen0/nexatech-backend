@@ -1,6 +1,15 @@
 server:
   port: 8082
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+
 spring:
   main:
     # OpenFeign + DevTools/context refresh can re-register FeignClientSpecification beans with the same name.

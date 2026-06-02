@@ -12,15 +12,31 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - kong:8001
+          - host.docker.internal:8001
         labels:
           service: kong-gateway
+
+  - job_name: identity-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - host.docker.internal:8082
+        labels:
+          service: identity-service
+
+  - job_name: user-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - host.docker.internal:8083
+        labels:
+          service: user-service
 
   - job_name: order-service
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - order-service:8084
+          - host.docker.internal:8084
         labels:
           service: order-service
 
@@ -28,7 +44,7 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - payment-service:8086
+          - host.docker.internal:8086
         labels:
           service: payment-service
 
@@ -36,22 +52,38 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - inventory-service:8085
+          - host.docker.internal:8085
         labels:
           service: inventory-service
+
+  - job_name: product-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - host.docker.internal:8090
+        labels:
+          service: product-service
 
   - job_name: shipping-service
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - shipping-service:8091
+          - host.docker.internal:8091
         labels:
           service: shipping-service
+
+  - job_name: chat-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - host.docker.internal:8089
+        labels:
+          service: chat-service
 
   - job_name: promotion-service
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - promotion-service:8093
+          - host.docker.internal:8093
         labels:
           service: promotion-service
