@@ -1,6 +1,15 @@
 server:
   port: 8089
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+
 spring:
   security:
     oauth2:
