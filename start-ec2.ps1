@@ -158,6 +158,10 @@ switch ($ServiceName) {
     "promotion-service" {
         $env:DATABASE_URL = "postgresql://$($env:DB_USERNAME):$($env:DB_PASSWORD)@$($env:EC2_HOST):5432/nexatech_promotions"
         $env:KAFKA_BROKERS = $env:KAFKA_BOOTSTRAP_SERVERS
+        $env:SERVICE_NAME = "promotion-service"
+        $env:PORT = "8093"
+        $env:EUREKA_INSTANCE_PORT = $env:PORT
+        $env:EUREKA_INSTANCE_HOSTNAME = if ($env:EUREKA_INSTANCE_IP_ADDRESS) { $env:EUREKA_INSTANCE_IP_ADDRESS } else { "127.0.0.1" }
         Set-Location (Join-Path $PSScriptRoot "promotion-service")
         npm run start:dev
         exit $LASTEXITCODE
