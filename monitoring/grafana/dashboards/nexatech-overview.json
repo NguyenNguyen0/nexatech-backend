@@ -31,19 +31,26 @@
           "color": {
             "mode": "thresholds"
           },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-background"
+            },
+            "inspect": false
+          },
           "mappings": [
             {
+              "type": "value",
               "options": {
                 "0": {
-                  "color": "red",
-                  "text": "DOWN"
+                  "text": "DOWN",
+                  "color": "red"
                 },
                 "1": {
-                  "color": "green",
-                  "text": "UP"
+                  "text": "UP",
+                  "color": "green"
                 }
-              },
-              "type": "value"
+              }
             }
           ],
           "thresholds": {
@@ -60,30 +67,109 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Status"
+              },
+              {
+                "id": "custom.width",
+                "value": 92
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "job"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Service"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "service"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "__name__"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 5,
-        "w": 24,
+        "h": 8,
+        "w": 8,
         "x": 0,
         "y": 0
       },
       "id": 1,
       "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+        "cellHeight": "md",
+        "footer": {
+          "countRows": false,
           "fields": "",
-          "values": false
+          "reducer": [
+            "sum"
+          ],
+          "show": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Service"
+          }
+        ]
       },
       "pluginVersion": "11.4.0",
       "targets": [
@@ -93,14 +179,17 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "up{job=~\"kong-gateway|order-service|payment-service|inventory-service|shipping-service|promotion-service\"}",
-          "legendFormat": "{{job}}",
-          "range": true,
-          "refId": "A"
+          "expr": "up{job=~\"kong-gateway|identity-service|user-service|order-service|payment-service|inventory-service|product-service|shipping-service|chat-service|promotion-service\"}",
+          "legendFormat": "",
+          "range": false,
+          "refId": "A",
+          "format": "table",
+          "instant": true
         }
       ],
-      "title": "Service Status",
-      "type": "stat"
+      "title": "Service Health",
+      "type": "table",
+      "description": "Latest scrape status from Prometheus. Green means the service metrics endpoint is reachable."
     },
     {
       "datasource": {
@@ -111,7 +200,7 @@
         "defaults": {
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 12,
+            "fillOpacity": 18,
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
@@ -124,9 +213,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 5
+        "w": 8,
+        "x": 8,
+        "y": 0
       },
       "id": 2,
       "options": {
@@ -135,7 +224,7 @@
             "lastNotNull",
             "mean"
           ],
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -151,7 +240,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (job) (rate(http_server_requests_seconds_count{job=~\"order-service|payment-service|inventory-service|shipping-service|promotion-service\"}[1m]))",
+          "expr": "sum by (job) (rate(http_server_requests_seconds_count{job=~\"identity-service|user-service|order-service|payment-service|inventory-service|product-service|shipping-service|chat-service|promotion-service\"}[1m]))",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
@@ -169,7 +258,7 @@
         "defaults": {
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 12,
+            "fillOpacity": 18,
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
@@ -181,9 +270,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 5
+        "w": 8,
+        "x": 16,
+        "y": 0
       },
       "id": 3,
       "options": {
@@ -192,7 +281,7 @@
             "lastNotNull",
             "mean"
           ],
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -226,7 +315,7 @@
         "defaults": {
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 10,
+            "fillOpacity": 12,
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
@@ -240,7 +329,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 13
+        "y": 12
       },
       "id": 4,
       "options": {
@@ -248,7 +337,7 @@
           "calcs": [
             "lastNotNull"
           ],
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -264,7 +353,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, job) (rate(http_server_requests_seconds_bucket{job=~\"order-service|payment-service|inventory-service|shipping-service|promotion-service\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, job) (rate(http_server_requests_seconds_bucket{job=~\"identity-service|user-service|order-service|payment-service|inventory-service|product-service|shipping-service|chat-service|promotion-service\"}[5m])))",
           "legendFormat": "{{job}} p95",
           "range": true,
           "refId": "A"
@@ -282,7 +371,7 @@
         "defaults": {
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 10,
+            "fillOpacity": 12,
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
@@ -296,7 +385,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 13
+        "y": 12
       },
       "id": 5,
       "options": {
@@ -304,7 +393,7 @@
           "calcs": [
             "lastNotNull"
           ],
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -320,7 +409,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (job, status) (rate(http_server_requests_seconds_count{job=~\"order-service|payment-service|inventory-service|shipping-service|promotion-service\",status=~\"2..|3..|4..|5..\"}[5m]))",
+          "expr": "sum by (job, status) (rate(http_server_requests_seconds_count{job=~\"identity-service|user-service|order-service|payment-service|inventory-service|product-service|shipping-service|chat-service|promotion-service\",status=~\"2..|3..|4..|5..\"}[5m]))",
           "legendFormat": "{{job}} {{status}}",
           "range": true,
           "refId": "A"
@@ -349,7 +438,7 @@
         "defaults": {
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 10,
+            "fillOpacity": 12,
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
@@ -363,7 +452,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 21
+        "y": 20
       },
       "id": 6,
       "options": {
@@ -371,7 +460,7 @@
           "calcs": [
             "lastNotNull"
           ],
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -387,7 +476,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "process_cpu_usage{job=~\"order-service|payment-service|inventory-service|shipping-service\"}",
+          "expr": "process_cpu_usage{job=~\"identity-service|user-service|order-service|payment-service|inventory-service|product-service|shipping-service|chat-service\"}",
           "legendFormat": "{{job}}",
           "range": true,
           "refId": "A"
@@ -405,7 +494,7 @@
         "defaults": {
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 10,
+            "fillOpacity": 12,
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
@@ -419,7 +508,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 21
+        "y": 20
       },
       "id": 7,
       "options": {
@@ -427,7 +516,7 @@
           "calcs": [
             "lastNotNull"
           ],
-          "displayMode": "table",
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
@@ -443,7 +532,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (job) (jvm_memory_used_bytes{job=~\"order-service|payment-service|inventory-service|shipping-service\",area=\"heap\"})",
+          "expr": "sum by (job) (jvm_memory_used_bytes{job=~\"identity-service|user-service|order-service|payment-service|inventory-service|product-service|shipping-service|chat-service\",area=\"heap\"})",
           "legendFormat": "{{job}} heap",
           "range": true,
           "refId": "A"
@@ -462,10 +551,137 @@
       ],
       "title": "Service Memory",
       "type": "timeseries"
+    },
+    {
+      "id": 9,
+      "title": "Filtered Service Uptime",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "time() - process_start_time_seconds{job=~\"kong-gateway|identity-service|user-service|order-service|payment-service|inventory-service|product-service|shipping-service|chat-service|promotion-service\"}",
+          "legendFormat": "{{job}} uptime",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "pluginVersion": "11.4.0"
+    },
+    {
+      "id": 10,
+      "title": "Filtered Service Started At",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "dateTimeAsIso",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "process_start_time_seconds{job=~\"kong-gateway|identity-service|user-service|order-service|payment-service|inventory-service|product-service|shipping-service|chat-service|promotion-service\"} * 1000",
+          "legendFormat": "{{job}} started",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "pluginVersion": "11.4.0"
     }
   ],
   "preload": false,
-  "refresh": "10s",
+  "refresh": "15s",
   "schemaVersion": 40,
   "tags": [
     "nexatech",
@@ -476,13 +692,13 @@
     "list": []
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "NexaTech Microservices Overview",
   "uid": "nexatech-overview",
-  "version": 1,
+  "version": 7,
   "weekStart": ""
 }

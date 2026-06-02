@@ -11,3 +11,12 @@ spring:
         max-attempts: 4
         max-interval: 5000
         multiplier: 1.5
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
