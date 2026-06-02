@@ -11,9 +11,9 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import java.util.List;
@@ -76,22 +76,12 @@ public class GatewaySecurityConfig {
 
     @Bean
     @Order(1)
-    public SecurityFilterChain publicEndpoints(HttpSecurity http, JwtHeaderRelayFilter jwtHeaderRelayFilter) throws Exception {
-        http.securityMatcher(PUBLIC_ENDPOINTS)
-            .csrf(AbstractHttpConfigurer::disable)
-            .cors(Customizer.withDefaults())
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(a -> a.anyRequest().permitAll())
-            .addFilterBefore(jwtHeaderRelayFilter, AuthorizationFilter.class);
-        return http.build();
-    }
-
-    @Bean
-    @Order(2)
     public SecurityFilterChain gatewayRoutes(HttpSecurity http, JwtHeaderRelayFilter jwtHeaderRelayFilter) throws Exception {
         stateless(http);
         http.authorizeHttpRequests(a -> a
-                .anyRequest().authenticated())
+                .anyRequest().access((authentication, context) ->
+                        new AuthorizationDecision(PUBLIC_ENDPOINTS.matches(context.getRequest())
+                                || authentication.get().isAuthenticated())))
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))
                 .addFilterAfter(jwtHeaderRelayFilter, BearerTokenAuthenticationFilter.class);
         return http.build();
