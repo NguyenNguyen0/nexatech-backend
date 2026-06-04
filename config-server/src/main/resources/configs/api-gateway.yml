@@ -5,8 +5,17 @@ server:
 gateway:
   cors:
     allowed-origin-patterns: ${GATEWAY_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
+  http-client:
+    max-connections: ${GATEWAY_HTTP_CLIENT_MAX_CONNECTIONS:200}
+    max-connections-per-route: ${GATEWAY_HTTP_CLIENT_MAX_CONNECTIONS_PER_ROUTE:100}
+    connection-request-timeout: ${GATEWAY_HTTP_CLIENT_CONNECTION_REQUEST_TIMEOUT:2s}
+    response-timeout: ${GATEWAY_HTTP_CLIENT_RESPONSE_TIMEOUT:45s}
 
 spring:
+  http:
+    clients:
+      connect-timeout: ${GATEWAY_HTTP_CLIENT_CONNECT_TIMEOUT:3s}
+      read-timeout: ${GATEWAY_HTTP_CLIENT_READ_TIMEOUT:45s}
   security:
     oauth2:
       resourceserver:

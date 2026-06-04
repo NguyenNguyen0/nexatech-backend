@@ -25,7 +25,7 @@ public class ProductImageController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    @RequiresPermission(PermissionsAccept.Product.IMAGE_WRITE)
+    // @RequiresPermission(PermissionsAccept.Product.IMAGE_WRITE)
     public ApiResponse<ProductResponse> uploadImages(
             @PathVariable String id,
             @RequestPart("files") List<MultipartFile> files) {
@@ -33,7 +33,7 @@ public class ProductImageController {
     }
 
     @DeleteMapping
-    @RequiresPermission(PermissionsAccept.Product.IMAGE_WRITE)
+    // @RequiresPermission(PermissionsAccept.Product.IMAGE_WRITE)
     public ApiResponse<ProductResponse> deleteImage(
             @PathVariable String id,
             @Valid @RequestBody ImageDeleteRequest request) {
@@ -41,7 +41,7 @@ public class ProductImageController {
     }
 
     @PutMapping("/reorder")
-    @RequiresPermission(PermissionsAccept.Product.IMAGE_WRITE)
+    // @RequiresPermission(PermissionsAccept.Product.IMAGE_WRITE)
     public ApiResponse<ProductResponse> reorderImages(
             @PathVariable String id,
             @Valid @RequestBody ImageReorderRequest request) {

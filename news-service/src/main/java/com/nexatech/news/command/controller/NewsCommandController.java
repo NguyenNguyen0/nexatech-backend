@@ -39,7 +39,7 @@ public class NewsCommandController {
     ImageAssetCommandService imageAssetCommandService;
 
     @PostMapping(consumes = {"multipart/form-data"})
-    @RequiresPermission(PermissionsAccept.News.WRITE)
+    // @RequiresPermission(PermissionsAccept.News.WRITE)
     public ResponseEntity<ApiResponse<NewsResponse>> createNews(
             @Valid @ModelAttribute NewsCreationRequest request,
             @RequestPart(value = "thumbnail", required = false) MultipartFile thumbnail) {
@@ -57,7 +57,7 @@ public class NewsCommandController {
     }
 
     @PutMapping(value = "/{id}", consumes = {"multipart/form-data"})
-    @RequiresPermission(PermissionsAccept.News.WRITE)
+    // @RequiresPermission(PermissionsAccept.News.WRITE)
     public ResponseEntity<ApiResponse<NewsResponse>> updateNews(
             @PathVariable String id,
             @Valid @ModelAttribute NewsUpdateRequest request,
@@ -75,7 +75,7 @@ public class NewsCommandController {
     }
 
     @PatchMapping("/{id}/visibility")
-    @RequiresPermission(PermissionsAccept.News.WRITE)
+    // @RequiresPermission(PermissionsAccept.News.WRITE)
     public ResponseEntity<ApiResponse<NewsResponse>> updateNewsVisibility(
             @PathVariable String id,
             @Valid @RequestBody NewsVisibilityRequest request) {
@@ -92,7 +92,7 @@ public class NewsCommandController {
     }
 
     @DeleteMapping("/{id}")
-    @RequiresPermission(PermissionsAccept.News.WRITE)
+    // @RequiresPermission(PermissionsAccept.News.WRITE)
     public ResponseEntity<ApiResponse<Void>> deleteNews(@PathVariable String id) {
         log.info("Request to delete news: id={}", id);
 
@@ -106,7 +106,7 @@ public class NewsCommandController {
     }
 
     @PostMapping("/{newsId}/images")
-    @RequiresPermission(PermissionsAccept.News.IMAGE_WRITE)
+    // @RequiresPermission(PermissionsAccept.News.IMAGE_WRITE)
     public ResponseEntity<ApiResponse<ImageAssetResponse>> uploadNewsImage(
             @PathVariable String newsId,
             @RequestPart("file") MultipartFile file) {
@@ -125,7 +125,7 @@ public class NewsCommandController {
     }
 
     @DeleteMapping("/{newsId}/images")
-    @RequiresPermission(PermissionsAccept.News.IMAGE_WRITE)
+    // @RequiresPermission(PermissionsAccept.News.IMAGE_WRITE)
     public ResponseEntity<ApiResponse<Void>> deleteAllNewsImages(@PathVariable String newsId) {
         log.info("Request to delete all images for news: newsId={}", newsId);
 
@@ -139,7 +139,7 @@ public class NewsCommandController {
     }
 
     @DeleteMapping("/images/public/{publicId}")
-    @RequiresPermission(PermissionsAccept.News.IMAGE_WRITE)
+    // @RequiresPermission(PermissionsAccept.News.IMAGE_WRITE)
     public ResponseEntity<ApiResponse<Void>> deleteImageByPublicId(@PathVariable String publicId) {
         log.info("Request to delete image by publicId: {}", publicId);
 

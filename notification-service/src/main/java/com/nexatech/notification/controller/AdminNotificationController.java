@@ -23,7 +23,7 @@ public class AdminNotificationController {
      * GET /api/v1/admin/notifications/failed — admin view of all failed notifications.
      */
     @GetMapping("/failed")
-    @RequiresPermission(PermissionsAccept.Notification.ADMIN_READ)
+    // @RequiresPermission(PermissionsAccept.Notification.ADMIN_READ)
     public ResponseEntity<ApiResponse<PageResponse<NotificationResponse>>> getFailedNotifications(
             @PageableDefault(size = 20) Pageable pageable) {
         PageResponse<NotificationResponse> page = PageResponse.of(

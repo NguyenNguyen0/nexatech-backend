@@ -82,7 +82,38 @@ if (-not $env:SPRING_JPA_OPEN_IN_VIEW) {
 }
 
 switch ($ServiceName) {
-    "api-gateway" {}
+    "api-gateway" {
+        if (-not $env:CHAT_SERVICE_URI) {
+            $env:CHAT_SERVICE_URI = "http://127.0.0.1:8089"
+        }
+        if (-not $env:CHAT_SERVICE_WS_URI) {
+            $env:CHAT_SERVICE_WS_URI = $env:CHAT_SERVICE_URI
+        }
+        if (-not $env:GATEWAY_HTTP_CLIENT_MAX_CONNECTIONS) {
+            $env:GATEWAY_HTTP_CLIENT_MAX_CONNECTIONS = "200"
+        }
+        if (-not $env:GATEWAY_HTTP_CLIENT_MAX_CONNECTIONS_PER_ROUTE) {
+            $env:GATEWAY_HTTP_CLIENT_MAX_CONNECTIONS_PER_ROUTE = "100"
+        }
+        if (-not $env:GATEWAY_HTTP_CLIENT_CONNECTION_REQUEST_TIMEOUT) {
+            $env:GATEWAY_HTTP_CLIENT_CONNECTION_REQUEST_TIMEOUT = "2s"
+        }
+        if (-not $env:GATEWAY_HTTP_CLIENT_RESPONSE_TIMEOUT) {
+            $env:GATEWAY_HTTP_CLIENT_RESPONSE_TIMEOUT = "45s"
+        }
+        if (-not $env:GATEWAY_HTTP_CLIENT_CONNECT_TIMEOUT) {
+            $env:GATEWAY_HTTP_CLIENT_CONNECT_TIMEOUT = "3s"
+        }
+        if (-not $env:GATEWAY_HTTP_CLIENT_READ_TIMEOUT) {
+            $env:GATEWAY_HTTP_CLIENT_READ_TIMEOUT = "45s"
+        }
+        if (-not $env:SPRING_HTTP_CLIENTS_CONNECT_TIMEOUT) {
+            $env:SPRING_HTTP_CLIENTS_CONNECT_TIMEOUT = $env:GATEWAY_HTTP_CLIENT_CONNECT_TIMEOUT
+        }
+        if (-not $env:SPRING_HTTP_CLIENTS_READ_TIMEOUT) {
+            $env:SPRING_HTTP_CLIENTS_READ_TIMEOUT = $env:GATEWAY_HTTP_CLIENT_READ_TIMEOUT
+        }
+    }
     "product-service" {
         # Only merge service secrets; keep EC2 infra from .env.ec2
         Import-DotEnvKeys -Path (Join-Path $PSScriptRoot "product-service/.env") -Keys @(
@@ -110,6 +141,12 @@ switch ($ServiceName) {
     }
     "chat-service" {
         $env:DB_URL = "jdbc:postgresql://$($env:EC2_HOST):5432/nexatech_chats"
+        $env:SPRING_DATA_MONGODB_URI = if ($env:MONGO_CHAT_URL) { $env:MONGO_CHAT_URL } else { "mongodb://nexatech:nexatech123@$($env:EC2_HOST):27017/nexatech_chats?authSource=admin&authMechanism=SCRAM-SHA-256" }
+        $env:SPRING_MONGODB_URI = $env:SPRING_DATA_MONGODB_URI
+        $env:SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE = if ($env:CHAT_SERVICE_HIKARI_MAXIMUM_POOL_SIZE) { $env:CHAT_SERVICE_HIKARI_MAXIMUM_POOL_SIZE } else { "8" }
+        $env:SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE = if ($env:CHAT_SERVICE_HIKARI_MINIMUM_IDLE) { $env:CHAT_SERVICE_HIKARI_MINIMUM_IDLE } else { "2" }
+        $env:SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT = if ($env:CHAT_SERVICE_HIKARI_CONNECTION_TIMEOUT) { $env:CHAT_SERVICE_HIKARI_CONNECTION_TIMEOUT } else { "15000" }
+        $env:SPRING_JPA_OPEN_IN_VIEW = "false"
     }
     "audit-service" {
         $env:SPRING_MONGODB_URI = if ($env:MONGO_AUDIT_URL) {
@@ -158,6 +195,10 @@ switch ($ServiceName) {
     "promotion-service" {
         $env:DATABASE_URL = "postgresql://$($env:DB_USERNAME):$($env:DB_PASSWORD)@$($env:EC2_HOST):5432/nexatech_promotions"
         $env:KAFKA_BROKERS = $env:KAFKA_BOOTSTRAP_SERVERS
+        $env:SERVICE_NAME = "promotion-service"
+        $env:PORT = "8093"
+        $env:EUREKA_INSTANCE_PORT = $env:PORT
+        $env:EUREKA_INSTANCE_HOSTNAME = if ($env:EUREKA_INSTANCE_IP_ADDRESS) { $env:EUREKA_INSTANCE_IP_ADDRESS } else { "127.0.0.1" }
         Set-Location (Join-Path $PSScriptRoot "promotion-service")
         npm run start:dev
         exit $LASTEXITCODE
