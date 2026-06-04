@@ -5,8 +5,9 @@ spring:
         enabled: true
   datasource:
     hikari:
-      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE:3}
-      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUMIDLE:1}
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:${SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE:3}}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:${SPRING_DATASOURCE_HIKARI_MINIMUMIDLE:1}}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:5000}
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:

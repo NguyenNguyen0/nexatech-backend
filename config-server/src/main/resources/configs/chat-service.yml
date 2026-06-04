@@ -21,7 +21,12 @@ spring:
     username: ${DB_USERNAME:nexatech}
     password: ${DB_PASSWORD:nexatech123}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${CHAT_SERVICE_HIKARI_MAXIMUM_POOL_SIZE:${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:8}}
+      minimum-idle: ${CHAT_SERVICE_HIKARI_MINIMUM_IDLE:${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:2}}
+      connection-timeout: ${CHAT_SERVICE_HIKARI_CONNECTION_TIMEOUT:${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:15000}}
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: false
@@ -31,7 +36,7 @@ spring:
     baselineOnMigrate: true
   data:
     mongodb:
-      uri: ${MONGO_CHAT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_chats?authSource=admin&authMechanism=SCRAM-SHA-256}
+      uri: ${SPRING_DATA_MONGODB_URI:${MONGO_CHAT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_chats?authSource=admin&authMechanism=SCRAM-SHA-256}}
       uuid-representation: standard
     redis:
       host: ${SPRING_DATA_REDIS_HOST:${REDIS_HOST:localhost}}
@@ -41,7 +46,7 @@ spring:
       ssl:
         enabled: ${SPRING_DATA_REDIS_SSL_ENABLED:${REDIS_SSL_ENABLED:false}}
   mongodb:
-    uri: ${MONGO_CHAT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_chats?authSource=admin&authMechanism=SCRAM-SHA-256}
+    uri: ${SPRING_DATA_MONGODB_URI:${MONGO_CHAT_URL:mongodb://nexatech:nexatech123@localhost:27017/nexatech_chats?authSource=admin&authMechanism=SCRAM-SHA-256}}
     uuid-representation: standard
 
 app:
