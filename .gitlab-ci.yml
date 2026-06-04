@@ -1,7 +1,6 @@
 workflow:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $DOCKERHUB_USERNAME && $DOCKERHUB_TOKEN'
-      when: always
     - when: never
 
 stages:
