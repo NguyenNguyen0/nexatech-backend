@@ -11,8 +11,10 @@
     <img src="https://img.shields.io/badge/Java-21-ED8B00?style=flat-square&logo=openjdk&logoColor=white" alt="Java 21" />
     <img src="https://img.shields.io/badge/Spring%20Boot-4.0.3-6DB33F?style=flat-square&logo=springboot&logoColor=white" alt="Spring Boot 4.0.3" />
     <img src="https://img.shields.io/badge/Spring%20Cloud-2025.1.0-6DB33F?style=flat-square&logo=spring&logoColor=white" alt="Spring Cloud 2025.1.0" />
-    <img src="https://img.shields.io/badge/NestJS-10-E0234E?style=flat-square&logo=nestjs&logoColor=white" alt="NestJS 10" />
+    <img src="https://img.shields.io/badge/NestJS-11.0.1-E0234E?style=flat-square&logo=nestjs&logoColor=white" alt="NestJS 11.0.1" />
     <img src="https://img.shields.io/badge/FastAPI-Python%203.12-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
+    <img src="https://img.shields.io/badge/Prisma-6.19.0-2d3748?style=flat-square&logo=prisma&logoColor=white" alt="Prisma 6.19.0" />
+    <img src="https://img.shields.io/badge/TypeScript-5.9.3-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.9.3" />
     <img src="https://img.shields.io/badge/Keycloak-26.5.2-4D4DFF?style=flat-square&logo=keycloak&logoColor=white" alt="Keycloak" />
     <img src="https://img.shields.io/badge/Kafka-KRaft-231F20?style=flat-square&logo=apachekafka&logoColor=white" alt="Kafka" />
     <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Compose" />
@@ -37,6 +39,17 @@
 - [Observability](#observability)
 - [Project Structure](#project-structure)
 - [Makefile Commands](#makefile-commands)
+
+---
+
+## 🏛️ Architectural Patterns
+
+NexaTech Backend implements several sophisticated architectural patterns:
+
+- **Microservices Architecture**: Polyglot services (Java, Node.js, Python) with a dedicated **API Gateway** and **Service Discovery**.
+- **Event-Driven Architecture (EDA)**: Asynchronous communication using **Apache Kafka** for high scalability and loose coupling.
+- **Space-Based Architecture (SBA)**: High-concurrency flash sale processing using **Redis** and **Lua scripts** as an in-memory transactional space.
+- **Pipeline Architecture**: Multi-stage data processing pipelines in the **Recommendation Service** for real-time personalization.
 
 ---
 
@@ -101,7 +114,7 @@
 | Java framework | Spring Boot 4.0.3 |
 | Cloud stack | Spring Cloud 2025.1.0, Eureka, Spring Cloud Config, Spring Cloud Gateway |
 | Identity provider | Keycloak 26.5.2 |
-| Node.js service | NestJS 10, Fastify, Prisma 5, TypeScript 5 |
+| Node.js service | NestJS 11.0.1, Fastify, Prisma 6.19.0, TypeScript 5.9.3 |
 | Python services | FastAPI, uv, py-eureka-client |
 | SQL database | PostgreSQL 16 Alpine |
 | NoSQL database | MongoDB 7 |

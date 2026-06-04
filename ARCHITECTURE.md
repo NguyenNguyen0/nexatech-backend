@@ -39,7 +39,7 @@ flowchart TB
   end
 
   subgraph python[Python / FastAPI]
-    agent[agent-service<br/>default :8093]
+    agent[agent-service<br/>default :8097]
     mcp[mcp-server :8094]
     reco[recommendation-service :8095]
   end
@@ -166,6 +166,22 @@ flowchart LR
   kafka --> audit[audit-service<br/>audit search]
 ```
 
+## Repository Layout
+
+NexaTech Backend follows a polyglot microservices architecture organized as follows:
+
+- `/` (root): Maven parent project for Java services.
+- `/api-gateway`, `/discovery-server`, `/config-server`: Core Spring Cloud infrastructure.
+- `/[domain]-service`: Business-logic Java Spring Boot services.
+- `/promotion-service`: Node.js (NestJS + Prisma) service for flash sales and promotion logic.
+- `/python-services`:
+  - `/agent-service`: LangGraph-based AI agent for admin automation.
+  - `/mcp-server`: Model Context Protocol server for cross-service tool calling.
+  - `/recommendation-service`: Product recommendation engine.
+- `/_docs`: Deep-dive documentation for specific features.
+- `/_postgres`, `/_realms`, `/_postman`: Database initialization, Keycloak exports, and API testing collections.
+- `/_scripts`: Shared utility scripts for builds and data seeding.
+
 ## Data Ownership
 
 ```mermaid
@@ -199,4 +215,4 @@ erDiagram
 - `docker-compose.infra.yml` starts local infrastructure only: PostgreSQL, MongoDB, Redis, Kafka, Keycloak and MinIO.
 - The root `Makefile` still has `full-up` targets that reference `docker-compose.yml`, but that file is not present in the current snapshot.
 - `api-gateway` is the active edge service in local development. `_kong/kong.yml` is useful architecture context, but is not wired by the current infra compose.
-- `promotion-service` and `agent-service` both default to `8093`; set `PORT` for one of them when running both locally.
+- Default service ports are mapped to avoid collisions: `promotion-service` (8093), `mcp-server` (8094), `recommendation-service` (8095), `audit-service` (8096), `agent-service` (8097).

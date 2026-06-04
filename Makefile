@@ -7,6 +7,7 @@ DOCKER_INFRA = docker-compose.infra.yml
 DOCKER_FULL = docker-compose.yml
 DOCKER_CORE = _realms/docker-compose-order-payment.yml
 MVN = mvn
+START_EC2_SH = ./_scripts/start-ec2.sh
 SHELL := /bin/bash
 
 # Load .env.ec2 và set env vars trong cùng một PowerShell process
@@ -19,6 +20,10 @@ SHELL := /bin/bash
 	run-gateway-test run-chat-test \
 	run-gateway-ec2 run-identity-ec2 run-user-ec2 run-product-ec2 run-inventory-ec2 \
 	run-order-ec2 run-payment-ec2 run-shipping-ec2 run-notification-ec2 run-chat-ec2 run-audit-ec2 run-storage-ec2 run-news-ec2 run-promotion-ec2 run-recommendation-ec2 \
+	run-gateway-test-sh run-chat-test-sh \
+	run-gateway-ec2-sh run-identity-ec2-sh run-user-ec2-sh run-product-ec2-sh run-inventory-ec2-sh \
+	run-order-ec2-sh run-payment-ec2-sh run-shipping-ec2-sh run-notification-ec2-sh run-chat-ec2-sh run-audit-ec2-sh run-storage-ec2-sh run-news-ec2-sh run-promotion-ec2-sh run-recommendation-ec2-sh \
+	migrate-promotion-ec2 migrate-promotion-ec2-sh seed-promotion-ec2 seed-promotion-ec2-sh \
 	run-all-terminals run-all-ec2-terminals run-store-ec2-terminals run-chat-ec2-terminals run-order-ec2-terminals
 
 help:
@@ -73,6 +78,23 @@ help:
 	@echo "  make run-news-ec2         - Run news-service (EC2 infra)"
 	@echo "  make run-promotion-ec2    - Run promotion-service (EC2 infra, Node.js)"
 	@echo "  make run-recommendation-ec2 - Run recommendation-service (EC2 infra, Python/FastAPI)"
+	@echo ""
+	@echo "Run with EC2 infra via Bash start-ec2.sh:"
+	@echo "  make run-gateway-ec2-sh      - Run api-gateway (EC2 infra)"
+	@echo "  make run-product-ec2-sh      - Run product-service (EC2 infra)"
+	@echo "  make run-inventory-ec2-sh    - Run inventory-service (EC2 infra)"
+	@echo "  make run-order-ec2-sh        - Run order-service (EC2 infra)"
+	@echo "  make run-payment-ec2-sh      - Run payment-service (EC2 infra)"
+	@echo "  make run-shipping-ec2-sh     - Run shipping-service (EC2 infra)"
+	@echo "  make run-user-ec2-sh         - Run user-service (EC2 infra)"
+	@echo "  make run-identity-ec2-sh     - Run identity-service (EC2 infra)"
+	@echo "  make run-notification-ec2-sh - Run notification-service (EC2 infra)"
+	@echo "  make run-chat-ec2-sh         - Run chat-service (EC2 infra)"
+	@echo "  make run-storage-ec2-sh      - Run storage-service (EC2 infra)"
+	@echo "  make run-audit-ec2-sh        - Run audit-service (EC2 infra)"
+	@echo "  make run-news-ec2-sh         - Run news-service (EC2 infra)"
+	@echo "  make run-promotion-ec2-sh    - Run promotion-service (EC2 infra, Node.js)"
+	@echo "  make run-recommendation-ec2-sh - Run recommendation-service (EC2 infra, Python/FastAPI)"
 
 	@echo ""
 	@echo "Open services in separate PowerShell terminals:"
@@ -222,71 +244,127 @@ run-chat-test: run-chat-ec2
 
 # --- Run Individual Services with EC2 Infra (.env.ec2) ---
 run-gateway-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 api-gateway
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 api-gateway
 
 run-product-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 product-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 product-service
 
 run-inventory-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 inventory-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 inventory-service
 
 run-identity-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 identity-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 identity-service
 
 run-storage-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 storage-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 storage-service
 
 run-order-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 order-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 order-service
 
 run-payment-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 payment-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 payment-service
 
 run-shipping-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 shipping-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 shipping-service
 
 run-notification-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 notification-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 notification-service
 
 run-chat-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 chat-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 chat-service
 
 run-audit-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 audit-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 audit-service
 
 run-user-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 user-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 user-service
 
 run-news-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 news-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 news-service
 
 run-promotion-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 promotion-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 promotion-service
 
 run-recommendation-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 recommendation-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 recommendation-service
 
 migrate-promotion-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 promotion-migrate
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 promotion-migrate
 
 seed-promotion-ec2:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-ec2.ps1 promotion-seed
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-ec2.ps1 promotion-seed
+
+# --- Run Individual Services with EC2 Infra via Bash (.env.ec2) ---
+run-gateway-test-sh: run-gateway-ec2-sh
+
+run-chat-test-sh: run-chat-ec2-sh
+
+run-gateway-ec2-sh:
+	$(START_EC2_SH) api-gateway
+
+run-product-ec2-sh:
+	$(START_EC2_SH) product-service
+
+run-inventory-ec2-sh:
+	$(START_EC2_SH) inventory-service
+
+run-identity-ec2-sh:
+	$(START_EC2_SH) identity-service
+
+run-storage-ec2-sh:
+	$(START_EC2_SH) storage-service
+
+run-order-ec2-sh:
+	$(START_EC2_SH) order-service
+
+run-payment-ec2-sh:
+	$(START_EC2_SH) payment-service
+
+run-shipping-ec2-sh:
+	$(START_EC2_SH) shipping-service
+
+run-notification-ec2-sh:
+	$(START_EC2_SH) notification-service
+
+run-chat-ec2-sh:
+	$(START_EC2_SH) chat-service
+
+run-audit-ec2-sh:
+	$(START_EC2_SH) audit-service
+
+run-user-ec2-sh:
+	$(START_EC2_SH) user-service
+
+run-news-ec2-sh:
+	$(START_EC2_SH) news-service
+
+run-promotion-ec2-sh:
+	$(START_EC2_SH) promotion-service
+
+run-recommendation-ec2-sh:
+	$(START_EC2_SH) recommendation-service
+
+migrate-promotion-ec2-sh:
+	$(START_EC2_SH) promotion-migrate
+
+seed-promotion-ec2-sh:
+	$(START_EC2_SH) promotion-seed
 
 # --- Open Multiple Services In Separate Terminals ---
 run-all-ec2-terminals:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-services.ps1 -Mode ec2
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-services.ps1 -Mode ec2
 
 run-all-terminals:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-services.ps1 -Mode local
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-services.ps1 -Mode local
 
 run-store-ec2-terminals:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-services.ps1 -Mode ec2 -Services api-gateway,product-service,inventory-service,promotion-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-services.ps1 -Mode ec2 -Services api-gateway,product-service,inventory-service,promotion-service
 
 run-chat-ec2-terminals:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-services.ps1 -Mode ec2 -Services api-gateway,chat-service,user-service,identity-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-services.ps1 -Mode ec2 -Services api-gateway,chat-service,user-service,identity-service
 
 run-order-ec2-terminals:
-	powershell -NoProfile -ExecutionPolicy Bypass -File ./start-services.ps1 -Mode ec2 -Services api-gateway,order-service,payment-service,shipping-service
+	powershell -NoProfile -ExecutionPolicy Bypass -File ./_scripts/start-services.ps1 -Mode ec2 -Services api-gateway,order-service,payment-service,shipping-service
 
 # --- Utility ---
 # Lệnh clean container và image thừa (Dùng trong PowerShell)
