@@ -93,27 +93,6 @@ async def classify_request(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def permission_gate(state: dict[str, Any]) -> dict[str, Any]:
-    roles = state.get("caller", {}).get("roles", [])
-    required_role = state.get("required_role")
-    if required_role and required_role not in roles:
-        logger.warning(
-            "Permission gate denied request: required_role=%s roles=%s",
-            required_role,
-            roles,
-        )
-        return {
-            "approval_result": "denied",
-            "final_status": "permission_denied",
-            "answer_context": {
-                "error": "permission_denied",
-                "required_role": required_role,
-                "caller_roles": roles,
-            },
-        }
-    return {"approval_result": None}
-
-
 async def domain_router(state: dict[str, Any]) -> dict[str, Any]:
     """Select the subagent responsible for this request domain."""
     domain = (state.get("mcp_target_domain") or "").strip().lower() or "general"
