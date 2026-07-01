@@ -16,6 +16,7 @@ from app.graph.llm_planner import (
 )
 from app.graph.nodes import (
     agent_think,
+    classify_request,
     domain_executor,
     domain_router,
     format_response,
@@ -431,3 +432,59 @@ def test_compile_graph_without_checkpointer() -> None:
     graph = compile_graph()
 
     assert graph is not None
+
+
+@pytest.mark.asyncio
+async def test_classify_request_resets_stale_scratch_state_from_previous_turn() -> None:
+    stale_state = {
+        "messages": [{"role": "user", "content": "sản phẩm nào bán chạy nhất?"}],
+        "caller": {"roles": ["operator"]},
+        "selected_tool": "list_products",
+        "selected_tool_args": {"params": {}},
+        "response_text": "Hiện tại có 803 sản phẩm trong hệ thống.",
+        "final_status": "completed",
+        "tool_results": [{"tool": "list_products", "result": {"ok": True}}],
+        "tool_errors": [{"tool": "list_products", "error": {"ok": False}}],
+        "pending_approval": {"tool_name": "list_products"},
+        "approval_result": "approved",
+        "approval_request_id": "old-request-id",
+        "expires_at": "2020-01-01T00:00:00Z",
+        "timeout_seconds": 30,
+        "answer_context": {"intent": "conversational"},
+        "last_tool_call": {"id": "old-call-id", "name": "list_products"},
+        "subagent_name": "product_subagent",
+    }
+
+    result = await classify_request(stale_state)
+
+    assert result["selected_tool"] is None
+    assert result["selected_tool_args"] == {}
+    assert result["response_text"] is None
+    assert result["final_status"] is None
+    assert result["tool_results"] == []
+    assert result["tool_errors"] == []
+    assert result["pending_approval"] is None
+    assert result["approval_result"] is None
+    assert result["approval_request_id"] is None
+    assert result["expires_at"] is None
+    assert result["timeout_seconds"] is None
+    assert result["answer_context"] == {}
+    assert result["last_tool_call"] is None
+    assert result["subagent_name"] is None
+
+
+@pytest.mark.asyncio
+async def test_classify_request_seeds_selected_tool_from_forced_tool() -> None:
+    result = await classify_request(
+        {
+            "messages": [{"role": "user", "content": "bất kỳ nội dung nào"}],
+            "caller": {"roles": ["operator"]},
+            "forced_tool": "create_payment",
+            "forced_tool_args": {"order_id": "ORD-001"},
+            # leftover from a previous turn — must not win over forced_tool
+            "selected_tool": "list_products",
+        }
+    )
+
+    assert result["selected_tool"] == "create_payment"
+    assert result["selected_tool_args"] == {"order_id": "ORD-001"}

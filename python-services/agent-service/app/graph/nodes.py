@@ -48,11 +48,43 @@ _DECISION_NORMALIZE: dict[str, str] = {
 
 
 async def classify_request(state: dict[str, Any]) -> dict[str, Any]:
+    """Entry node for every fresh turn.
+
+    The checkpointer persists the full ``AgentState`` across turns on the
+    same thread, so this is the single node every non-resume invocation
+    passes through (``START -> classify_request``) before anything else
+    runs. It clears per-turn scratch fields left over from the previous
+    turn — without this, a stale ``selected_tool``/``response_text`` makes
+    ``plan_with_subagent``/``format_response`` short-circuit and the agent
+    repeats its previous answer verbatim instead of handling the new
+    message.
+
+    ``forced_tool``/``forced_tool_args`` are the one input-only exception:
+    a caller may set them to force-execute a specific tool for this turn,
+    bypassing planning (used by direct tool-invoke callers and tests).
+    """
     input_text = state.get("input_text") or extract_latest_user_text(state)
+    forced_tool = state.get("forced_tool")
+    forced_tool_args = state.get("forced_tool_args") or {}
+
     return {
         "input_text": input_text,
         "required_role": state.get("required_role") or "operator",
         "request_sensitivity": state.get("request_sensitivity") or "low",
+        "selected_tool": forced_tool,
+        "selected_tool_args": forced_tool_args if forced_tool else {},
+        "response_text": None,
+        "final_status": None,
+        "tool_results": [],
+        "tool_errors": [],
+        "pending_approval": None,
+        "approval_result": None,
+        "approval_request_id": None,
+        "expires_at": None,
+        "timeout_seconds": None,
+        "answer_context": {},
+        "last_tool_call": None,
+        "subagent_name": None,
     }
 
 

@@ -61,10 +61,8 @@ async def test_graph_interrupt_and_resume_with_postgres_checkpointer(
             "messages": [{"role": "user", "content": "Tạo payment cho đơn ORD-001"}],
             "caller": {"roles": ["operator"]},
             "checkpointer_enabled": True,
-            "selected_tool": "create_payment",
-            "selected_tool_args": {"order_id": "ORD-001"},
-            "tool_results": [],
-            "tool_errors": [],
+            "forced_tool": "create_payment",
+            "forced_tool_args": {"order_id": "ORD-001"},
         }
 
         first_result = await graph.ainvoke(

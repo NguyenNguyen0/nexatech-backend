@@ -20,6 +20,8 @@ except Exception:
 if _COPILOTKIT_AVAILABLE and _CopilotKitState is not None:
     class AgentState(_CopilotKitState, total=False):  # type: ignore[misc]
         caller: dict[str, Any]
+        forced_tool: str | None
+        forced_tool_args: dict[str, Any] | None
         checkpointer_enabled: bool
         thread_id: str
         request_id: str
@@ -50,6 +52,8 @@ else:
     class AgentState(TypedDict, total=False):  # type: ignore[no-redef]
         messages: Annotated[list, add_messages]
         caller: dict[str, Any]
+        forced_tool: str | None
+        forced_tool_args: dict[str, Any] | None
         checkpointer_enabled: NotRequired[bool]
         thread_id: NotRequired[str]
         request_id: NotRequired[str]
