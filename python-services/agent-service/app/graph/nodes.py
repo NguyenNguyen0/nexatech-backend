@@ -62,8 +62,13 @@ async def classify_request(state: dict[str, Any]) -> dict[str, Any]:
     ``forced_tool``/``forced_tool_args`` are the one input-only exception:
     a caller may set them to force-execute a specific tool for this turn,
     bypassing planning (used by direct tool-invoke callers and tests).
+
+    ``input_text`` is always recomputed from the latest message — it must
+    never fall back to ``state.get("input_text")``, since that value is
+    itself this node's own output from the *previous* turn and would make
+    every later turn re-plan/re-synthesize against the first message.
     """
-    input_text = state.get("input_text") or extract_latest_user_text(state)
+    input_text = extract_latest_user_text(state)
     forced_tool = state.get("forced_tool")
     forced_tool_args = state.get("forced_tool_args") or {}
 

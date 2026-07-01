@@ -515,3 +515,21 @@ async def test_classify_request_seeds_selected_tool_from_forced_tool() -> None:
 
     assert result["selected_tool"] == "create_payment"
     assert result["selected_tool_args"] == {"order_id": "ORD-001"}
+
+
+@pytest.mark.asyncio
+async def test_classify_request_recomputes_input_text_from_latest_message() -> None:
+    stale_state = {
+        "messages": [
+            {"role": "user", "content": "hiện tại có bao nhiêu sản phẩm?"},
+            {"role": "assistant", "content": "Hiện tại có 803 sản phẩm."},
+            {"role": "user", "content": "sản phẩm nào bán chạy nhất?"},
+        ],
+        "caller": {"roles": ["operator"]},
+        # leftover from the previous turn — must not win over the latest message
+        "input_text": "hiện tại có bao nhiêu sản phẩm?",
+    }
+
+    result = await classify_request(stale_state)
+
+    assert result["input_text"] == "sản phẩm nào bán chạy nhất?"
