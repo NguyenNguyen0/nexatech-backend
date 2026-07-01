@@ -10,6 +10,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.graph.edges import route_after_interrupt
+from app.hitl.sensitivity import TOOL_SENSITIVITY
 from app.hitl.timeout_registry import (
     cancel_timeout,
     pending_timeout_ids,
@@ -17,6 +18,24 @@ from app.hitl.timeout_registry import (
 )
 
 """Tests for Phase 7 — HITL decision routing and timeout registry."""
+
+
+# ── TOOL_SENSITIVITY coverage ────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    [
+        "create_product",
+        "update_product",
+        "delete_product",
+        "restore_product",
+        "delete_review",
+    ],
+)
+def test_mutating_catalog_tools_do_not_default_to_low_sensitivity(tool_name: str) -> None:
+    assert tool_name in TOOL_SENSITIVITY
+    assert TOOL_SENSITIVITY[tool_name] != "low"
 
 
 # ── route_after_interrupt ───────────────────────────────────────────────────

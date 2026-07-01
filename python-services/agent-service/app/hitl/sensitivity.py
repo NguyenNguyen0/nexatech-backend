@@ -38,5 +38,14 @@ TOOL_SENSITIVITY: dict[str, str] = {
     "get_order_trace": "low",
     "cancel_order": "high",
     "continue_order_payment": "medium",
+    # ── Product / review tools ─────────────────────────────────────
+    "create_product": "medium",
+    "update_product": "medium",
+    "delete_product": "high",
+    "restore_product": "medium",
+    "create_review": "low",
+    "update_review": "low",
+    "delete_review": "medium",
+    "mark_review_helpful": "low",
 }
 
