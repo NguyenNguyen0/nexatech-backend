@@ -9,10 +9,10 @@ from uuid import uuid4
 from langgraph.types import interrupt
 
 from app.core.settings import SETTINGS
-from app.graph.llm_planner import plan_tool_call_with_llm, synthesize_agent_response
+from app.graph.llm_planner import synthesize_agent_response
 from app.graph.subagents import plan_with_subagent
 from app.graph.tool_descriptions import TOOL_DESCRIPTIONS
-from app.graph.tool_registry import extract_latest_user_text, plan_tool_call
+from app.graph.tool_registry import extract_latest_user_text
 from app.hitl.sensitivity import TOOL_SENSITIVITY
 from app.mcp_client import MCP_CLIENT
 from app.runtime.delegation_metrics import DELEGATION_METRICS
@@ -107,124 +107,6 @@ async def permission_gate(state: dict[str, Any]) -> dict[str, Any]:
             },
         }
     return {"approval_result": None}
-
-
-_CONVERSATIONAL_PATTERNS: tuple[str, ...] = (
-    # Greetings
-    "xin chào", "chào", "hello", "hi ", "hi!", "hey", "chao ban", "chào bạn",
-    # Thanks
-    "cảm ơn", "cam on", "thanks", "thank you", "cảm ơn bạn",
-    # Identity
-    "bạn là ai", "ban la ai", "bạn tên gì", "who are you", "what are you",
-    # Capabilities — phrased as open question (not "liệt kê tool")
-    "bạn có thể làm gì", "bạn giúp được gì", "can you help", "help me",
-    "bạn làm được gì", "ban lam duoc gi",
-    # Affirmations / acknowledgements
-    "ok", "okay", "được", "được rồi", "great", "got it", "hiểu rồi",
-    # Goodbye
-    "tạm biệt", "bye", "goodbye",
-)
-
-
-def _is_conversational(input_text: str) -> bool:
-    """Return True when the message is a greeting, chitchat, or general conversational
-    exchange that does not require any MCP tool invocation."""
-    stripped = input_text.strip().casefold()
-    if not stripped:
-        return True
-    # Short messages with no domain keywords are almost always conversational.
-    # 6 words ≈ upper bound for a greeting/ack.
-    word_count = len(stripped.split())
-    if word_count <= 6 and any(p in stripped for p in _CONVERSATIONAL_PATTERNS):
-        return True
-    return False
-
-
-def _is_tool_catalog_request(input_text: str) -> bool:
-    """Return True only when user is asking ABOUT the tool catalog itself.
-
-    Must NOT fire for requests like "dùng tool list_products_by_category_slug ..."
-    where "tool" appears but the intent is to invoke a specific tool.
-    """
-    normalized = input_text.casefold()
-
-    # If a registered tool name appears in the text, the user is invoking a tool,
-    # not asking for a catalog listing — short-circuit immediately.
-    from app.graph.tool_registry import TOOL_DESCRIPTORS
-    if any(d.tool_name in normalized for d in TOOL_DESCRIPTORS):
-        return False
-
-    # Treat "tool" as catalog intent only when paired with list/capability terms.
-    tool_terms = ("tool", "tools", "công cụ", "cong cu", "khả năng", "kha nang")
-    list_terms = (
-        "liệt kê",
-        "liet ke",
-        "danh sách",
-        "danh sach",
-        "có thể sử dụng",
-        "co the su dung",
-        "bạn có thể",
-        "ban co the",
-    )
-    return any(term in normalized for term in tool_terms) and any(
-        term in normalized for term in list_terms
-    )
-
-
-async def agent_think(state: dict[str, Any]) -> dict[str, Any]:
-    selected_tool = state.get("selected_tool")
-    selected_tool_args = state.get("selected_tool_args") or {}
-    if not selected_tool:
-        input_text = state.get("input_text") or extract_latest_user_text(state)
-        if _is_conversational(input_text):
-            logger.info("Conversational input detected — skipping tool planning. input=%r", input_text)
-            return {
-                "selected_tool_args": selected_tool_args,
-                "final_status": "conversational",
-                "answer_context": {"intent": "conversational", "input_text": input_text},
-            }
-        if _is_tool_catalog_request(input_text):
-            available_tools = state.get("available_tools") or []
-            if not available_tools:
-                logger.error("Tool catalog request received but available_tools is empty.")
-            return {
-                "selected_tool_args": selected_tool_args,
-                "final_status": "tool_catalog",
-                "answer_context": {
-                    "intent": "tool_catalog",
-                    "available_tools": available_tools,
-                },
-            }
-        plan = plan_tool_call(
-            input_text,
-            available_tools=state.get("available_tools"),
-        )
-        if plan is None:
-            plan = await plan_tool_call_with_llm(
-                input_text,
-                available_tools=state.get("available_tools"),
-            )
-        if plan is None:
-            logger.warning(
-                "No matching tool plan for input. available_tools=%s input=%r",
-                state.get("available_tools") or [],
-                input_text,
-            )
-            return {
-                "selected_tool_args": selected_tool_args,
-                "final_status": "no_matching_tool",
-                "answer_context": {
-                    "error": "no_matching_tool",
-                    "available_tools": state.get("available_tools") or [],
-                },
-            }
-        return {
-            "selected_tool": plan.tool_name,
-            "selected_tool_args": plan.tool_args,
-            "required_role": state.get("required_role") or plan.required_role,
-            "response_text": None,
-        }
-    return {"selected_tool_args": selected_tool_args, "response_text": None}
 
 
 async def domain_router(state: dict[str, Any]) -> dict[str, Any]:

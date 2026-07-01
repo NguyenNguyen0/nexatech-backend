@@ -21,12 +21,6 @@ def route_after_domain_executor(state: dict[str, Any]) -> str:
     return "needs_approval"
 
 
-def route_after_agent_think(state: dict[str, Any]) -> str:
-    if not state.get("selected_tool"):
-        return "format_response"
-    return "needs_approval"
-
-
 def route_after_needs_approval(state: dict[str, Any]) -> str:
     if state.get("response_text"):
         return "format_response"

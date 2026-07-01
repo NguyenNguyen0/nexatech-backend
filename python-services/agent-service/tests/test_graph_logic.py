@@ -15,7 +15,6 @@ from app.graph.llm_planner import (
     _planner_system_prompt,
 )
 from app.graph.nodes import (
-    agent_think,
     classify_request,
     domain_executor,
     domain_router,
@@ -37,11 +36,14 @@ def test_plan_tool_call_matches_promotions() -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_think_selects_news_listing_tool() -> None:
-    result = await agent_think(
+async def test_domain_executor_selects_news_listing_tool() -> None:
+    result = await domain_executor(
         {
             "messages": [{"role": "user", "content": "Liệt kê tin tức mới nhất"}],
-            "caller": {"roles": ["operator"]},
+            "mcp_target_domain": "news",
+            "available_tools": ["list_news"],
+            "tool_results": [],
+            "tool_errors": [],
         }
     )
 
@@ -246,7 +248,7 @@ async def test_inventory_tool_catalog_includes_read_and_write_tools() -> None:
 
 
 @pytest.mark.asyncio
-async def test_agent_think_uses_llm_fallback_when_heuristic_misses(
+async def test_domain_executor_uses_llm_fallback_when_heuristic_misses(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_llm_plan(_: str, **__: object):
@@ -259,14 +261,17 @@ async def test_agent_think_uses_llm_fallback_when_heuristic_misses(
             rationale="llm",
         )
 
-    monkeypatch.setattr("app.graph.nodes.plan_tool_call_with_llm", fake_llm_plan)
+    monkeypatch.setattr("app.graph.subagents.plan_tool_call_with_llm", fake_llm_plan)
 
-    result = await agent_think(
+    result = await domain_executor(
         {
             "messages": [
                 {"role": "user", "content": "Giúp tôi chọn hành động marketing phù hợp"}
             ],
-            "caller": {"roles": ["operator"]},
+            "mcp_target_domain": "promotion",
+            "available_tools": ["list_promotions"],
+            "tool_results": [],
+            "tool_errors": [],
         }
     )
 
@@ -275,8 +280,8 @@ async def test_agent_think_uses_llm_fallback_when_heuristic_misses(
 
 
 @pytest.mark.asyncio
-async def test_agent_think_lists_available_tools_for_capability_question() -> None:
-    result = await agent_think(
+async def test_domain_executor_lists_available_tools_for_capability_question() -> None:
+    result = await domain_executor(
         {
             "messages": [
                 {
@@ -284,8 +289,10 @@ async def test_agent_think_lists_available_tools_for_capability_question() -> No
                     "content": "hãy liệt kê các tool mà bạn có thể sử dụng thành 1 danh sách",
                 }
             ],
+            "mcp_target_domain": "general",
             "available_tools": ["list_promotions", "list_flash_sales"],
-            "caller": {"roles": ["operator"]},
+            "tool_results": [],
+            "tool_errors": [],
         }
     )
 
@@ -295,6 +302,26 @@ async def test_agent_think_lists_available_tools_for_capability_question() -> No
         "available_tools": ["list_promotions", "list_flash_sales"],
     }
     assert "response_text" not in result
+
+
+@pytest.mark.asyncio
+async def test_domain_executor_short_circuits_conversational_greeting() -> None:
+    result = await domain_executor(
+        {
+            "messages": [{"role": "user", "content": "xin chào"}],
+            "mcp_target_domain": "general",
+            "available_tools": ["list_products"],
+            "tool_results": [],
+            "tool_errors": [],
+        }
+    )
+
+    assert result["final_status"] == "conversational"
+    assert result["answer_context"] == {
+        "intent": "conversational",
+        "input_text": "xin chào",
+    }
+    assert "selected_tool" not in result
 
 
 @pytest.mark.asyncio

@@ -4,8 +4,69 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.graph.llm_planner import plan_tool_call_with_llm
-from app.graph.tool_registry import extract_latest_user_text, plan_tool_call
+from app.graph.tool_registry import TOOL_DESCRIPTORS, extract_latest_user_text, plan_tool_call
 from app.runtime.delegation_metrics import DELEGATION_METRICS
+
+
+_CONVERSATIONAL_PATTERNS: tuple[str, ...] = (
+    # Greetings
+    "xin chào", "chào", "hello", "hi ", "hi!", "hey", "chao ban", "chào bạn",
+    # Thanks
+    "cảm ơn", "cam on", "thanks", "thank you", "cảm ơn bạn",
+    # Identity
+    "bạn là ai", "ban la ai", "bạn tên gì", "who are you", "what are you",
+    # Capabilities — phrased as open question (not "liệt kê tool")
+    "bạn có thể làm gì", "bạn giúp được gì", "can you help", "help me",
+    "bạn làm được gì", "ban lam duoc gi",
+    # Affirmations / acknowledgements
+    "ok", "okay", "được", "được rồi", "great", "got it", "hiểu rồi",
+    # Goodbye
+    "tạm biệt", "bye", "goodbye",
+)
+
+
+def _is_conversational(input_text: str) -> bool:
+    """Return True when the message is a greeting, chitchat, or general conversational
+    exchange that does not require any MCP tool invocation."""
+    stripped = input_text.strip().casefold()
+    if not stripped:
+        return True
+    # Short messages with no domain keywords are almost always conversational.
+    # 6 words ≈ upper bound for a greeting/ack.
+    word_count = len(stripped.split())
+    if word_count <= 6 and any(p in stripped for p in _CONVERSATIONAL_PATTERNS):
+        return True
+    return False
+
+
+def _is_tool_catalog_request(input_text: str) -> bool:
+    """Return True only when user is asking ABOUT the tool catalog itself.
+
+    Must NOT fire for requests like "dùng tool list_products_by_category_slug ..."
+    where "tool" appears but the intent is to invoke a specific tool.
+    """
+    normalized = input_text.casefold()
+
+    # If a registered tool name appears in the text, the user is invoking a tool,
+    # not asking for a catalog listing — short-circuit immediately.
+    if any(d.tool_name in normalized for d in TOOL_DESCRIPTORS):
+        return False
+
+    # Treat "tool" as catalog intent only when paired with list/capability terms.
+    tool_terms = ("tool", "tools", "công cụ", "cong cu", "khả năng", "kha nang")
+    list_terms = (
+        "liệt kê",
+        "liet ke",
+        "danh sách",
+        "danh sach",
+        "có thể sử dụng",
+        "co the su dung",
+        "bạn có thể",
+        "ban co the",
+    )
+    return any(term in normalized for term in tool_terms) and any(
+        term in normalized for term in list_terms
+    )
 
 
 _DOMAIN_TOOL_ALLOWLIST: dict[str, set[str]] = {
@@ -134,7 +195,26 @@ async def plan_with_subagent(state: dict[str, Any]) -> dict[str, Any]:
 
     domain = _normalize_domain(state.get("mcp_target_domain"))
     input_text = state.get("input_text") or extract_latest_user_text(state)
+    subagent_name = f"{domain}_subagent" if domain != "general" else "general_subagent"
+
+    if _is_conversational(input_text):
+        return {
+            "final_status": "conversational",
+            "answer_context": {"intent": "conversational", "input_text": input_text},
+            "subagent_name": subagent_name,
+        }
+
     available_tools = list(state.get("available_tools") or [])
+
+    if _is_tool_catalog_request(input_text):
+        if not available_tools:
+            DELEGATION_METRICS.record("tool_catalog_empty_total", domain=domain)
+        return {
+            "final_status": "tool_catalog",
+            "answer_context": {"intent": "tool_catalog", "available_tools": available_tools},
+            "subagent_name": subagent_name,
+        }
+
     scoped_tools = _scope_tools_by_domain(domain, available_tools)
     DELEGATION_METRICS.record("delegation_requests_total", domain=domain)
     DELEGATION_METRICS.record("scoped_tools_count", domain=domain, increment=len(scoped_tools))
