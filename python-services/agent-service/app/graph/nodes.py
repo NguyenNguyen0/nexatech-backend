@@ -72,10 +72,29 @@ async def classify_request(state: dict[str, Any]) -> dict[str, Any]:
     forced_tool = state.get("forced_tool")
     forced_tool_args = state.get("forced_tool_args") or {}
 
+    # The legacy /runs, /runs/stream endpoints resolve available_tools and
+    # mcp_target_url before invoking the graph (server.py's
+    # _resolve_mcp_runtime_context). The AG-UI/CopilotKit endpoint has no
+    # such pre-processing step — it hands the graph whatever `state` the
+    # frontend sent, which never includes these — so without this fallback
+    # available_tools stays empty and the planner can never match a tool.
+    mcp_target_url = state.get("mcp_target_url") or SETTINGS.mcp_server_url
+    available_tools = state.get("available_tools")
+    if not available_tools:
+        available_tools = await MCP_CLIENT.list_available_tools(base_url=mcp_target_url)
+        if not available_tools:
+            logger.error(
+                "No available tools from MCP server for planner. baseUrl=%s",
+                mcp_target_url,
+            )
+
     return {
         "input_text": input_text,
         "required_role": state.get("required_role") or "operator",
         "request_sensitivity": state.get("request_sensitivity") or "low",
+        "available_tools": available_tools,
+        "mcp_target_url": mcp_target_url,
+        "mcp_meta_url": state.get("mcp_meta_url") or SETTINGS.mcp_meta_url,
         "selected_tool": forced_tool,
         "selected_tool_args": forced_tool_args if forced_tool else {},
         "response_text": None,
