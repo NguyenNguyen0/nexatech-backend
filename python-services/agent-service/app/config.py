@@ -15,3 +15,5 @@ def configure_runtime_environment() -> None:
 
     if SETTINGS.groq_api_key:
         os.environ["GROQ_API_KEY"] = SETTINGS.groq_api_key
+    if SETTINGS.openai_api_key:
+        os.environ["OPENAI_API_KEY"] = SETTINGS.openai_api_key

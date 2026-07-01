@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from app.core.settings import SETTINGS
+from app.graph.llm_factory import get_chat_model, llm_provider_configured
 from app.graph.tool_registry import TOOL_DESCRIPTORS, ToolPlan
 from app.mcp_client import MCP_CLIENT
 from app.prompts.default import load_default_system_prompt
@@ -142,7 +143,7 @@ async def plan_tool_call_with_llm(
     *,
     available_tools: list[str] | None = None,
 ) -> ToolPlan | None:
-    if not user_text.strip() or not SETTINGS.groq_api_key:
+    if not user_text.strip() or not llm_provider_configured():
         return None
 
     if available_tools is None:
@@ -153,16 +154,12 @@ async def plan_tool_call_with_llm(
 
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
-        from langchain_groq import ChatGroq
+
+        # deterministic output for planner — JSON only, no creative drift
+        llm = get_chat_model(temperature=0)
     except Exception as exc:  # pragma: no cover
         logger.warning("LLM planner dependencies are not available: %s", exc)
         return None
-
-    llm = ChatGroq(
-        model=SETTINGS.groq_model,
-        api_key=SETTINGS.groq_api_key,
-        temperature=0,  # deterministic output for planner — JSON only, no creative drift
-    )
 
     system_prompt = f"{_planner_system_prompt()}\n\nAvailable tools:\n{await _build_tool_catalog(available_tools)}"
 
@@ -238,9 +235,14 @@ def _truncate_data(data: Any, max_list_size: int = 5, max_string_len: int = 200)
 
 
 async def synthesize_agent_response(state: dict[str, Any]) -> str:
-    if not SETTINGS.groq_api_key:
-        logger.error("LLM response synthesis is unavailable: GROQ_API_KEY is not configured.")
-        raise RuntimeError("LLM response synthesis unavailable: GROQ_API_KEY is not configured")
+    if not llm_provider_configured():
+        logger.error(
+            "LLM response synthesis is unavailable: no API key configured for provider '%s'.",
+            SETTINGS.llm_provider,
+        )
+        raise RuntimeError(
+            f"LLM response synthesis unavailable: no API key configured for provider '{SETTINGS.llm_provider}'"
+        )
 
     # Hard guard: never invoke LLM synthesis when there are no tool results
     # for a state that expected a tool execution — the LLM would hallucinate data.
@@ -260,7 +262,8 @@ async def synthesize_agent_response(state: dict[str, Any]) -> str:
 
     try:
         from langchain_core.messages import HumanMessage, SystemMessage
-        from langchain_groq import ChatGroq
+
+        llm = get_chat_model(temperature=SETTINGS.groq_temperature)
     except Exception as exc:  # pragma: no cover
         logger.exception("LLM response synthesis dependencies are unavailable.")
         raise RuntimeError(
@@ -280,11 +283,6 @@ async def synthesize_agent_response(state: dict[str, Any]) -> str:
         "answer_context": _truncate_data(state.get("answer_context") or {}),
     }
 
-    llm = ChatGroq(
-        model=SETTINGS.groq_model,
-        api_key=SETTINGS.groq_api_key,
-        temperature=SETTINGS.groq_temperature,
-    )
     system_prompt = (
         f"{load_default_system_prompt()}\n\n"
         f"{_AGENTIC_NO_VERBOSE_LEAK_RULES}\n\n"
