@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -304,6 +305,64 @@ async def test_stream_endpoint_lets_graph_handle_empty_tool_catalog(
     assert "LLM synthesized response" in payload
     events = conversation["events"]
     assert [event["eventType"] for event in events] == ["user_message", "agent_result"]
+
+
+@pytest.mark.asyncio
+async def test_stream_tool_events_share_a_stable_call_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_invoke_graph(
+        graph_input: object, *, thread_id: str
+    ) -> dict[str, object]:
+        return {
+            "threadId": thread_id,
+            "status": "completed",
+            "output": {"selected_tool": "list_products", "tool_errors": []},
+            "interrupts": [],
+            "state": {
+                "values": {
+                    "selected_tool": "list_products",
+                    "tool_errors": [],
+                    "response_text": "Hiện tại có 803 sản phẩm.",
+                    "last_tool_call": {
+                        "id": "call-abc-123",
+                        "name": "list_products",
+                        "status": "completed",
+                        "result": {"ok": True, "data": {"total": 803}},
+                    },
+                },
+                "next": [],
+                "interrupts": [],
+            },
+        }
+
+    monkeypatch.setattr("app.server._invoke_graph", fake_invoke_graph)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        async with client.stream(
+            "POST",
+            "/api/v1/agent/runs/stream",
+            json={"message": "liệt kê sản phẩm", "runId": "run-call-id-test"},
+            headers={"X-User-Id": "user-123", "X-User-Role": "operator"},
+        ) as response:
+            payload = (await response.aread()).decode("utf-8")
+
+    frames = [block for block in payload.split("\n\n") if block.strip()]
+
+    def frame_data(event_name: str) -> dict[str, object]:
+        for frame in frames:
+            if f"event: {event_name}" in frame:
+                json_line = frame.split("data: ", 1)[1]
+                return json.loads(json_line)["data"]
+        raise AssertionError(f"no frame found for event {event_name}")
+
+    started_call_id = frame_data("tool.started")["callId"]
+    completed_data = frame_data("tool.completed")
+    assert completed_data["callId"] == started_call_id
+    assert completed_data["result"] == {"ok": True, "data": {"total": 803}}
 
 
 @pytest.mark.asyncio

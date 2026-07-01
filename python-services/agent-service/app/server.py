@@ -330,6 +330,23 @@ def _extract_tool_summary(
     return selected_tool, has_error, error_message, status_code
 
 
+def _extract_last_tool_call(result: dict[str, Any]) -> dict[str, Any]:
+    output = result.get("output")
+    state_values = (result.get("state") or {}).get("values")
+
+    if isinstance(state_values, dict):
+        last_tool_call = state_values.get("last_tool_call")
+        if isinstance(last_tool_call, dict):
+            return last_tool_call
+
+    if isinstance(output, dict):
+        last_tool_call = output.get("last_tool_call")
+        if isinstance(last_tool_call, dict):
+            return last_tool_call
+
+    return {}
+
+
 async def _log_connected_mcp_tools(message: str, *, base_url: str | None = None) -> list[str]:
     """Log and return only tools actually available from MCP server."""
     target_base_url = (base_url or SETTINGS.mcp_server_url).rstrip("/")
@@ -921,6 +938,9 @@ async def run_agent_stream(
                 _extract_tool_summary(result)
             )
             if selected_tool:
+                last_tool_call = _extract_last_tool_call(result)
+                correlation_id = getattr(raw_request.state, "correlation_id", None)
+                tool_call_id = last_tool_call.get("id") or str(uuid.uuid4())
                 yield _sse_frame(
                     "tool.started",
                     _run_event(
@@ -928,14 +948,13 @@ async def run_agent_stream(
                         run_id=run_id,
                         thread_id=thread_id,
                         data={
+                            "callId": tool_call_id,
                             "tool": selected_tool,
                             "toolName": selected_tool,
                             "name": selected_tool,
                         },
                     ),
                 )
-                correlation_id = getattr(raw_request.state, "correlation_id", None)
-                last_tool_call = result.get("last_tool_call") or {}
                 if has_tool_error:
                     # Log tool call failure with correlationId for grep
                     logger.error(
@@ -952,6 +971,7 @@ async def run_agent_stream(
                             run_id=run_id,
                             thread_id=thread_id,
                             data={
+                                "callId": tool_call_id,
                                 "tool": selected_tool,
                                 "toolName": selected_tool,
                                 "name": selected_tool,
@@ -970,6 +990,7 @@ async def run_agent_stream(
                             run_id=run_id,
                             thread_id=thread_id,
                             data={
+                                "callId": tool_call_id,
                                 "tool": selected_tool,
                                 "toolName": selected_tool,
                                 "name": selected_tool,
